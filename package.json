@@ -1,0 +1,13 @@
+{
+  "name": "vampireraise",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "serve": "npx serve -l 3000 .",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.4"
+  }
+}

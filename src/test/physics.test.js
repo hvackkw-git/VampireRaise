@@ -1,0 +1,131 @@
+// 캐릭터 물리 테스트: 착지·이탈 낙하·측면 반전·스프링·워프·스턴
+import { describe, it, expect } from "vitest";
+import { tickCharacter, startJump } from "../engine/physics.js";
+import { FLOOR_Y, CHAR_SIZE } from "../constants.js";
+
+function makeChar(over = {}) {
+  return {
+    id: 1, side: "vampire",
+    x: 100, y: FLOOR_Y - CHAR_SIZE, w: CHAR_SIZE, h: CHAR_SIZE,
+    vx: 0, vy: 0, dir: 1, state: "IDLE", timer: 99,
+    _platformId: null, _stunUntil: 0, _stunImmuneUntil: 0,
+    _spikeIgnoreUntil: 0, _warpCooldownUntil: 0,
+    _blockBounces: 0, _blockBounceDecay: 0,
+    dead: false,
+    ...over,
+  };
+}
+
+function makeCtx(platforms = [], powered = new Map()) {
+  return { platforms, blockPowered: powered, now: 10000, rng: () => 0.5 };
+}
+
+function run(c, ctx, seconds, dt = 1 / 60) {
+  for (let t = 0; t < seconds; t += dt) tickCharacter(c, ctx, dt);
+}
+
+describe("낙하와 착지", () => {
+  it("공중에서 FALL로 바닥에 착지한다", () => {
+    const c = makeChar({ y: 200, state: "FALL", vy: 0 });
+    run(c, makeCtx(), 3);
+    expect(c.y).toBe(FLOOR_Y - CHAR_SIZE);
+    expect(["IDLE", "CRAWL", "STAY"]).toContain(c.state);
+  });
+
+  it("낙하 중 플랫폼 윗면에 착지한다", () => {
+    const plat = { id: 7, x: 100, y: 400, blockType: "platform_block" };
+    const c = makeChar({ x: 100, y: 300, state: "FALL", vy: 0 });
+    run(c, makeCtx([plat]), 2);
+    expect(c._platformId).toBe(7);
+    expect(c.y).toBe(400 - CHAR_SIZE);
+  });
+
+  it("플랫폼이 사라지면 자유낙하 후 바닥 착지", () => {
+    const plat = { id: 7, x: 100, y: 400, blockType: "platform_block" };
+    const ctx = makeCtx([plat]);
+    const c = makeChar({ x: 100, y: 400 - CHAR_SIZE, state: "IDLE", _platformId: 7 });
+    run(c, ctx, 0.1);
+    expect(c._platformId).toBe(7);
+    ctx.platforms.length = 0; // 블록 회수
+    run(c, ctx, 3);
+    expect(c._platformId).toBeNull();
+    expect(c.y).toBe(FLOOR_Y - CHAR_SIZE);
+  });
+
+  it("레드스톤 배선은 지형이 아니다 (통과 낙하)", () => {
+    const plat = { id: 7, x: 100, y: 400, blockType: "redstone_block" };
+    const c = makeChar({ x: 100, y: 300, state: "FALL", vy: 0 });
+    run(c, makeCtx([plat]), 3);
+    expect(c._platformId).toBeNull();
+    expect(c.y).toBe(FLOOR_Y - CHAR_SIZE);
+  });
+
+  it("ON 게이트는 통과, OFF 게이트는 착지", () => {
+    const gate = { id: 9, x: 100, y: 400, blockType: "gate_block" };
+    const onMap = new Map([[9, true]]);
+    let c = makeChar({ x: 100, y: 300, state: "FALL", vy: 0 });
+    run(c, makeCtx([gate], onMap), 3);
+    expect(c._platformId).toBeNull();
+    c = makeChar({ x: 100, y: 300, state: "FALL", vy: 0 });
+    const offCtx = makeCtx([gate]);
+    let landedOnGate = false;
+    for (let t = 0; t < 3; t += 1 / 60) {
+      tickCharacter(c, offCtx, 1 / 60);
+      if (c._platformId === 9) { landedOnGate = true; break; }
+    }
+    expect(landedOnGate).toBe(true);
+  });
+});
+
+describe("걷기(CRAWL) 충돌", () => {
+  it("진행 방향 블록에 막히면 반전한다", () => {
+    const plat = { id: 3, x: 200, y: FLOOR_Y - 20, blockType: "platform_block" };
+    const c = makeChar({ x: 150, state: "CRAWL", dir: 1, timer: 10 });
+    run(c, makeCtx([plat]), 1);
+    expect(c.dir).toBe(-1);
+  });
+});
+
+describe("기믹 블록", () => {
+  it("스프링 착지 시 다시 튀어오른다", () => {
+    const spring = { id: 5, x: 100, y: 400, blockType: "spring_block" };
+    const c = makeChar({ x: 100, y: 340, state: "FALL", vy: 0 });
+    const ctx = makeCtx([spring]);
+    let bounced = false;
+    for (let t = 0; t < 2; t += 1 / 60) {
+      tickCharacter(c, ctx, 1 / 60);
+      if (c.state === "JUMP" && c.vy < 0) { bounced = true; break; }
+    }
+    expect(bounced).toBe(true);
+  });
+
+  it("블랙홀 착지 시 화이트홀 위로 워프", () => {
+    const black = { id: 11, x: 100, y: 400, blockType: "black_hole_block", pairId: 12 };
+    const white = { id: 12, x: 220, y: 300, blockType: "white_hole_block", pairId: 11 };
+    const c = makeChar({ x: 100, y: 340, state: "FALL", vy: 0 });
+    run(c, makeCtx([black, white]), 1);
+    // 워프 후 화이트홀 x 부근에서 낙하 중이거나 바닥 도달
+    expect(Math.abs(c.x + c.w / 2 - (white.x + 10))).toBeLessThan(12);
+  });
+
+  it("스턴 블록에 스치면 STUN 상태로 낙하", () => {
+    const stun = { id: 13, x: 100, y: 500, blockType: "stun_block" };
+    const c = makeChar({ x: 100, y: 460, state: "FALL", vy: 100 });
+    const ctx = makeCtx([stun]);
+    let stunned = false;
+    for (let t = 0; t < 2; t += 1 / 60) {
+      tickCharacter(c, ctx, 1 / 60);
+      if (c.state === "STUN") { stunned = true; break; }
+    }
+    expect(stunned).toBe(true);
+  });
+});
+
+describe("startJump", () => {
+  it("위쪽으로 발사한다", () => {
+    const c = makeChar();
+    startJump(c, () => 0.5);
+    expect(c.state).toBe("JUMP");
+    expect(c.vy).toBeLessThan(0);
+  });
+});

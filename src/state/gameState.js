@@ -1,0 +1,133 @@
+// src/state/gameState.js
+// 게임 상태 생성·저장·복원 (localStorage)
+
+import {
+  TANK_W, FLOOR_Y, CHAR_SIZE, VAMPIRE_BASE, INITIAL_VAMPIRE_COUNT,
+} from "../constants.js";
+
+export const SAVE_KEY = "vampireraise.save.v1";
+
+/** 캐릭터 레코드 생성 */
+export function createCharacter(state, side, opts = {}) {
+  const id = state.chars.nextId++;
+  const c = {
+    id,
+    side,                       // 'vampire' | 'human' | 'slave'
+    x: opts.x ?? Math.random() * (TANK_W - CHAR_SIZE),
+    y: opts.y ?? FLOOR_Y - CHAR_SIZE,
+    w: CHAR_SIZE, h: CHAR_SIZE,
+    vx: 0, vy: 0,
+    dir: Math.random() < 0.5 ? -1 : 1,
+    state: opts.state ?? "IDLE",
+    timer: Math.random() * 2,
+    _platformId: null,
+    _stunUntil: 0,
+    _stunImmuneUntil: 0,
+    _spikeIgnoreUntil: 0,
+    _warpCooldownUntil: 0,
+    _blockBounces: 0,
+    _blockBounceDecay: 0,
+    _atkCd: Math.random(),      // 첫 공격 타이밍 분산
+    // ── 성장 ──
+    level: opts.level ?? 1,
+    exp: 0,
+    maxHp: opts.maxHp ?? VAMPIRE_BASE.maxHp,
+    hp: opts.hp ?? opts.maxHp ?? VAMPIRE_BASE.maxHp,
+    atk: opts.atk ?? VAMPIRE_BASE.atk,
+    job: null,                  // 향후 직업 분류
+    skills: [],                 // 향후 스킬트리
+    dead: false,
+  };
+  state.chars.items.push(c);
+  return c;
+}
+
+/** 새 게임 초기 상태 */
+export function createInitialState() {
+  const state = {
+    version: 1,
+    blood: 0,
+    wave: {
+      current: 1,
+      active: false,
+      auto: false,
+      pendingSpawns: [],  // [{ spawnAt(초, waveClock) }]
+      clock: 0,           // 웨이브 경과 시계(초) — 스폰 스케줄용
+      nextAutoAt: null,   // 자동 웨이브 예약 시각(clock 기준)
+    },
+    prestige: { count: 0 }, // 향후 프리스티지 훅
+    platforms: { nextId: 1, items: [] },
+    chars: { nextId: 1, items: [] },
+  };
+  for (let i = 0; i < INITIAL_VAMPIRE_COUNT; i++) createCharacter(state, "vampire");
+  return state;
+}
+
+/** 저장 대상만 추린 직렬화 (일시적 _필드 제외) */
+export function serialize(state) {
+  return JSON.stringify({
+    version: state.version,
+    blood: state.blood,
+    wave: {
+      current: state.wave.current,
+      auto: state.wave.auto,
+      // 진행 중 웨이브는 저장하지 않음 — 복원 시 비전투 상태로 시작
+    },
+    prestige: state.prestige,
+    platforms: state.platforms,
+    chars: {
+      nextId: state.chars.nextId,
+      items: state.chars.items
+        .filter((c) => c.side !== "human") // 인간은 웨이브 소속 — 저장 안 함
+        .map((c) => ({
+          id: c.id, side: c.side, x: c.x, y: c.y, dir: c.dir,
+          level: c.level, exp: c.exp, maxHp: c.maxHp, hp: c.hp, atk: c.atk,
+          job: c.job, skills: c.skills, dead: c.dead,
+        })),
+    },
+  });
+}
+
+export function saveState(state, storage = globalThis.localStorage) {
+  try { storage?.setItem(SAVE_KEY, serialize(state)); } catch { /* 저장 실패 무시 */ }
+}
+
+/** 저장본 → 상태 복원. 저장본이 없거나 손상 시 null */
+export function loadState(storage = globalThis.localStorage) {
+  let raw = null;
+  try { raw = storage?.getItem(SAVE_KEY); } catch { return null; }
+  if (!raw) return null;
+  let data;
+  try { data = JSON.parse(raw); } catch { return null; }
+  if (!data || data.version !== 1) return null;
+
+  const state = createInitialState();
+  state.chars.items = [];
+  state.blood = Number(data.blood) || 0;
+  state.wave.current = Math.max(1, Number(data.wave?.current) || 1);
+  state.wave.auto = !!data.wave?.auto;
+  state.prestige = data.prestige ?? { count: 0 };
+  if (data.platforms?.items) {
+    state.platforms.nextId = Number(data.platforms.nextId) || 1;
+    state.platforms.items = data.platforms.items;
+  }
+  state.chars.nextId = Number(data.chars?.nextId) || 1;
+  for (const rec of data.chars?.items ?? []) {
+    const c = createCharacter(state, rec.side, {
+      x: rec.x, y: rec.y, level: rec.level,
+      maxHp: rec.maxHp, hp: rec.hp, atk: rec.atk,
+    });
+    c.id = rec.id;
+    c.dir = rec.dir === -1 ? -1 : 1;
+    c.exp = Number(rec.exp) || 0;
+    c.job = rec.job ?? null;
+    c.skills = rec.skills ?? [];
+    c.dead = !!rec.dead;
+  }
+  // createCharacter가 nextId를 증가시키므로 저장본 값으로 재고정
+  state.chars.nextId = Math.max(
+    Number(data.chars?.nextId) || 1,
+    ...state.chars.items.map((c) => c.id + 1),
+  );
+  return state;
+}
