@@ -13,7 +13,7 @@ import {
 import { TANK_W, TANK_H } from "./constants.js";
 import { createInitialState, loadState, saveState } from "./state/gameState.js";
 import { tickCharacter } from "./engine/physics.js";
-import { makeIdleDecider } from "./game/ai.js";
+import { makeIdleDecider, tickAggro } from "./game/ai.js";
 import { tickCombat, aliveChars } from "./game/combat.js";
 import { tickWaves } from "./game/waves.js";
 import {
@@ -109,7 +109,8 @@ function frame(nowMs) {
   });
   tickPistons(platforms, signals.powered, yBounds);
 
-  // 2) 캐릭터 물리
+  // 2) 감지(인식 원 안의 적에게 접근) → 캐릭터 물리
+  tickAggro(state);
   const ctx = { platforms, blockPowered: signals.powered, now: nowMs, rng: Math.random };
   for (const c of chars) tickCharacter(c, ctx, simDt, idleDecider);
 
