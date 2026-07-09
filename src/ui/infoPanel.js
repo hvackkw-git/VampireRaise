@@ -1,31 +1,38 @@
 // src/ui/infoPanel.js
-// 캐릭터 정보 패널 (Shrimprium 수질 패널 자리 대체):
+// 캐릭터 정보 패널 (수조 하단 오버레이, Shrimprium 수질 패널 자리 대체):
 // 레벨·직업·경험치·HP·공격력 + 스킬트리 자리(직업 분류 후 개방).
+// 캐릭터 선택 시에만 표시된다.
 
 import { expToNext } from "../constants.js";
 
 const SIDE_LABEL = { vampire: "🧛 뱀파이어", human: "🙍 인간", slave: "🧟 노예" };
 const SKILL_SLOTS = 5;
 
-let defaultEl, charEl;
+let panelEl, charEl;
 
-export function initInfoPanel() {
-  defaultEl = document.getElementById("infoDefault");
+export function initInfoPanel({ onClose } = {}) {
+  panelEl = document.getElementById("info-panel");
   charEl = document.getElementById("infoChar");
+  document.getElementById("btnInfoClose").addEventListener("click", () => {
+    hideInfoPanel();
+    onClose?.();
+  });
+}
+
+export function hideInfoPanel() {
+  panelEl.classList.add("hidden");
 }
 
 /**
- * 선택 캐릭터 정보 갱신. char가 null이면 기본 안내.
+ * 선택 캐릭터 정보 갱신. char가 null이면 패널 숨김.
  * (매 프레임이 아니라 저빈도 호출 — index.js에서 4Hz + 선택 변경 시)
  */
 export function renderInfoPanel(char) {
   if (!char || char.dead) {
-    defaultEl.classList.remove("hidden");
-    charEl.classList.add("hidden");
+    hideInfoPanel();
     return;
   }
-  defaultEl.classList.add("hidden");
-  charEl.classList.remove("hidden");
+  panelEl.classList.remove("hidden");
   const need = expToNext(char.level);
   const hpPct = Math.max(0, Math.min(100, (char.hp / char.maxHp) * 100));
   const expPct = Math.max(0, Math.min(100, (char.exp / need) * 100));
@@ -49,8 +56,7 @@ export function renderInfoPanel(char) {
       <span class="info-label">공격력</span>
       <span>${char.atk}</span>
     </div>
-    <div class="info-skill-title">스킬트리</div>
+    <div class="info-skill-title">스킬트리 <span class="skill-hint">— 직업 분류 후 개방</span></div>
     <div class="skill-tree">${skillNodes}</div>
-    <div class="skill-hint">직업 분류 후 개방됩니다</div>
   `;
 }

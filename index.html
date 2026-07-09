@@ -15,20 +15,6 @@
 <body>
   <div id="app">
     <div class="game-root">
-      <header id="hud">
-        <div class="hud-stats">
-          <span id="hudWave">🌊 웨이브 1</span>
-          <span id="hudHumans"></span>
-          <span id="hudBlood">🩸 0</span>
-        </div>
-        <div class="hud-buttons">
-          <button id="btnWave" class="hud-btn">▶ 웨이브</button>
-          <button id="btnAuto" class="hud-btn">자동 OFF</button>
-          <button id="btnSummon" class="hud-btn">🧛 소환</button>
-          <button id="btnDecorate" class="hud-btn">🛠 꾸미기</button>
-        </div>
-      </header>
-
       <div class="tank-scale-wrapper" id="tankWrapper">
         <div id="tank">
           <div class="tank-bg"></div>
@@ -39,28 +25,41 @@
           <div id="platform-grid-overlay" class="hidden"></div>
           <div class="rgb-tint" id="rgbTint"></div>
           <div class="tank-floor"></div>
+
+          <!-- 게임 영역 내 오버레이 UI (Shrimprium 핫키 스타일) -->
+          <header id="hud" class="ui-overlay">
+            <span id="hudWave" class="hud-chip">🌊 1</span>
+            <span id="hudHumans" class="hud-chip"></span>
+            <span id="hudBlood" class="hud-chip">🩸 0</span>
+          </header>
+          <div id="hotkeys" class="ui-overlay">
+            <button id="btnWave" class="hotkey" title="웨이브 시작">▶</button>
+            <button id="btnAuto" class="hotkey" title="자동 웨이브">♻</button>
+            <button id="btnSummon" class="hotkey" title="뱀파이어 소환">🧛<i id="summonCost"></i></button>
+            <button id="btnDecorate" class="hotkey" title="꾸미기">🛠</button>
+          </div>
+
+          <div id="decorate-bar" class="ui-overlay hidden">
+            <div class="decorate-controls" id="decorateControls">
+              <button id="btnLogicLayer" class="deco-btn" title="논리 레이어">⚡</button>
+              <span id="decoSelInfo" class="deco-sel-info"></span>
+              <button id="btnRotate" class="deco-btn hidden">↻</button>
+              <button id="btnStealth" class="deco-btn hidden">👻</button>
+              <button id="btnSensorOp" class="deco-btn hidden">≥</button>
+              <button id="btnSensorMinus" class="deco-btn hidden">−</button>
+              <button id="btnSensorPlus" class="deco-btn hidden">＋</button>
+              <button id="btnRetrieve" class="deco-btn hidden">📦</button>
+              <button id="btnDecoDone" class="deco-btn">완료</button>
+            </div>
+            <div class="decorate-palette" id="decoratePalette"></div>
+          </div>
+
+          <section id="info-panel" class="ui-overlay hidden">
+            <button id="btnInfoClose" class="info-close">✕</button>
+            <div id="infoChar" class="info-char"></div>
+          </section>
         </div>
       </div>
-
-      <div id="decorate-bar" class="hidden">
-        <div class="decorate-controls" id="decorateControls">
-          <button id="btnLogicLayer" class="deco-btn" title="논리 레이어">⚡</button>
-          <span id="decoSelInfo" class="deco-sel-info"></span>
-          <button id="btnRotate" class="deco-btn hidden">↻ 회전</button>
-          <button id="btnStealth" class="deco-btn hidden">👻 투명</button>
-          <button id="btnSensorOp" class="deco-btn hidden">≥</button>
-          <button id="btnSensorMinus" class="deco-btn hidden">−</button>
-          <button id="btnSensorPlus" class="deco-btn hidden">＋</button>
-          <button id="btnRetrieve" class="deco-btn hidden">📦 회수</button>
-          <button id="btnDecoDone" class="deco-btn">완료</button>
-        </div>
-        <div class="decorate-palette" id="decoratePalette"></div>
-      </div>
-
-      <section id="info-panel">
-        <div id="infoDefault" class="info-default">캐릭터를 탭하면 정보가 표시됩니다</div>
-        <div id="infoChar" class="info-char hidden"></div>
-      </section>
     </div>
     <div id="toast-layer"></div>
   </div>

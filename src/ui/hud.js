@@ -1,5 +1,5 @@
 // src/ui/hud.js
-// 상단 HUD: 웨이브/피 표시 + 웨이브 시작·자동 토글·뱀파이어 소환·꾸미기 진입.
+// 수조 내 오버레이 HUD: 좌상단 상태 칩 + 우상단 핫키(웨이브·자동·소환·꾸미기).
 
 import { summonCost } from "../constants.js";
 import { startWave, humansAlive } from "../game/waves.js";
@@ -14,6 +14,7 @@ export function initHud(state, { onDecorate }) {
   const btnAuto = document.getElementById("btnAuto");
   const btnSummon = document.getElementById("btnSummon");
   const btnDecorate = document.getElementById("btnDecorate");
+  const elSummonCost = document.getElementById("summonCost");
 
   const vampireCount = () =>
     state.chars.items.filter((c) => c.side === "vampire").length;
@@ -45,15 +46,14 @@ export function initHud(state, { onDecorate }) {
 
   /** 저빈도(4Hz) 갱신 */
   function render() {
-    elWave.textContent = `🌊 웨이브 ${state.wave.current}`;
+    elWave.textContent = `🌊 ${state.wave.current}`;
     const humans = humansAlive(state);
     elHumans.textContent = state.wave.active ? `🙍 ${humans}` : "";
     elBlood.textContent = `🩸 ${state.blood}`;
     btnWave.disabled = state.wave.active;
-    btnWave.textContent = state.wave.active ? "진행 중…" : "▶ 웨이브";
-    btnAuto.textContent = `자동 ${state.wave.auto ? "ON" : "OFF"}`;
+    btnWave.textContent = state.wave.active ? "⏳" : "▶";
     btnAuto.classList.toggle("on", state.wave.auto);
-    btnSummon.textContent = `🧛 소환 ${summonCost(vampireCount())}`;
+    elSummonCost.textContent = String(summonCost(vampireCount()));
   }
   render();
   return { render };

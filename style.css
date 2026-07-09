@@ -16,40 +16,65 @@ button { font-family: inherit; color: inherit; }
 .game-root {
   height: 100%;
   width: 100%;
-  max-width: 480px;
   display: flex;
-  flex-direction: column;
+  justify-content: center;
   align-items: center;
 }
 
-/* ── HUD ── */
+/* ── 게임 영역 내 오버레이 UI (수조와 함께 스케일) ── */
+.ui-overlay { position: absolute; z-index: 20; }
+
 #hud {
-  width: 100%;
-  padding: 6px 8px 4px;
+  top: 6px; left: 6px;
   display: flex;
-  flex-direction: column;
   gap: 4px;
-  z-index: 10;
+  pointer-events: none;
 }
-.hud-stats {
-  display: flex;
-  gap: 12px;
-  font-size: 13px;
+.hud-chip {
+  background: rgba(20, 10, 34, 0.72);
+  border: 1px solid #43305f;
+  border-radius: 8px;
+  padding: 2px 6px;
+  font-size: 10px;
   color: #e8d7ff;
 }
+.hud-chip:empty { display: none; }
 #hudHumans { color: #7ec8e3; }
-.hud-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
-.hud-btn {
-  background: #2a1a3a;
-  border: 1px solid #5a3a7a;
-  border-radius: 6px;
-  padding: 5px 9px;
-  font-size: 12px;
-  cursor: pointer;
+
+/* 핫키: 우상단 세로 열 (Shrimprium 퀵토글 스타일) */
+#hotkeys {
+  top: 6px; right: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
-.hud-btn:active { background: #3a2a4a; }
-.hud-btn.on { background: #5a2040; border-color: #c04070; }
-.hud-btn:disabled { opacity: 0.45; cursor: default; }
+.hotkey {
+  position: relative;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: rgba(42, 26, 58, 0.85);
+  border: 1px solid #5a3a7a;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.hotkey:active { background: rgba(58, 42, 74, 0.9); }
+.hotkey.on { background: rgba(90, 32, 64, 0.9); border-color: #c04070; box-shadow: 0 0 6px rgba(192, 64, 112, 0.6); }
+.hotkey:disabled { opacity: 0.45; cursor: default; }
+.hotkey i {
+  position: absolute;
+  bottom: -2px; right: -4px;
+  font-style: normal;
+  font-size: 8px;
+  color: #ffd0da;
+  background: rgba(20, 10, 34, 0.85);
+  border-radius: 6px;
+  padding: 0 3px;
+}
+.hotkey i:empty { display: none; }
 
 /* ── 수조(전장) ── */
 .tank-scale-wrapper { position: relative; flex: 0 0 auto; }
@@ -59,8 +84,6 @@ button { font-family: inherit; color: inherit; }
   width: 320px; height: 640px;
   transform-origin: 0 0;
   overflow: hidden;
-  border: 2px solid #43305f;
-  border-radius: 6px;
   background: linear-gradient(180deg, #1a0f26 0%, #241536 55%, #2d1a42 100%);
 }
 .tank-bg {
@@ -173,13 +196,12 @@ button { font-family: inherit; color: inherit; }
   border-color: rgba(255, 90, 90, 0.9) !important;
 }
 
-/* ── 꾸미기 바 ── */
+/* ── 꾸미기 바 (수조 하단 오버레이) ── */
 #decorate-bar {
-  width: 100%;
-  background: #180f22;
+  left: 0; right: 0; bottom: 0;
+  background: rgba(24, 15, 34, 0.92);
   border-top: 1px solid #43305f;
-  padding: 6px 8px;
-  z-index: 10;
+  padding: 5px 6px;
 }
 .decorate-controls {
   display: flex;
@@ -222,24 +244,26 @@ button { font-family: inherit; color: inherit; }
   margin: 0 3px;
 }
 
-/* ── 캐릭터 정보 패널 (수질 패널 대체) ── */
+/* ── 캐릭터 정보 패널 (수조 하단 오버레이, 수질 패널 대체) ── */
 #info-panel {
-  width: 100%;
-  flex: 1 1 auto;
-  min-height: 96px;
-  background: #180f22;
+  left: 0; right: 0; bottom: 0;
+  background: rgba(24, 15, 34, 0.92);
   border-top: 1px solid #43305f;
-  padding: 8px 12px;
+  padding: 7px 10px;
+  max-height: 150px;
   overflow-y: auto;
-  z-index: 9;
 }
-.info-default {
-  color: #8a76a8;
+.info-close {
+  position: absolute;
+  top: 4px; right: 6px;
+  width: 20px; height: 20px;
+  background: transparent;
+  border: none;
+  color: #9c88bc;
   font-size: 12px;
-  text-align: center;
-  padding-top: 18px;
+  cursor: pointer;
 }
-.info-char { font-size: 12px; }
+.info-char { font-size: 11px; }
 .info-head {
   display: flex; align-items: baseline; gap: 8px;
   margin-bottom: 6px;

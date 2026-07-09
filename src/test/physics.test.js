@@ -121,6 +121,27 @@ describe("기믹 블록", () => {
   });
 });
 
+describe("FIGHT 상태", () => {
+  it("타이머가 만료돼도 제자리에서 유지된다 (전투 틱이 해제 담당)", () => {
+    const c = makeChar({ state: "FIGHT", timer: -1 });
+    const x0 = c.x;
+    run(c, makeCtx(), 1);
+    expect(c.state).toBe("FIGHT");
+    expect(c.x).toBe(x0);
+  });
+
+  it("발밑 플랫폼이 사라지면 낙하로 전환된다", () => {
+    const plat = { id: 7, x: 100, y: 400, blockType: "platform_block" };
+    const ctx = makeCtx([plat]);
+    const c = makeChar({ x: 100, y: 400 - CHAR_SIZE, state: "FIGHT", _platformId: 7, timer: -1 });
+    run(c, ctx, 0.1);
+    expect(c.state).toBe("FIGHT");
+    ctx.platforms.length = 0;
+    run(c, ctx, 0.1);
+    expect(["FALL", "IDLE"]).toContain(c.state);
+  });
+});
+
 describe("startJump", () => {
   it("위쪽으로 발사한다", () => {
     const c = makeChar();

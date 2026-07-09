@@ -17,7 +17,7 @@ import { makeIdleDecider } from "./game/ai.js";
 import { tickCombat, aliveChars } from "./game/combat.js";
 import { tickWaves } from "./game/waves.js";
 import {
-  initTankView, resizeTank, renderBlocks, renderChars,
+  initTankView, renderBlocks, renderChars,
   renderCombatEvents, toTankLocal, showToast, spawnFloatText,
 } from "./ui/tankView.js";
 import { createDecorateMode } from "./decorate/decorateMode.js";
@@ -28,20 +28,26 @@ const state = loadState() ?? createInitialState();
 const ui = { decorateMode: false, selectedBlockId: null, selectedCharId: null };
 
 initTankView();
-initInfoPanel();
+initInfoPanel({ onClose: () => { ui.selectedCharId = null; } });
 preloadStatefulBlockSprites();
 
-const decorate = createDecorateMode(state, ui, { onExit: () => resizeTank() });
+const decorate = createDecorateMode(state, ui, {});
 const hud = initHud(state, {
   onDecorate: () => {
-    if (decorate.active) decorate.exit();
-    else { decorate.enter(); resizeTank(); }
+    if (decorate.active) {
+      decorate.exit();
+    } else {
+      ui.selectedCharId = null;
+      renderInfoPanel(null);
+      decorate.enter();
+    }
   },
 });
 
 // ── 캐릭터 탭 선택 (일반 모드) ──
 document.getElementById("tank").addEventListener("pointerdown", (ev) => {
   if (ui.decorateMode) return;
+  if (ev.target.closest?.(".ui-overlay")) return; // 오버레이 UI 탭은 수조 입력 아님
   const local = toTankLocal(ev.clientX, ev.clientY);
   let hit = null, hitD = Infinity;
   for (const c of aliveChars(state)) {

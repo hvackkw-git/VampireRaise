@@ -30,8 +30,10 @@ export const CONVEYOR_PUSH_SPD = 40;  // 컨베이어가 미는 속도 px/s
 export const SLIDE_SPD = 70;          // 미끄럼 블록 슬라이드 속도 px/s
 export const WARP_COOLDOWN_MS = 1000; // 블랙홀 워프 재사용 대기
 
-// ── 전투 ──
-export const ATTACK_RANGE = 30;       // 중심 간 거리(px)
+// ── 전투 (교전형: 만나면 마주보고 멈춰서 싸운다) ──
+export const ENGAGE_RANGE = 34;       // 교전 시작 거리 (중심 간 px)
+export const FIGHT_BREAK_RANGE = 48;  // 이 거리보다 멀어지면 교전 해제
+export const ENGAGE_MAX_DY = 26;      // 교전 가능한 최대 높이 차 (중심 기준)
 export const ATTACK_COOLDOWN_S = 1.0; // 공격 주기(초)
 
 /** 진영이 서로 적대적인지 */
