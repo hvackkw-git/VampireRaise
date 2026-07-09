@@ -27,6 +27,7 @@ export function createCharacter(state, side, opts = {}) {
     _warpCooldownUntil: 0,
     _blockBounces: 0,
     _blockBounceDecay: 0,
+    _fightTargetId: null,       // 교전 대상 (FIGHT 상태)
     _atkCd: Math.random(),      // 첫 공격 타이밍 분산
     // ── 성장 ──
     level: opts.level ?? 1,

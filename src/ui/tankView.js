@@ -25,17 +25,12 @@ export function initTankView() {
   window.addEventListener("resize", resizeTank);
 }
 
-/** 뷰포트에 맞춰 수조 스케일 조정 */
+/** 뷰포트에 맞춰 수조 스케일 조정 — 모든 UI가 수조 내 오버레이라 화면을 꽉 채운다 */
 export function resizeTank() {
   const root = document.querySelector(".game-root");
   if (!root || !tankEl || !wrapperEl) return;
-  const hud = document.getElementById("hud");
-  const decoBar = document.getElementById("decorate-bar");
-  // 정보 패널은 flex 잔여 공간을 쓰므로 최소 높이(110px)만 확보해 둔다
-  const usedH = (hud?.offsetHeight ?? 0)
-    + (decoBar && !decoBar.classList.contains("hidden") ? decoBar.offsetHeight : 0);
-  const availH = Math.max(200, root.clientHeight - usedH - 110); // 110px = 패널 최소 공간
   const availW = root.clientWidth;
+  const availH = root.clientHeight;
   tankScale = Math.min(availW / TANK_W, availH / TANK_H);
   wrapperEl.style.width = `${TANK_W * tankScale}px`;
   wrapperEl.style.height = `${TANK_H * tankScale}px`;
@@ -163,8 +158,9 @@ export function renderChars(state, nowMs, ui) {
       entry.lastSide = c.side;
       entry.lastFrame = -1;
     }
-    const moving = Math.abs(c.vx) > 1 || c.state === "CRAWL" || c.state === "JUMP";
-    const frame = moving ? Math.floor(nowMs / 90) % CHAR_SHEET_FRAMES : 0;
+    // FIGHT는 제자리지만 몸싸움 느낌이 나도록 빠르게 프레임을 돌린다
+    const moving = Math.abs(c.vx) > 1 || c.state === "CRAWL" || c.state === "JUMP" || c.state === "FIGHT";
+    const frame = moving ? Math.floor(nowMs / (c.state === "FIGHT" ? 60 : 90)) % CHAR_SHEET_FRAMES : 0;
     if (entry.lastFrame !== frame) {
       entry.sprite.style.backgroundPosition = `${-frame * CHAR_SIZE}px 0`;
       entry.lastFrame = frame;

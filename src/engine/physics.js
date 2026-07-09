@@ -174,7 +174,7 @@ export function tickCharacter(c, ctx, simDt, onIdleDecide) {
         : plat.y - c.h;
     } else {
       c._platformId = null;
-      if (c.state === "IDLE" || c.state === "CRAWL" || c.state === "STAY") {
+      if (c.state === "IDLE" || c.state === "CRAWL" || c.state === "STAY" || c.state === "FIGHT") {
         c.vx = 0; c.vy = 0;
         c.state = "FALL";
       }
@@ -187,14 +187,15 @@ export function tickCharacter(c, ctx, simDt, onIdleDecide) {
   }
 
   // ── 상태 머신 ──
-  if (c.state === "IDLE" || c.state === "STAY") {
+  if (c.state === "IDLE" || c.state === "STAY" || c.state === "FIGHT") {
     c.vx = 0;
     if (c.y < effectiveGroundY - 0.5) {
       // 발밑이 비었으면 낙하로 전환
       c.state = "FALL";
     } else {
       c.y = effectiveGroundY; c.vy = 0;
-      if (c.timer <= 0) {
+      // FIGHT는 전투 틱이 해제할 때까지 그 자리에서 마주보고 유지
+      if (c.state !== "FIGHT" && c.timer <= 0) {
         if (c.state === "STAY") {
           c.state = "IDLE"; c.timer = 0.3 + rng();
         } else if (onIdleDecide) {

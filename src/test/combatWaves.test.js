@@ -10,6 +10,55 @@ beforeEach(() => {
   state = createInitialState();
 });
 
+describe("교전 (마주보고 싸우기)", () => {
+  it("적과 만나면 둘 다 멈춰 서서 마주본다 (FIGHT)", () => {
+    const vamp = state.chars.items[0];
+    vamp.x = 100; vamp.dir = -1; vamp._atkCd = 5;
+    const human = createCharacter(state, "human", { x: 120, y: vamp.y, maxHp: 100, atk: 1 });
+    human.dir = 1; human._atkCd = 5;
+    const events = tickCombat(state, 0.016);
+    expect(events.some((e) => e.type === "engage")).toBe(true);
+    expect(vamp.state).toBe("FIGHT");
+    expect(human.state).toBe("FIGHT");
+    expect(vamp.dir).toBe(1);   // 오른쪽의 인간을 마주본다
+    expect(human.dir).toBe(-1); // 왼쪽의 뱀파이어를 마주본다
+    expect(vamp.vx).toBe(0);
+  });
+
+  it("대상이 멀어지면 교전이 풀린다", () => {
+    const vamp = state.chars.items[0];
+    vamp.x = 100; vamp._atkCd = 5;
+    const human = createCharacter(state, "human", { x: 120, y: vamp.y, maxHp: 100, atk: 1 });
+    human._atkCd = 5;
+    tickCombat(state, 0.016);
+    expect(vamp.state).toBe("FIGHT");
+    human.x = 300; // 강제로 멀어짐
+    tickCombat(state, 0.016);
+    expect(vamp.state).toBe("IDLE");
+    expect(vamp._fightTargetId).toBeNull();
+  });
+
+  it("공중(점프)으로 스쳐 지나갈 때는 교전·데미지가 없다", () => {
+    const vamp = state.chars.items[0];
+    vamp.x = 100; vamp.state = "JUMP"; vamp._atkCd = 0;
+    const human = createCharacter(state, "human", { x: 110, y: vamp.y, maxHp: 100, atk: 5 });
+    human._atkCd = 0;
+    const events = tickCombat(state, 0.016);
+    expect(events.some((e) => e.type === "engage")).toBe(false);
+    expect(events.some((e) => e.type === "hit")).toBe(false);
+    expect(human.hp).toBe(100);
+  });
+
+  it("높이가 다르면(다른 플랫폼) 교전하지 않는다", () => {
+    const vamp = state.chars.items[0];
+    vamp.x = 100; vamp._atkCd = 0;
+    const human = createCharacter(state, "human", { x: 100, y: vamp.y - 60, maxHp: 100, atk: 5 });
+    human._atkCd = 0;
+    const events = tickCombat(state, 0.016);
+    expect(events.some((e) => e.type === "engage")).toBe(false);
+  });
+});
+
 describe("전투와 전염", () => {
   it("사거리 내 적을 공격해 데미지를 준다", () => {
     const vamp = state.chars.items[0];

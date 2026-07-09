@@ -183,6 +183,7 @@ export function createDecorateMode(state, ui, { onExit } = {}) {
 
   function onPointerDown(ev) {
     if (!ui.decorateMode) return;
+    if (ev.target.closest?.(".ui-overlay")) return; // 오버레이 UI 탭은 수조 입력 아님
     const local = toTankLocal(ev.clientX, ev.clientY);
     if (selectedPaletteType) {
       painting = true;
