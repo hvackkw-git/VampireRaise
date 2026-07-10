@@ -6,15 +6,15 @@ import {
   RGB_BLOCK_TINTS, CONVEYOR_ANIM_FRAMES, HOLE_ANIM_FRAMES,
 } from "../platform/platformBlockRenderer.js";
 import {
-  TANK_W, TANK_H, CHAR_SPRITES, DETECT_RANGE, HUMAN_PROJECTILE_RADIUS,
+  TANK_W, TANK_H, PANEL_H, CHAR_SPRITES, DETECT_RANGE, HUMAN_PROJECTILE_RADIUS,
 } from "../constants.js";
 
 const blockEls = new Map(); // platId → { el, img, lastSrc, lastRot }
 const charEls = new Map();  // charId → { el, sprite, hpFill, lastSide }
 const projectileEls = new Map(); // projectileId → el
 
-/** 논리 캔버스 높이 = 수조(640) + 패널 영역(130) — Shrimprium 320×670 방식 */
-const CANVAS_H = TANK_H + 130;
+/** 논리 캔버스 높이 = 수조(640) + 패널 영역(150) — Shrimprium 320×670 방식 */
+const CANVAS_H = TANK_H + PANEL_H;
 
 let layerLogic, layerPlatform, layerChars, layerFx, rgbTintEl, tankEl, canvasEl, canvasWrapperEl;
 let uiScale = 1;
@@ -191,6 +191,9 @@ export function renderChars(state, nowMs, ui) {
     // 스프라이트 기본 방향: 왼쪽 → 오른쪽 이동 시 좌우 반전
     entry.sprite.style.transform = c.dir > 0 ? "scaleX(-1)" : "";
     entry.el.classList.toggle("stunned", c.state === "STUN");
+    // 패널이 자동으로 비추는 캐릭터는 은은한 표시, 직접 탭한 선택은 금색 표시
+    entry.el.classList.toggle("focused",
+      ui.panelCharId === c.id && ui.selectedCharId !== c.id);
     entry.el.classList.toggle("selected", ui.selectedCharId === c.id);
     entry.hpFill.style.width = `${Math.max(0, Math.min(100, (c.hp / c.maxHp) * 100))}%`;
     // 돌진 잔상: 45ms 간격으로 현재 모습의 고스트를 남긴다

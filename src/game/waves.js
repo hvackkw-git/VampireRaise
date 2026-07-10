@@ -4,6 +4,7 @@
 import {
   TANK_W, CHAR_SIZE,
   humanCountForWave, humanStatsForWave, waveReward,
+  accountExpForWave, accountExpToNext,
   HUMAN_SPAWN_INTERVAL_S, AUTO_WAVE_DELAY_S,
 } from "../constants.js";
 import { createCharacter } from "../state/gameState.js";
@@ -17,6 +18,18 @@ export function vampireSideAlive(state) {
 
 export function humansAlive(state) {
   return state.chars.items.filter((c) => !c.dead && c.side === "human").length;
+}
+
+/** 계정 경험치 지급 + 계정 레벨업. 레벨업 시 events에 acctlevel 기록 */
+export function grantAccountExp(state, amount, events = []) {
+  const acct = state.account;
+  if (!acct) return;
+  acct.exp += amount;
+  while (acct.exp >= accountExpToNext(acct.level)) {
+    acct.exp -= accountExpToNext(acct.level);
+    acct.level += 1;
+    events.push({ type: "acctlevel", level: acct.level });
+  }
 }
 
 /** 웨이브 시작: 인간 스폰 스케줄 등록 */
@@ -89,6 +102,7 @@ export function tickWaves(state, simDt, rng = Math.random) {
     if (w.pendingSpawns.length === 0 && humansAlive(state) === 0) {
       const reward = waveReward(w.current);
       state.blood += reward;
+      grantAccountExp(state, accountExpForWave(w.current), events);
       w.active = false;
       w.current += 1;
       reviveVampires(state, rng);

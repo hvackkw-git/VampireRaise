@@ -5,6 +5,9 @@
 export const TANK_W = 320;
 export const TANK_H = 640;
 
+/** 하단 상시 패널 영역 높이 — 논리 캔버스 전체 높이 = TANK_H + PANEL_H */
+export const PANEL_H = 150;
+
 /** 바닥(지면) Y 좌표 — 캐릭터 발이 닿는 선 */
 export const FLOOR_Y = 624;
 
@@ -83,6 +86,20 @@ export function isEnemySide(a, b) {
 export function expToNext(level) {
   return 20 * level;
 }
+/** MP 초당 자연 재생 */
+export const MP_REGEN_PER_S = 4;
+/** 혈귀 돌진 MP 소모 — 부족해도 발동은 막지 않는다 (향후 스킬 코스트 훅) */
+export const DASH_MP_COST = 10;
+
+// ── 계정 성장 (신규): 웨이브 클리어로 계정 경험치 획득 ──
+/** 계정 레벨업에 필요한 경험치 */
+export function accountExpToNext(level) {
+  return 80 * level;
+}
+/** 웨이브 N 클리어 시 계정 경험치 */
+export function accountExpForWave(n) {
+  return 10 + 4 * n;
+}
 /** 처치 시 획득 경험치 */
 export function expForKill(victimLevel) {
   return 8 + 2 * victimLevel;
@@ -91,10 +108,13 @@ export const LEVELUP_HP_GAIN = 10;
 export const LEVELUP_ATK_GAIN = 2;
 
 /** 뱀파이어 초기 스탯 */
-export const VAMPIRE_BASE = { maxHp: 60, atk: 8 };
+export const VAMPIRE_BASE = { maxHp: 60, atk: 8, maxMp: 40 };
 
 /** 좀비(노예) 기본 스탯 — 향후 소유 뱀파이어 스킬트리로 보정 */
-export const SLAVE_BASE = { maxHp: 5, hpDecayPerSecond: 1 };
+export const SLAVE_BASE = { maxHp: 5, hpDecayPerSecond: 1, maxMp: 10 };
+
+/** 인간 기본 MP (직업 미분류 단계) */
+export const HUMAN_BASE_MP = 20;
 
 // ── 웨이브 ──
 /** 웨이브 N의 인간 수 */

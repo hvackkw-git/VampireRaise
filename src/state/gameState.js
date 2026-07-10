@@ -2,7 +2,8 @@
 // 게임 상태 생성·저장·복원 (localStorage)
 
 import {
-  TANK_W, FLOOR_Y, CHAR_SIZE, CHAR_SPRITES, VAMPIRE_BASE, SLAVE_BASE, INITIAL_VAMPIRE_COUNT,
+  TANK_W, FLOOR_Y, CHAR_SIZE, CHAR_SPRITES, VAMPIRE_BASE, SLAVE_BASE, HUMAN_BASE_MP,
+  INITIAL_VAMPIRE_COUNT,
 } from "../constants.js";
 
 export const SAVE_KEY = "vampireraise.save.v1";
@@ -49,9 +50,11 @@ export function createCharacter(state, side, opts = {}) {
     exp: 0,
     maxHp: opts.maxHp ?? baseStats.maxHp,
     hp: opts.hp ?? opts.maxHp ?? baseStats.maxHp,
+    maxMp: opts.maxMp ?? baseStats.maxMp ?? HUMAN_BASE_MP,
+    mp: opts.mp ?? opts.maxMp ?? baseStats.maxMp ?? HUMAN_BASE_MP,
     atk: opts.atk ?? baseStats.atk,
     job: null,                  // 향후 직업 분류
-    skills: [],                 // 향후 스킬트리
+    skills: side === "vampire" ? ["dash"] : [], // 장착 스킬 (v1: 뱀파이어 혈귀 돌진)
     projectileSkill: opts.projectileSkill ?? null, // 인간 투사체 성장 훅(count/homing/damage/cooldown/range/speed)
     ownerVampireId: opts.ownerVampireId ?? null, // 노예 소유 뱀파이어 id
     vampireOrder: side === "vampire" ? (opts.vampireOrder ?? nextVampireOrder(state)) : null,
@@ -66,6 +69,7 @@ export function createInitialState() {
   const state = {
     version: 1,
     blood: 0,
+    account: { level: 1, exp: 0 }, // 계정 성장 (웨이브 클리어로 경험치 획득)
     wave: {
       current: 1,
       active: false,
@@ -88,6 +92,7 @@ export function serialize(state) {
   return JSON.stringify({
     version: state.version,
     blood: state.blood,
+    account: state.account,
     wave: {
       current: state.wave.current,
       auto: state.wave.auto,
@@ -101,7 +106,8 @@ export function serialize(state) {
         .filter((c) => c.side !== "human") // 인간은 웨이브 소속 — 저장 안 함
         .map((c) => ({
           id: c.id, side: c.side, x: c.x, y: c.y, dir: c.dir,
-          level: c.level, exp: c.exp, maxHp: c.maxHp, hp: c.hp, atk: c.atk,
+          level: c.level, exp: c.exp, maxHp: c.maxHp, hp: c.hp,
+          maxMp: c.maxMp, mp: c.mp, atk: c.atk,
           ownerVampireId: c.ownerVampireId, vampireOrder: c.vampireOrder,
           job: c.job, skills: c.skills, dead: c.dead,
         })),
@@ -114,6 +120,7 @@ export function resetState(state, storage = globalThis.localStorage) {
   try { storage?.removeItem(SAVE_KEY); } catch { /* 무시 */ }
   const fresh = createInitialState();
   state.blood = fresh.blood;
+  state.account = fresh.account;
   state.wave = fresh.wave;
   state.prestige = fresh.prestige;
   state.platforms = fresh.platforms;
@@ -136,6 +143,10 @@ export function loadState(storage = globalThis.localStorage) {
   const state = createInitialState();
   state.chars.items = [];
   state.blood = Number(data.blood) || 0;
+  state.account = {
+    level: Math.max(1, Number(data.account?.level) || 1),
+    exp: Math.max(0, Number(data.account?.exp) || 0),
+  };
   state.wave.current = Math.max(1, Number(data.wave?.current) || 1);
   state.wave.auto = !!data.wave?.auto;
   state.prestige = data.prestige ?? { count: 0 };
@@ -148,13 +159,15 @@ export function loadState(storage = globalThis.localStorage) {
     const c = createCharacter(state, rec.side, {
       x: rec.x, y: rec.y, level: rec.level,
       maxHp: rec.maxHp, hp: rec.hp, atk: rec.atk,
+      maxMp: rec.maxMp, mp: rec.mp,
       ownerVampireId: rec.ownerVampireId, vampireOrder: rec.vampireOrder,
     });
     c.id = rec.id;
     c.dir = rec.dir === -1 ? -1 : 1;
     c.exp = Number(rec.exp) || 0;
     c.job = rec.job ?? null;
-    c.skills = rec.skills ?? [];
+    // 구버전 저장본은 skills가 빈 배열 — createCharacter의 기본 장착(dash)을 유지
+    if (Array.isArray(rec.skills) && rec.skills.length) c.skills = rec.skills;
     c.dead = !!rec.dead;
   }
   // createCharacter가 nextId를 증가시키므로 저장본 값으로 재고정

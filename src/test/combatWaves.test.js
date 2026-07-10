@@ -2,8 +2,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { createInitialState, createCharacter } from "../state/gameState.js";
 import { tickCombat, grantExp, infectToSlave } from "../game/combat.js";
-import { startWave, tickWaves, vampireSideAlive, humansAlive } from "../game/waves.js";
-import { humanCountForWave, humanStatsForWave, expToNext, SLAVE_BASE } from "../constants.js";
+import { startWave, tickWaves, vampireSideAlive, humansAlive, grantAccountExp } from "../game/waves.js";
+import {
+  humanCountForWave, humanStatsForWave, expToNext, SLAVE_BASE,
+  accountExpForWave, accountExpToNext,
+} from "../constants.js";
 
 let state;
 beforeEach(() => {
@@ -200,6 +203,23 @@ describe("웨이브", () => {
     expect(state.wave.current).toBe(1);
     expect(humansAlive(state)).toBe(0);
     expect(vampireSideAlive(state)).toBeGreaterThan(0);
+  });
+
+  it("클리어 시 계정 경험치를 획득한다", () => {
+    startWave(state);
+    for (let t = 0; t < 12; t += 0.1) tickWaves(state, 0.1);
+    state.chars.items = state.chars.items.filter((c) => c.side !== "human");
+    const expBefore = state.account.exp;
+    tickWaves(state, 0.1); // clear (웨이브 1)
+    expect(state.account.exp).toBe(expBefore + accountExpForWave(1));
+  });
+
+  it("계정 경험치가 차면 계정 레벨업한다", () => {
+    const events = [];
+    grantAccountExp(state, accountExpToNext(1) + 5, events);
+    expect(state.account.level).toBe(2);
+    expect(state.account.exp).toBe(5);
+    expect(events.some((e) => e.type === "acctlevel" && e.level === 2)).toBe(true);
   });
 
   it("자동 웨이브: 클리어 후 딜레이 뒤 자동 시작", () => {
