@@ -36,9 +36,12 @@ export function initTankView() {
   window.addEventListener("resize", resizeTank);
 }
 
+let coreCounterEl = null;
+
 /**
  * 스폰 존 표시: 오른쪽 위(인간)·왼쪽 아래(뱀파이어)에 2×2 크기의 하얀 네모를
  * 배경 위·캐릭터 아래 레이어(layerLogic 앞)에 한 번만 그린다. 순수 시각 마커.
+ * 뱀파이어 존 가운데에는 베이스 코어 숫자를 표시한다.
  */
 function renderSpawnZones() {
   const layer = document.createElement("div");
@@ -50,10 +53,23 @@ function renderSpawnZones() {
     el.style.top = `${zone.y}px`;
     el.style.width = `${zone.w}px`;
     el.style.height = `${zone.h}px`;
+    if (side === "vampire") {
+      coreCounterEl = document.createElement("span");
+      coreCounterEl.className = "spawn-zone-core";
+      el.appendChild(coreCounterEl);
+    }
     layer.appendChild(el);
   }
   // tank-bg 바로 뒤에 삽입해 블록/캐릭터가 그 위에 그려지도록 맨 앞쪽(첫 자식 다음)에 둔다.
   tankEl.insertBefore(layer, layerLogic);
+}
+
+/** 베이스 코어 숫자 갱신 (뱀파이어 존 가운데). 얼마 안 남으면 위험 색으로 표시. */
+export function setCoreCounter(hp) {
+  if (!coreCounterEl) return;
+  const v = String(Math.max(0, Math.round(hp)));
+  if (coreCounterEl.textContent !== v) coreCounterEl.textContent = v;
+  coreCounterEl.classList.toggle("low", hp <= 5);
 }
 
 /** 뷰포트에 맞춰 논리 캔버스(수조+패널) 전체를 한 스케일로 조정 */

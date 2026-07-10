@@ -3,7 +3,7 @@
 
 import {
   TANK_W, FLOOR_Y, CHAR_SIZE, CHAR_SPRITES, VAMPIRE_BASE, SLAVE_BASE, HUMAN_BASE_MP,
-  INITIAL_VAMPIRE_COUNT, VAMPIRE_SPAWN_ZONE, spawnXInZone,
+  INITIAL_VAMPIRE_COUNT, VAMPIRE_SPAWN_ZONE, spawnXInZone, BASE_CORE_HP,
 } from "../constants.js";
 
 export const SAVE_KEY = "vampireraise.save.v1";
@@ -80,6 +80,7 @@ export function createInitialState() {
     version: 1,
     blood: 0,
     account: { level: 1, exp: 0 }, // 계정 성장 (웨이브 클리어로 경험치 획득)
+    core: { hp: BASE_CORE_HP, max: BASE_CORE_HP }, // 베이스 코어: 인간이 뱀파이어 존에 들어오면 감소, 0이면 게임오버
     wave: {
       current: 1,
       active: false,
@@ -104,6 +105,7 @@ export function serialize(state) {
     version: state.version,
     blood: state.blood,
     account: state.account,
+    core: state.core,
     wave: {
       current: state.wave.current,
       auto: state.wave.auto,
@@ -134,6 +136,7 @@ export function resetState(state, storage = globalThis.localStorage) {
   const fresh = createInitialState();
   state.blood = fresh.blood;
   state.account = fresh.account;
+  state.core = fresh.core;
   state.wave = fresh.wave;
   state.prestige = fresh.prestige;
   state.platforms = fresh.platforms;
@@ -159,6 +162,11 @@ export function loadState(storage = globalThis.localStorage) {
   state.account = {
     level: Math.max(1, Number(data.account?.level) || 1),
     exp: Math.max(0, Number(data.account?.exp) || 0),
+  };
+  const coreMax = Math.max(1, Number(data.core?.max) || BASE_CORE_HP);
+  state.core = {
+    max: coreMax,
+    hp: Math.max(0, Math.min(coreMax, Number(data.core?.hp ?? coreMax))),
   };
   state.wave.current = Math.max(1, Number(data.wave?.current) || 1);
   state.wave.auto = !!data.wave?.auto;

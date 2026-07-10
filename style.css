@@ -140,6 +140,14 @@ button { font-family: inherit; color: inherit; }
   box-sizing: border-box;
   image-rendering: pixelated;
 }
+.spawn-zone-core {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 20px; line-height: 1;
+  color: #fff;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.9), 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+.spawn-zone-core.low { color: #ff5470; text-shadow: 0 0 6px rgba(255, 40, 70, 0.9); }
 
 .layer-blocks-logic, .layer-blocks-platform, .layer-chars, .layer-fx {
   position: absolute; inset: 0; pointer-events: none;

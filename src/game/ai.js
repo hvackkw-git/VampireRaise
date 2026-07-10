@@ -14,9 +14,12 @@ import {
   DETECT_RANGE, PING_REFRESH_S,
   DASH_ROUTE_MULT, DASH_RANGED_ROUTE_MULT, DASH_RANGED_SKILL_MULT, TANK_W, TANK_H, FLOOR_Y,
   DASH_SPD, DASH_COOLDOWN_S, DASH_ARRIVE_DIST, DASH_MAX_S, DASH_MP_COST,
-  HUMAN_PROJECTILE_RANGE,
+  HUMAN_PROJECTILE_RANGE, VAMPIRE_SPAWN_ZONE,
   isEnemySide,
 } from "../constants.js";
+
+/** 인간이 행군하는 베이스(뱀파이어 스폰 존) 중심 x */
+const BASE_GOAL_X = VAMPIRE_SPAWN_ZONE.x + VAMPIRE_SPAWN_ZONE.w / 2;
 import { startJump, NON_PLATFORM_BLOCK_TYPES } from "../engine/physics.js";
 import { isLogicLayerBlock, getSpikeDir, PLATFORM_W, PLATFORM_H } from "../platform/platformBlockRenderer.js";
 import { findNearestEnemy, aliveChars } from "./combat.js";
@@ -390,20 +393,29 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null) 
       continue;
     }
 
-    // 인간은 플랫폼 위에서 적을 쫓기보다 바닥으로 이어지는 최단 하강 가장자리를 우선한다.
-    if (c.side === "human" && c._platformId != null) {
-      descentNavigator ??= createHumanDescentNavigator(state.platforms.items, blockPowered);
-      const descent = descentNavigator.findStep(c);
-      if (descent) {
-        c._ping = null;
-        c._descentTargetX = descent.targetX;
-        c.dir = descent.dir;
-        c.state = "CRAWL";
-        c.timer = Math.max(c.timer, 0.4);
-        continue;
+    // 인간은 적을 쫓지 않고 뱀파이어 스폰 존(베이스)까지 최소 경로로 행군한다.
+    // 플랫폼 위에선 베이스에 가까운 쪽으로 내려가는 최단 하강 가장자리를 따라가고,
+    // 바닥에선 베이스 x를 향해 곧장 걷는다. (앞을 막는 뱀파이어와는 combat 틱이 교전 처리)
+    if (c.side === "human") {
+      c._ping = null;
+      if (c._platformId != null) {
+        descentNavigator ??= createHumanDescentNavigator(state.platforms.items, blockPowered, BASE_GOAL_X);
+        const descent = descentNavigator.findStep(c);
+        if (descent) {
+          c._descentTargetX = descent.targetX;
+          c.dir = descent.dir;
+          c.state = "CRAWL";
+          c.timer = Math.max(c.timer, 0.4);
+          continue;
+        }
       }
+      c._descentTargetX = null;
+      const cx = c.x + c.w / 2;
+      if (Math.abs(BASE_GOAL_X - cx) > 2) c.dir = BASE_GOAL_X > cx ? 1 : -1;
+      c.state = "CRAWL";
+      c.timer = Math.max(c.timer, 0.4);
+      continue;
     }
-    c._descentTargetX = null;
 
 
     // ── 원거리 피격 반격: 공격자에게 핑을 찍고 더 넓은 예산(감지×2.5×스킬배율)으로 돌진 ──

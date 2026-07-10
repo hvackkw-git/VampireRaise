@@ -32,6 +32,9 @@ export const VAMPIRE_SPAWN_ZONE = {
   w: SPAWN_ZONE_SIZE, h: SPAWN_ZONE_SIZE,
 };
 
+/** 베이스 코어 초기 수치 — 인간이 뱀파이어 스폰 존에 들어올 때마다 1씩 줄고, 0이면 게임오버 */
+export const BASE_CORE_HP = 20;
+
 /**
  * 스폰 존 안에서 캐릭터(size)의 좌상단 x를 무작위로 뽑는다.
  * 캐릭터가 존보다 넓으면 존 왼쪽에 붙여 클램프한다.

@@ -6,7 +6,7 @@ import {
   humanCountForWave, humanStatsForWave, waveReward,
   accountExpForWave, accountExpToNext,
   HUMAN_SPAWN_INTERVAL_S, AUTO_WAVE_DELAY_S,
-  HUMAN_SPAWN_ZONE, VAMPIRE_SPAWN_ZONE, spawnXInZone,
+  HUMAN_SPAWN_ZONE, VAMPIRE_SPAWN_ZONE, spawnXInZone, BASE_CORE_HP,
 } from "../constants.js";
 import { createCharacter } from "../state/gameState.js";
 import { findHumanSpawnRoutes } from "./descentNavigation.js";
@@ -87,8 +87,45 @@ export function reviveVampires(state, rng = Math.random) {
 }
 
 /**
+ * 뱀파이어 스폰 존(베이스)에 도달한 인간을 처리한다.
+ * 존에 들어온 인간은 즉시 제거되고 코어(state.core.hp)가 1 줄어든다.
+ * @returns {Array<object>} invade 이벤트 목록
+ */
+export function tickBaseInvasion(state) {
+  const events = [];
+  const zone = VAMPIRE_SPAWN_ZONE;
+  const reached = (c) =>
+    !c.dead && c.side === "human"
+    && c.y + c.h >= FLOOR_Y - 2                 // 바닥에 서 있고
+    && c.x + c.w / 2 <= zone.x + zone.w;        // 존의 오른쪽 끝까지 도달
+  const survivors = [];
+  for (const c of state.chars.items) {
+    if (reached(c)) {
+      state.core.hp = Math.max(0, state.core.hp - 1);
+      events.push({ type: "invade", char: c, coreHp: state.core.hp });
+    } else {
+      survivors.push(c);
+    }
+  }
+  if (events.length) state.chars.items = survivors;
+  return events;
+}
+
+/** 게임오버(코어 소진): 웨이브 1로 리셋·인간 제거·코어 회복·뱀파이어 부활 */
+function triggerGameOver(state, rng) {
+  state.chars.items = state.chars.items.filter((c) => c.side !== "human");
+  const w = state.wave;
+  w.active = false;
+  w.pendingSpawns = [];
+  w.current = 1;
+  w.nextAutoAt = null;
+  state.core.hp = state.core.max ?? BASE_CORE_HP;
+  reviveVampires(state, rng);
+}
+
+/**
  * 웨이브 틱.
- * @returns {Array<object>} events — spawn/clear/defeat/autostart
+ * @returns {Array<object>} events — spawn/invade/gameover/clear/defeat/autostart
  */
 export function tickWaves(state, simDt, rng = Math.random, blockPowered = null) {
   const events = [];
@@ -109,6 +146,15 @@ export function tickWaves(state, simDt, rng = Math.random, blockPowered = null) 
         atk: stats.atk,
       });
       events.push({ type: "spawn", char: c });
+    }
+
+    // 베이스 침입: 뱀파이어 존에 도달한 인간 처리 → 코어 감소
+    events.push(...tickBaseInvasion(state));
+    // 게임오버: 코어 소진 → 웨이브 1로 리셋, 코어 회복, 뱀파이어 부활
+    if (state.core.hp <= 0) {
+      triggerGameOver(state, rng);
+      events.push({ type: "gameover" });
+      return events;
     }
 
     // 패배: 뱀파이어 진영 전멸 → 인간 제거, 웨이브 1로 리셋, 뱀파이어 부활

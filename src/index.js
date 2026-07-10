@@ -10,7 +10,7 @@ import {
 import {
   tickTimers, tickRepeaters, tickGates, tickSensors, tickPistons,
 } from "./platform/logicBlocks.js";
-import { TANK_W, TANK_H, MP_REGEN_PER_S } from "./constants.js";
+import { TANK_W, TANK_H, MP_REGEN_PER_S, VAMPIRE_SPAWN_ZONE } from "./constants.js";
 import { createInitialState, loadState, saveState } from "./state/gameState.js";
 import { tickCharacter } from "./engine/physics.js";
 import { tickAggro } from "./game/ai.js";
@@ -20,6 +20,7 @@ import { tickWaves } from "./game/waves.js";
 import {
   initTankView, renderBlocks, renderChars, renderPings,
   renderCombatEvents, renderProjectiles, toTankLocal, showToast, spawnFloatText,
+  setCoreCounter,
 } from "./ui/tankView.js";
 import { createDecorateMode } from "./decorate/decorateMode.js";
 import { initInfoPanel, renderInfoPanel } from "./ui/infoPanel.js";
@@ -196,7 +197,14 @@ function frame(nowMs) {
     else if (ev.type === "autostart") showToast(`🌊 웨이브 ${ev.wave} 시작!`);
     else if (ev.type === "acctlevel") showToast(`🌟 계정 레벨 ${ev.level} 달성!`);
     else if (ev.type === "routeblocked") showToast("자동 웨이브 중지: 인간 이동 경로가 막혔습니다");
+    else if (ev.type === "invade") {
+      spawnFloatText(VAMPIRE_SPAWN_ZONE.x + VAMPIRE_SPAWN_ZONE.w / 2 - 6,
+        VAMPIRE_SPAWN_ZONE.y - 8, `-1`, "fx-infect");
+    } else if (ev.type === "gameover") {
+      showToast("☠️ 베이스 함락! 게임오버 — 웨이브 1부터 다시 시작합니다");
+    }
   }
+  setCoreCounter(state.core.hp);
   tickRecall(gameClock);
 
   // 5) 렌더
