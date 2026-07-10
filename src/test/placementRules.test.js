@@ -17,7 +17,7 @@ describe("snapToGrid", () => {
   it("20px 그리드에 스냅한다", () => {
     expect(snapToGrid(33, minY + 27)).toEqual({ x: 20, y: minY + 20 });
   });
-  it("상/하 7칸 금지 영역은 null", () => {
+  it("상/하 4칸 금지 영역은 null", () => {
     expect(snapToGrid(0, minY - 1)).toBeNull();
     expect(snapToGrid(0, maxY + 21)).toBeNull();
     expect(snapToGrid(0, minY)).not.toBeNull();
