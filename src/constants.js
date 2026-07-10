@@ -16,15 +16,17 @@ export const CHAR_SIZE = 32;
  * - size: 프레임 한 변(px). 캐릭터 논리 박스(w/h)도 이 값.
  * - frames: 걷기 프레임 수 (가로 스트립).
  * - topPad: 프레임 상단 투명 여백(px) — 세로 충돌은 이 여백을 제외한 "몸통"으로
- *   판정한다 (Shrimprium SHRIMP_SPRITE_TOP_PAD 방식). 몸통 높이 ≤ 20px이면
- *   1칸 통로를 위아래로 지나갈 수 있다.
- * 기본 방향은 왼쪽 (렌더러가 dir>0일 때 좌우 반전).
+ *   판정한다 (Shrimprium SHRIMP_SPRITE_TOP_PAD 방식).
+ *
+ * ★ 어셋 규격: 32×32에 그리되, 충돌 몸통(size - topPad)이 20px 이하가 되도록
+ *   topPad ≥ 12를 유지할 것 — 그래야 1칸(20px) 통로를 위아래로 지나갈 수 있다.
+ *   (가로는 getCharHitbox가 중앙 20px로 자동 캡) 기본 방향은 왼쪽.
  */
 export const CHAR_SPRITES = {
   vampire: { src: "assets/shrimp_variants/shrimp-4frame-cherry_red.png", size: 32, frames: 8, topPad: 18 },
   human:   { src: "assets/shrimp_variants/shrimp-4frame-blue_velvet.png", size: 32, frames: 8, topPad: 18 },
-  // 인체형 좀비 더미 (tools/generate_zombie_dummy.py) — 몸통 하단 16px, 폭 ≤20px
-  slave:   { src: "assets/chars/zombie_walk.png", size: 24, frames: 8, topPad: 8 },
+  // 인체형 좀비 더미 (tools/generate_zombie_dummy.py) — 몸통 하단 18px(y14~31), 폭 ≤20px
+  slave:   { src: "assets/chars/zombie_walk.png", size: 32, frames: 8, topPad: 14 },
 };
 
 // ── 이동 물리 (Shrimprium 새우 물리 이식값) ──

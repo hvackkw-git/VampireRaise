@@ -1,14 +1,19 @@
 # tools/generate_zombie_dummy.py
-# 노예(좀비) 인체형 더미 스프라이트 생성기 — 24×24 × 8프레임 걷기 = 192×24 PNG.
-# 규격: 몸통은 캔버스 하단 16px(y 8~23) 안, 폭 ≤20px, 발이 맨 아래변(y=23).
-#       왼쪽을 바라보는 기본 방향 (렌더러가 dir>0일 때 좌우 반전).
+# 노예(좀비) 인체형 더미 스프라이트 생성기 — 32×32 × 8프레임 걷기 = 256×32 PNG.
+#
+# 어셋 규격 (모든 캐릭터 공통):
+#   - 캔버스 32×32, 1:1 렌더 (확대는 게임 캔버스 스케일이 담당).
+#   - "충돌 몸통"은 하단 18px(y 14~31), 가로는 중앙 20px(x 6~25) 안에 그린다.
+#     → 논리 몸통(size - topPad = 18px ≤ 20px) 덕에 1칸(20px) 통로를 통과.
+#   - 발이 캔버스 맨 아래변(y=31). 기본 방향은 왼쪽 (렌더러가 dir>0일 때 반전).
+#   - 상단 y 0~13은 여백 — 직업 표식(모자/투구 등) 공간, 충돌 제외.
 # 사용: python3 tools/generate_zombie_dummy.py  →  assets/chars/zombie_walk.png
 
 import os
 import struct
 import zlib
 
-W, H, FRAMES = 24, 24, 8
+W, H, FRAMES = 32, 32, 8
 OUT = os.path.join(os.path.dirname(__file__), "..", "assets", "chars", "zombie_walk.png")
 
 # 팔레트 (RGBA)
@@ -42,34 +47,38 @@ def draw_frame(px, f):
     bob = 1 if swing == 0 else 0
     b = -bob  # 몸 전체 y 오프셋 (들썩일 때 위로 1px)
 
-    # ── 다리/발 (y 19~23, 발은 항상 바닥에) ──
-    leg_front_x = 10 + swing   # 앞다리 (왼쪽 = 진행 방향)
-    leg_back_x = 13 - swing    # 뒷다리
-    rect(px, fx, leg_front_x, 19, 2, 4, PANTS)
-    rect(px, fx, leg_back_x, 19, 2, 4, PANTS)
-    rect(px, fx, leg_front_x - 1, 23, 3, 1, SHOE)
-    rect(px, fx, leg_back_x, 23, 3, 1, SHOE)
+    # ── 다리/발 (y 27~31, 발은 항상 바닥에) ──
+    leg_front_x = 13 + swing   # 앞다리 (왼쪽 = 진행 방향)
+    leg_back_x = 17 - swing    # 뒷다리
+    rect(px, fx, leg_front_x, 27, 3, 4, PANTS)
+    rect(px, fx, leg_back_x, 27, 3, 4, PANTS)
+    rect(px, fx, leg_front_x - 1, 31, 4, 1, SHOE)
+    rect(px, fx, leg_back_x, 31, 4, 1, SHOE)
 
-    # ── 몸통 (y 14~18) — 낡은 옷 ──
-    rect(px, fx, 9, 14 + b, 7, 5, CLOTH)
-    rect(px, fx, 14, 14 + b, 2, 5, CLOTH_D)   # 등쪽 음영
-    rect(px, fx, 9, 18 + b, 7, 1, CLOTH_D)    # 밑단 음영
+    # ── 몸통 (y 21~27) — 낡은 옷, 찢어진 밑단 ──
+    rect(px, fx, 12, 21 + b, 9, 6, CLOTH)
+    rect(px, fx, 19, 21 + b, 2, 6, CLOTH_D)   # 등쪽 음영
+    rect(px, fx, 12, 26 + b, 9, 1, CLOTH_D)   # 밑단 음영
+    rect(px, fx, 14, 27 + b, 2, 1, CLOTH_D)   # 찢어진 자락
 
     # ── 좀비 팔: 앞으로 쭉 뻗음 (진행 방향 왼쪽) + 손 ──
-    arm_y = 14 + b + (1 if f % 4 >= 2 else 0)  # 팔도 느리게 위아래 흐느적
-    rect(px, fx, 4, arm_y, 6, 2, CLOTH)
-    rect(px, fx, 2, arm_y, 2, 2, SKIN)         # 손
-    rect(px, fx, 4, arm_y + 1, 6, 1, CLOTH_D)  # 팔 아래 음영
+    arm_y = 22 + b + (1 if f % 4 >= 2 else 0)  # 팔도 느리게 위아래 흐느적
+    rect(px, fx, 8, arm_y, 6, 3, CLOTH)
+    rect(px, fx, 6, arm_y, 2, 3, SKIN)          # 손
+    rect(px, fx, 7, arm_y + 2, 1, 1, SKIN_D)    # 손 음영
+    rect(px, fx, 8, arm_y + 2, 6, 1, CLOTH_D)   # 팔 아래 음영
 
-    # ── 목 (y 13) ──
-    rect(px, fx, 11, 13 + b, 3, 1, SKIN_D)
+    # ── 목 (y 20) ──
+    rect(px, fx, 14, 20 + b, 3, 1, SKIN_D)
 
-    # ── 머리 (y 8~12, 앞으로 1px 숙인 구부정한 자세) ──
-    rect(px, fx, 8, 9 + b, 7, 4, SKIN)         # 얼굴
-    rect(px, fx, 8, 8 + b, 7, 1, HAIR)         # 머리카락 윗줄
-    rect(px, fx, 13, 9 + b, 2, 3, HAIR)        # 뒤통수 머리카락
-    rect(px, fx, 8, 12 + b, 7, 1, SKIN_D)      # 턱 음영
-    rect(px, fx, 9, 10 + b, 1, 1, EYE)         # 붉은 눈 (왼쪽 응시)
+    # ── 머리 (y 14~20, 앞으로 1px 숙인 구부정한 자세) ──
+    rect(px, fx, 11, 15 + b, 9, 5, SKIN)        # 얼굴
+    rect(px, fx, 11, 14 + b, 9, 1, HAIR)        # 머리카락 윗줄
+    rect(px, fx, 12, 15 + b, 7, 1, HAIR)        # 머리카락 두 번째 줄 (덥수룩)
+    rect(px, fx, 18, 15 + b, 2, 4, HAIR)        # 뒤통수 머리카락
+    rect(px, fx, 11, 19 + b, 9, 1, SKIN_D)      # 턱 음영
+    rect(px, fx, 12, 17 + b, 2, 1, EYE)         # 붉은 눈 (왼쪽 응시)
+    rect(px, fx, 13, 19 + b, 2, 1, (70, 40, 45, 255))  # 벌어진 입
 
 
 def png_chunk(tag, data):
