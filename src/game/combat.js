@@ -6,6 +6,7 @@
 import {
   ENGAGE_RANGE, FIGHT_BREAK_RANGE, ENGAGE_MAX_DY, ATTACK_COOLDOWN_S, isEnemySide,
   expToNext, expForKill, LEVELUP_HP_GAIN, LEVELUP_ATK_GAIN, KILL_BLOOD_REWARD,
+  CHAR_SPRITES,
 } from "../constants.js";
 
 const center = (c) => ({ x: c.x + c.w / 2, y: c.y + c.h / 2 });
@@ -47,9 +48,13 @@ export function grantExp(c, amount, events) {
   }
 }
 
-/** 인간 → 노예 전염 */
+/** 인간 → 노예 전염 (스프라이트 크기가 다르면 발 위치를 유지하며 박스 교체) */
 export function infectToSlave(c) {
   c.side = "slave";
+  const size = CHAR_SPRITES.slave?.size ?? c.h;
+  c.y += c.h - size; // 발(y+h) 고정
+  c.w = size;
+  c.h = size;
   c.hp = c.maxHp;
   c.dead = false;
   c.state = "IDLE";

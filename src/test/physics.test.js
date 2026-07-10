@@ -1,7 +1,7 @@
 // 캐릭터 물리 테스트: 착지·이탈 낙하·측면 반전·스프링·워프·스턴
 import { describe, it, expect } from "vitest";
 import { tickCharacter, startJump } from "../engine/physics.js";
-import { FLOOR_Y, CHAR_SIZE } from "../constants.js";
+import { FLOOR_Y, CHAR_SIZE, CHAR_SPRITES } from "../constants.js";
 
 function makeChar(over = {}) {
   return {
@@ -83,6 +83,12 @@ describe("걷기(CRAWL) 충돌", () => {
     const c = makeChar({ x: 150, state: "CRAWL", dir: 1, timer: 10 });
     run(c, makeCtx([plat]), 1);
     expect(c.dir).toBe(-1);
+  });
+
+  it("규격 보장: 모든 진영의 충돌 몸통 높이는 20px 이하 (1칸 통과)", () => {
+    for (const cfg of Object.values(CHAR_SPRITES)) {
+      expect(cfg.size - cfg.topPad).toBeLessThanOrEqual(20);
+    }
   });
 
   it("1칸(20px) 세로 통로를 걸어서 통과한다 — 몸통(하단 14px)만 충돌", () => {

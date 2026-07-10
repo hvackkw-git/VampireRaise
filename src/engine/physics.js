@@ -9,18 +9,20 @@ import {
   getSlideDir, getSpikeDir, getConveyorDir, isLogicLayerBlock,
 } from "../platform/platformBlockRenderer.js";
 import {
-  TANK_W, FLOOR_Y, CRAWL_SPD, CHAR_SIZE, CHAR_SPRITE_TOP_PAD,
+  TANK_W, FLOOR_Y, CRAWL_SPD, CHAR_SPRITES,
   PX_GRAVITY, PX_GRAVITY_JUMP, PX_GRAVITY_JUMP_LAND,
   STUN_DURATION_MS, CONVEYOR_PUSH_SPD, SLIDE_SPD, WARP_COOLDOWN_MS,
 } from "../constants.js";
 
 /**
- * 세로 충돌용 몸통 윗변 Y. 스프라이트 상단 투명 여백(TOP_PAD)을 제외해
- * 실제 그림이 있는 몸통(아래쪽 ~14px)만 벽·스턴 판정에 쓴다.
+ * 세로 충돌용 몸통 윗변 Y. 진영별 스프라이트 상단 투명 여백(topPad)을 제외해
+ * 실제 그림이 있는 몸통만 벽·스턴 판정에 쓴다.
  * 발(c.y + c.h)은 그대로 — 착지/지면 판정은 변하지 않는다.
  */
 export function getCharBodyTop(c) {
-  return c.y + CHAR_SPRITE_TOP_PAD * (c.h / CHAR_SIZE);
+  const cfg = CHAR_SPRITES[c.side];
+  if (!cfg) return c.y;
+  return c.y + cfg.topPad * (c.h / cfg.size);
 }
 
 /** 캐릭터가 밟을 수 없는(지형이 아닌) 블록 — 레드스톤 배선 + 스턴 */

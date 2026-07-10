@@ -6,7 +6,7 @@ import {
   RGB_BLOCK_TINTS, CONVEYOR_ANIM_FRAMES, HOLE_ANIM_FRAMES,
 } from "../platform/platformBlockRenderer.js";
 import {
-  TANK_W, TANK_H, CHAR_SPRITE, CHAR_SIZE, CHAR_SHEET_FRAMES, DETECT_RANGE,
+  TANK_W, TANK_H, CHAR_SPRITES, DETECT_RANGE,
 } from "../constants.js";
 
 const blockEls = new Map(); // platId → { el, img, lastSrc, lastRot }
@@ -160,9 +160,12 @@ export function renderChars(state, nowMs, ui) {
       entry = { el, detect, sprite, hpFill, lastSide: null, lastFrame: -1 };
       charEls.set(c.id, entry);
     }
+    const cfg = CHAR_SPRITES[c.side];
     if (entry.lastSide !== c.side) {
-      entry.sprite.style.backgroundImage = `url('${CHAR_SPRITE[c.side]}')`;
-      entry.sprite.style.backgroundSize = `${CHAR_SIZE * CHAR_SHEET_FRAMES}px ${CHAR_SIZE}px`;
+      entry.el.style.width = `${cfg.size}px`;
+      entry.el.style.height = `${cfg.size}px`;
+      entry.sprite.style.backgroundImage = `url('${cfg.src}')`;
+      entry.sprite.style.backgroundSize = `${cfg.size * cfg.frames}px ${cfg.size}px`;
       entry.el.className = `char side-${c.side}`;
       entry.lastSide = c.side;
       entry.lastFrame = -1;
@@ -170,16 +173,16 @@ export function renderChars(state, nowMs, ui) {
       const r = DETECT_RANGE[c.side] ?? 0;
       entry.detect.style.width = `${r * 2}px`;
       entry.detect.style.height = `${r * 2}px`;
-      entry.detect.style.left = `${c.w / 2 - r}px`;
-      entry.detect.style.top = `${c.h / 2 - r}px`;
+      entry.detect.style.left = `${cfg.size / 2 - r}px`;
+      entry.detect.style.top = `${cfg.size / 2 - r}px`;
     }
     // FIGHT/DASH는 빠르게 프레임을 돌려 몸싸움·질주 느낌을 낸다
     const moving = Math.abs(c.vx) > 1 || c.state === "CRAWL" || c.state === "JUMP"
       || c.state === "FIGHT" || c.state === "DASH";
     const fast = c.state === "FIGHT" || c.state === "DASH";
-    const frame = moving ? Math.floor(nowMs / (fast ? 60 : 90)) % CHAR_SHEET_FRAMES : 0;
+    const frame = moving ? Math.floor(nowMs / (fast ? 60 : 90)) % cfg.frames : 0;
     if (entry.lastFrame !== frame) {
-      entry.sprite.style.backgroundPosition = `${-frame * CHAR_SIZE}px 0`;
+      entry.sprite.style.backgroundPosition = `${-frame * cfg.size}px 0`;
       entry.lastFrame = frame;
     }
     entry.el.style.left = `${c.x}px`;
@@ -204,6 +207,8 @@ export function renderChars(state, nowMs, ui) {
 function spawnDashGhost(c, entry) {
   const g = document.createElement("div");
   g.className = "char-ghost";
+  g.style.width = `${c.w}px`;
+  g.style.height = `${c.h}px`;
   g.style.backgroundImage = entry.sprite.style.backgroundImage;
   g.style.backgroundSize = entry.sprite.style.backgroundSize;
   g.style.backgroundPosition = entry.sprite.style.backgroundPosition;
