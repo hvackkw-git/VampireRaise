@@ -421,10 +421,17 @@ export function getPlatformYRange(tankH = 640) {
 }
 
 /**
+ * 1칸(20px)짜리 수직 통로를 안정적으로 통과하기 위한 캐릭터 수평 충돌 폭.
+ * 히트박스가 정확히 PLATFORM_W와 같으면 부동소수/프레임 이동 오차로 양옆 블록에
+ * 살짝 걸려 낙하·점프 통과가 막힐 수 있어, 실제 몸통 기준으로 여유를 둔다.
+ */
+export const CHAR_HITBOX_W = 14;
+
+/**
  * 캐릭터의 충돌 히트박스(수평) 좌측 x와 폭을 반환합니다.
- * 성체 스프라이트(예: 64px)는 플랫폼 블록(PLATFORM_W=20px)보다 넓어 간격 1칸짜리
- * 빈 공간으로 떨어지지 못하므로, 스프라이트가 PLATFORM_W보다 넓으면 좌우를 균등히
- * 깎아 히트박스 폭을 PLATFORM_W에 맞춥니다(중앙 정렬). 이미 더 좁으면 그대로 둡니다.
+ * 스프라이트가 플랫폼 블록(PLATFORM_W=20px)보다 넓어도 1칸짜리 빈 공간을
+ * 위아래로 통과할 수 있도록 중앙 몸통 폭(CHAR_HITBOX_W)만 충돌에 사용합니다.
+ * 이미 더 좁은 캐릭터는 원래 폭을 유지합니다.
  * 모든 수평 충돌/상호작용 판정은 이 히트박스를 기준으로 해야 합니다.
  * @param {{ x: number, w: number }} char
  * @returns {{ x: number, w: number }} 히트박스 좌측 x와 폭
@@ -432,11 +439,12 @@ export function getPlatformYRange(tankH = 640) {
 export function getCharHitbox(char) {
   const x = Number(char?.x) || 0;
   const w = Number(char?.w);
-  if (!Number.isFinite(w) || w <= PLATFORM_W) {
+  if (!Number.isFinite(w) || w <= CHAR_HITBOX_W) {
     return { x, w: Number.isFinite(w) ? w : 0 };
   }
-  const inset = (w - PLATFORM_W) / 2;
-  return { x: x + inset, w: PLATFORM_W };
+  const hitboxW = Math.min(w, CHAR_HITBOX_W);
+  const inset = (w - hitboxW) / 2;
+  return { x: x + inset, w: hitboxW };
 }
 
 /**
@@ -465,9 +473,9 @@ export function charSweepsPlatformX(char, plat, nextX) {
   const widthRaw = Number(char?.w);
   const platformX = Number(plat?.x);
   if (![startXRaw, endXRaw, widthRaw, platformX].every(Number.isFinite)) return false;
-  // 히트박스 기준으로 보정 (스프라이트가 PLATFORM_W보다 넓으면 좌우 인셋).
-  const inset = widthRaw > PLATFORM_W ? (widthRaw - PLATFORM_W) / 2 : 0;
-  const width = widthRaw - 2 * inset;
+  // 히트박스 기준으로 보정 (스프라이트가 넓어도 중앙 몸통 폭만 충돌).
+  const width = Math.min(widthRaw, CHAR_HITBOX_W);
+  const inset = (widthRaw - width) / 2;
   const startX = startXRaw + inset;
   const endX = endXRaw + inset;
   const minX = Math.min(startX, endX);

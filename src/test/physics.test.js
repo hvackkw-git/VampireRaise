@@ -2,6 +2,7 @@
 import { describe, it, expect } from "vitest";
 import { tickCharacter, startJump } from "../engine/physics.js";
 import { FLOOR_Y, CHAR_SIZE, CHAR_SPRITES } from "../constants.js";
+import { CHAR_HITBOX_W } from "../platform/platformBlockRenderer.js";
 
 function makeChar(over = {}) {
   return {
@@ -60,6 +61,25 @@ describe("낙하와 착지", () => {
     expect(c.y).toBe(FLOOR_Y - CHAR_SIZE);
   });
 
+
+  it("1칸(20px) 빈 세로 구멍으로 낙하 통과한다", () => {
+    const left = { id: 10, x: 80, y: 400, blockType: "platform_block" };
+    const right = { id: 11, x: 120, y: 400, blockType: "platform_block" };
+    const c = makeChar({ x: 95, y: 300, state: "FALL", vy: 0 });
+    run(c, makeCtx([left, right]), 2);
+    expect(c._platformId).toBeNull();
+    expect(c.y).toBeGreaterThan(400);
+  });
+
+  it("1칸(20px) 빈 세로 구멍으로 점프 통과한다", () => {
+    const left = { id: 10, x: 80, y: 400, blockType: "platform_block" };
+    const right = { id: 11, x: 120, y: 400, blockType: "platform_block" };
+    const c = makeChar({ x: 95, y: 410, state: "JUMP", vy: -180, vx: 0 });
+    run(c, makeCtx([left, right]), 0.35);
+    expect(c._platformId).toBeNull();
+    expect(c.y + c.h).toBeLessThan(400);
+  });
+
   it("ON 게이트는 통과, OFF 게이트는 착지", () => {
     const gate = { id: 9, x: 100, y: 400, blockType: "gate_block" };
     const onMap = new Map([[9, true]]);
@@ -85,7 +105,8 @@ describe("걷기(CRAWL) 충돌", () => {
     expect(c.dir).toBe(-1);
   });
 
-  it("규격 보장: 모든 진영의 충돌 몸통 높이는 20px 이하 (1칸 통과)", () => {
+  it("규격 보장: 모든 진영의 충돌 몸통은 1칸 통로보다 작다", () => {
+    expect(CHAR_HITBOX_W).toBeLessThan(20);
     for (const cfg of Object.values(CHAR_SPRITES)) {
       expect(cfg.size - cfg.topPad).toBeLessThanOrEqual(20);
     }
