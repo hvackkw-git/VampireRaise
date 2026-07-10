@@ -100,9 +100,17 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
     expect(vamp.state).toBe("DASH");
   });
 
-  it("감지 원 밖이면 돌진하지 않는다 (감지는 다른 유닛과 동일)", () => {
+  it("직선 감지 원 밖이어도 우회 거리가 예산(×2) 이내면 돌진한다", () => {
     const vamp = put("vampire", 0);
-    put("human", DETECT_RANGE.vampire + 30); // 원 밖 — 예전 ×2 발동 거리였던 위치
+    put("human", DETECT_RANGE.vampire + 30); // 감지 원 밖, 하지만 우회 거리 120 ≤ 180
+    tickAggro(state, 0.016, () => 0.9);
+    expect(vamp.state).toBe("DASH");
+    expect(vamp._ping).toBeNull();
+  });
+
+  it("우회 거리가 예산(×2)을 넘으면 돌진하지 않는다", () => {
+    const vamp = put("vampire", 0);
+    put("human", DETECT_RANGE.vampire * 2 + 40);
     tickAggro(state, 0.016, () => 0.9);
     expect(vamp.state).toBe("IDLE");
     expect(vamp._ping).toBeNull();
@@ -140,9 +148,9 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
     expect(wire).toBe(clear);
   });
 
-  it("중력을 무시하고 위쪽 대상에게도 직선으로 날아간다", () => {
+  it("중력을 무시하고 위쪽 감지 원 밖 대상에게도 최단 경로로 날아간다", () => {
     const vamp = put("vampire", 100);
-    put("human", 120, { y: FLOOR_Y - CHAR_SIZE - 70 }); // 직선 ~73 < 90, 우회 160 ≤ 180
+    put("human", 120, { y: FLOOR_Y - CHAR_SIZE - 120 }); // 직선 감지 밖, 우회 거리 ≤ 180
     const ctx = { platforms: [], blockPowered: new Map(), now: 10000, rng: () => 0.9 };
     const y0 = vamp.y;
     let flewUp = false;
