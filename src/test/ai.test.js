@@ -115,13 +115,13 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
     expect(vamp.state).toBe("DASH");
   });
 
-  it("직선 감지 원 밖이어도 우회 거리가 예산(×2) 이내면 돌진한다", () => {
+  it("직선 감지 원 밖이면 우회 거리가 예산(×2) 이내여도 돌진하지 않는다", () => {
     const vamp = put("vampire", 0);
-    const human = put("human", DETECT_RANGE.vampire + 30); // 감지 원 밖, 하지만 우회 거리 120 ≤ 180
+    const human = put("human", DETECT_RANGE.vampire + 30); // 감지 원 밖
     state.platforms.items.push({ id: 1, x: human.x, y: human.y + human.h, blockType: "platform_block" });
     tickAggro(state, 0.016, () => 0.9);
-    expect(vamp.state).toBe("DASH");
-    expect(vamp._ping).toBeNull();
+    expect(vamp.state).not.toBe("DASH");
+    expect(vamp._dashTargetId).toBeNull();
   });
 
   it("노예는 뱀파이어 돌진 대상이 아니다", () => {
@@ -135,15 +135,15 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
     expect(vamp._dashTargetId).toBeNull();
   });
 
-  it("플랫폼 근처라도 대상이 플랫폼 위쪽 영역에 없으면 돌진하지 않는다", () => {
+  it("대상이 플랫폼 위쪽 영역에 없으면 적 중심을 목표로 돌진한다", () => {
     const vamp = put("vampire", 100);
     const human = put("human", 140);
     state.platforms.items.push({ id: 1, x: human.x, y: human.y + 16, blockType: "platform_block" });
 
     tickAggro(state, 0.016, () => 0.9);
 
-    expect(vamp.state).not.toBe("DASH");
-    expect(vamp._dashTargetId).toBeNull();
+    expect(vamp.state).toBe("DASH");
+    expect(vamp._dashGoal).toEqual({ x: human.x + human.w / 2, y: human.y + human.h / 2 });
   });
 
   it("우회 거리가 예산(×2)을 넘으면 돌진하지 않는다", () => {
@@ -154,14 +154,14 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
     expect(vamp._ping).toBeNull();
   });
 
-  it("인간 근처에 플랫폼 블록이 없으면 감지됐어도 공중 돌진하지 않고 걷는다", () => {
+  it("인간 근처에 플랫폼 블록이 없어도 감지 원 안이면 BFS 경로로 돌진한다", () => {
     const vamp = put("vampire", 80);
     put("human", 140);
 
     tickAggro(state, 0.016, () => 0.9);
 
-    expect(vamp.state).not.toBe("DASH");
-    expect(vamp._ping).not.toBeNull(); // 인식은 했고 (감지 원 안)
+    expect(vamp.state).toBe("DASH");
+    expect(vamp._ping).toBeNull();
   });
 
   it("BFS 우회 거리: 플랫폼 블록을 피해 돌아가는 실제 최단 경로를 계산한다", () => {
@@ -181,9 +181,9 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
     expect(wire).toBe(clear);
   });
 
-  it("중력을 무시하고 위쪽 감지 원 밖 대상에게도 최단 경로로 날아간다", () => {
+  it("중력을 무시하고 위쪽 감지 원 안 대상에게 최단 경로로 날아간다", () => {
     const vamp = put("vampire", 100);
-    const human = put("human", 120, { y: FLOOR_Y - CHAR_SIZE - 120 }); // 직선 감지 밖, 우회 거리 ≤ 180
+    const human = put("human", 100, { y: FLOOR_Y - CHAR_SIZE - 70 }); // 감지 원 안, 우회 거리 ≤ 180
     state.platforms.items.push({ id: 1, x: human.x, y: human.y + CHAR_SIZE, blockType: "platform_block" });
     const ctx = { platforms: state.platforms.items, blockPowered: new Map(), now: 10000, rng: () => 0.9 };
     const y0 = vamp.y;
@@ -196,10 +196,22 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
     expect(flewUp).toBe(true);
   });
 
+  it("감지 원 안의 적이 2마리 이상이면 BFS 경로가 더 짧은 대상에게 돌진한다", () => {
+    const vamp = put("vampire", 100);
+    const nearBlocked = put("human", 100, { y: FLOOR_Y - CHAR_SIZE - 70 });
+    const farClear = put("human", 165);
+    state.platforms.items.push({ id: 1, x: nearBlocked.x, y: nearBlocked.y + CHAR_SIZE, blockType: "platform_block" });
+
+    tickAggro(state, 0.016, () => 0.9);
+
+    expect(vamp.state).toBe("DASH");
+    expect(vamp._dashTargetId).toBe(farClear.id);
+  });
+
   it("위쪽 플랫폼으로 돌진할 때 경로 Y를 착지 가능한 높이에 맞춘다", () => {
-    const plat = { id: 1, x: 120, y: 520, blockType: "platform_block" };
-    const vamp = put("vampire", 120);
-    put("human", 120, { y: 520 - CHAR_SIZE, _platformId: 1 });
+    const plat = { id: 1, x: 120, y: 560, blockType: "platform_block" };
+    const vamp = put("vampire", 40, { y: 560 - CHAR_SIZE });
+    put("human", 120, { y: 560 - CHAR_SIZE, _platformId: 1 });
     state.platforms.items.push(plat);
 
     tickAggro(state, 0.016, () => 0.9);

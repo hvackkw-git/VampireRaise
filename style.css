@@ -41,6 +41,18 @@ button { font-family: inherit; color: inherit; }
 .hud-chip:empty { display: none; }
 #hudHumans { color: #7ec8e3; }
 
+#versionBadge {
+  right: 6px; bottom: 6px;
+  padding: 2px 6px;
+  border: 1px solid rgba(255, 210, 87, 0.55);
+  border-radius: 7px;
+  background: rgba(20, 10, 34, 0.72);
+  color: #ffd257;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+
 /* 핫키: 우상단 세로 열 (Shrimprium 퀵토글 스타일) */
 #hotkeys {
   top: 6px; right: 6px;

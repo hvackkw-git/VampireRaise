@@ -195,16 +195,35 @@ export function estimateRouteDist(c, t, platforms) {
   return findDashRoute(c, t, platforms)?.dist ?? Infinity;
 }
 
+function dashRouteMultiplier(c) {
+  return Number.isFinite(c?.dashRouteMult) ? c.dashRouteMult : DASH_ROUTE_MULT;
+}
+
+function isInDetectRange(c, enemy) {
+  const range = DETECT_RANGE[c.side] ?? 0;
+  const a = centerOf(c);
+  const b = centerOf(enemy);
+  return Math.hypot(b.x - a.x, b.y - a.y) <= range;
+}
+
+function dashGoalForEnemy(c, enemy, platforms) {
+  const platformGoal = nearestPlatformStandPointTo(enemy, platforms, c.h);
+  return platformGoal ?? centerOf(enemy);
+}
+
 function findNearestDashRoute(c, chars, platforms) {
-  const budget = (DETECT_RANGE.vampire ?? 0) * DASH_ROUTE_MULT;
+  const detectRange = DETECT_RANGE[c.side] ?? 0;
+  const budget = detectRange * dashRouteMultiplier(c);
   let best = null;
   for (const enemy of chars) {
     if (enemy === c || enemy.dead || !isEnemySide(c.side, enemy.side)) continue;
-    const goal = nearestPlatformStandPointTo(enemy, platforms, c.h);
-    if (!goal) continue;
+    if (!isInDetectRange(c, enemy)) continue;
+    const goal = dashGoalForEnemy(c, enemy, platforms);
     const route = findDashRoute(c, pointAsTarget(goal, c), platforms, goal);
     if (!route || route.dist > budget || route.dist <= DASH_ARRIVE_DIST + 8) continue;
-    if (!best || route.dist < best.route.dist) best = { char: enemy, route, goal };
+    if (!best || route.dist < best.route.dist || (route.dist === best.route.dist && enemy.id < best.char.id)) {
+      best = { char: enemy, route, goal };
+    }
   }
   return best;
 }
@@ -250,8 +269,8 @@ export function tickAggro(state, simDt, rng = Math.random) {
     }
 
     // ── 뱀파이어 패시브(혈귀 돌진) ──
-    // 중력을 무시한다. 직선 감지 원 밖(특히 위쪽)의 적도 플랫폼을 피해 돌아가는
-    // BFS 최단 경로가 감지범위×2 이내면 그 최단 경로로 날아간다.
+    // 중력을 무시한다. 감지 원 안의 적 중 플랫폼을 피해 돌아가는 BFS 최단 경로가
+    // 감지범위×배율 이내인 가장 짧은 대상에게 그 최단 경로로 날아간다.
     if (c.side === "vampire" && !(c._dashCd > 0)) {
       const found = findNearestDashRoute(c, chars, state.platforms.items);
       if (found) {
