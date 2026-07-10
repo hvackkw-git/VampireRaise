@@ -32,7 +32,7 @@ function loadUserId(storage = globalThis.localStorage) {
 let els = null;
 let lastSkillKey = null; // 장착 스킬 재구성 최소화용 캐시 키
 
-export function initInfoPanel() {
+export function initInfoPanel({ onSkillTree } = {}) {
   const $ = (id) => document.getElementById(id);
   els = {
     panel: $("info-panel"),
@@ -56,13 +56,31 @@ export function initInfoPanel() {
     els.skillGrid.appendChild(slot);
     return slot;
   });
-  for (let i = 0; i < HOTKEY_SLOT_COUNT; i++) {
-    const slot = document.createElement("div");
+  els.hotkeySlots = Array.from({ length: HOTKEY_SLOT_COUNT }, (_, i) => {
+    const slot = document.createElement("button");
+    slot.type = "button";
     slot.className = "hotkey-slot";
-    slot.textContent = String(i + 1);
+    if (i === 0) {
+      slot.classList.add("assigned");
+      slot.title = "스킬 트리";
+      slot.setAttribute("aria-label", "핫키 1: 스킬 트리");
+      slot.innerHTML = '<span class="hotkey-glyph">✦</span><small>1</small>';
+      slot.addEventListener("click", () => onSkillTree?.());
+    } else {
+      slot.textContent = String(i + 1);
+      slot.title = "빈 핫키";
+      slot.disabled = true;
+    }
     els.hotkeyGrid.appendChild(slot);
-  }
+    return slot;
+  });
   lastSkillKey = null;
+  return {
+    setSkillTreeOpen(open) {
+      els.hotkeySlots[0].classList.toggle("on", open);
+      els.hotkeySlots[0].setAttribute("aria-pressed", String(open));
+    },
+  };
 }
 
 function setBar(fill, num, cur, max) {

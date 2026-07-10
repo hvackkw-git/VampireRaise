@@ -42,7 +42,7 @@
             <button id="btnDecorate" class="hotkey" title="꾸미기">🛠</button>
             <button id="btnReset" class="hotkey hotkey-danger" title="처음부터 재시작">🔄</button>
           </div>
-          <div id="versionBadge" class="ui-overlay">v0001</div>
+          <div id="versionBadge" class="ui-overlay">v0002</div>
 
         </div>
         </div>
@@ -96,6 +96,25 @@
             </div>
           </section>
         </div>
+
+        <section id="skillTreePanel" class="skill-tree-panel hidden" aria-label="스킬 트리">
+          <header class="skill-tree-header">
+            <div class="skill-tree-heading">
+              <h2>스킬 트리</h2>
+              <span id="skillTreeOwner">—</span>
+            </div>
+            <div class="skill-tree-level">LV <strong id="skillTreeLevel">1</strong></div>
+            <div class="skill-tree-points">SP <strong id="skillTreePoints">0</strong></div>
+            <button id="btnSkillTreeClose" class="skill-tree-close" type="button" aria-label="스킬 트리 닫기" title="닫기">×</button>
+          </header>
+          <div id="skillTreeBoard" class="skill-tree-board">
+            <svg class="skill-tree-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              <g id="skillTreeLines"></g>
+            </svg>
+            <div id="skillTreeNodes" class="skill-tree-nodes"></div>
+          </div>
+          <footer id="skillTreeDetail" class="skill-tree-detail">빈 스킬 슬롯</footer>
+        </section>
         </div>
       </div>
     </div>

@@ -17,7 +17,7 @@ beforeEach(() => {
 
 const put = (side, x, over = {}) => {
   const c = createCharacter(state, side, { x, y: FLOOR_Y - CHAR_SIZE, maxHp: 100, atk: 5, ...over });
-  c.state = "IDLE";
+  c.state = "CRAWL";
   c.timer = 99;   // 자율 행동 억제 — 감지 반응만 관찰
   c._pingCd = 0;  // 첫 틱에 즉시 핑 갱신
   return c;
@@ -57,7 +57,7 @@ describe("핑 추적", () => {
     put("human", DETECT_RANGE.vampire + 80);
     tickAggro(state, 0.016, () => 0.9);
     expect(vamp._ping).toBeNull();
-    expect(vamp.state).toBe("IDLE");
+    expect(vamp.state).toBe("CRAWL");
   });
 
   it("핑은 1초 주기로 갱신된다: 대상이 범위를 벗어나도 다음 갱신까지 유지", () => {
@@ -148,7 +148,7 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
 
     tickAggro(state, 0.016, () => 0.9);
 
-    expect(vamp.state).toBe("IDLE");
+    expect(vamp.state).toBe("CRAWL");
     expect(vamp._dashTargetId).toBeNull();
     expect(vamp._ping).toBeNull();
   });
@@ -157,7 +157,7 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
     const vamp = put("vampire", 0);
     put("human", DETECT_RANGE.vampire * 2 + 40);
     tickAggro(state, 0.016, () => 0.9);
-    expect(vamp.state).toBe("IDLE");
+    expect(vamp.state).toBe("CRAWL");
     expect(vamp._ping).toBeNull();
   });
 
@@ -181,7 +181,7 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
 
     tickAggro(state, 0.016, () => 0.9);
 
-    expect(vamp.state).toBe("IDLE");
+    expect(vamp.state).toBe("CRAWL");
     expect(vamp._ping).toBeNull();
     expect(vamp._dashTargetId).toBeNull();
   });
@@ -274,7 +274,8 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
     expect(ended).toBe(true);
     expect(vamp._platformId).toBe(plat.id);
     expect(vamp.y).toBe(plat.y - CHAR_SIZE);
-    expect(Math.abs(vamp.x + vamp.w / 2 - (plat.x + 10))).toBeLessThan(0.001);
+    // 안착 직후 같은 프레임부터 다시 걷기 시작하므로 최대 한 프레임 이동은 허용한다.
+    expect(Math.abs(vamp.x + vamp.w / 2 - (plat.x + 10))).toBeLessThanOrEqual(1.21);
     expect(Math.abs(human.x - 120)).toBeLessThan(0.001);
   });
 
@@ -325,7 +326,7 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
     const human = put("human", 140);
     state.platforms.items.push({ id: 1, x: human.x, y: human.y + human.h, blockType: "gate_block" });
     tickAggro(state, 0.016, () => 0.9, new Map([[1, true]]));
-    expect(vamp.state).toBe("IDLE");
+    expect(vamp.state).toBe("CRAWL");
     expect(vamp._dashTargetId).toBeNull();
     expect(vamp._ping).toBeNull();
   });
@@ -346,7 +347,7 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
       const human = put("human", 140);
       state.platforms.items = [{ id: 1, x: human.x, y: human.y + human.h, blockType, rotation: 0 }];
       tickAggro(state, 0.016, () => 0.9);
-      expect(vamp.state, blockType).toBe("IDLE");
+      expect(vamp.state, blockType).toBe("CRAWL");
       expect(vamp._dashTargetId, blockType).toBeNull();
       expect(vamp._ping, blockType).toBeNull();
     }
@@ -368,8 +369,8 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
   });
 });
 
-describe("플랫폼 위 최단거리 추적 (경로 탐색 없음)", () => {
-  it("플랫폼 위에서 아래 적에게 플랫폼 윗면 목표가 없으면 제자리에 머문다", () => {
+describe("플랫폼 위 연속 이동", () => {
+  it("아래 적에게 플랫폼 목표가 없어도 멈추지 않고 가장자리로 걸어 내려간다", () => {
     // 감지는 유클리드 거리 — 원 안에 들도록 플랫폼(y=560)과 인간(x=100)을 가깝게 배치
     const plat = { id: 1, x: 140, y: 560, blockType: "platform_block" };
     const vamp = put("vampire", 140, { y: 560 - CHAR_SIZE });
@@ -382,10 +383,9 @@ describe("플랫폼 위 최단거리 추적 (경로 탐색 없음)", () => {
       tickAggro(state, 1 / 60, () => 0.9);
       tickCharacter(vamp, ctx, 1 / 60);
     }
-    // 뱀파이어 핑은 플랫폼 윗면만 허용하므로 아래 바닥의 적에게 뛰어내리지 않는다.
-    expect(vamp._platformId).toBe(1);
-    expect(vamp.y).toBe(560 - CHAR_SIZE);
-    expect(vamp.x).toBe(140);
+    expect(vamp._platformId).toBeNull();
+    expect(["CRAWL", "FALL", "JUMP"]).toContain(vamp.state);
+    expect(["IDLE", "STAY"]).not.toContain(vamp.state);
   });
 
   it("대상이 바로 아래여도 플랫폼 윗면 목표가 없으면 핑을 찍지 않는다", () => {
@@ -399,8 +399,8 @@ describe("플랫폼 위 최단거리 추적 (경로 탐색 없음)", () => {
       tickAggro(state, 1 / 60, () => 0.9);
       tickCharacter(vamp, ctx, 1 / 60);
     }
-    expect(vamp._platformId).toBe(1);
-    expect(vamp.state).toBe("IDLE");
+    expect(vamp._platformId).toBeNull();
+    expect(vamp.state).toBe("CRAWL");
     expect(vamp._ping).toBeNull();
   });
 });

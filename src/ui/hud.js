@@ -6,7 +6,7 @@ import { startWave, humansAlive } from "../game/waves.js";
 import { createCharacter, resetState } from "../state/gameState.js";
 import { showToast } from "./tankView.js";
 
-export function initHud(state, { onDecorate, onReset }) {
+export function initHud(state, { onDecorate, onReset, getBlockPowered, isDecorating }) {
   const elWave = document.getElementById("hudWave");
   const elHumans = document.getElementById("hudHumans");
   const elBlood = document.getElementById("hudBlood");
@@ -19,15 +19,32 @@ export function initHud(state, { onDecorate, onReset }) {
   const vampireCount = () =>
     state.chars.items.filter((c) => c.side === "vampire").length;
 
-  btnWave.addEventListener("click", () => {
-    if (startWave(state)) showToast(`🌊 웨이브 ${state.wave.current} 시작!`);
-  });
+  const showStartFailure = () => {
+    if (state.wave.lastStartError === "noPath") showToast("아래까지 이어지는 인간 이동 경로가 없습니다");
+  };
+
+  const tryStartWave = () => {
+    if (isDecorating?.()) {
+      showToast("꾸미기를 완료한 뒤 웨이브를 시작하세요");
+      return false;
+    }
+    const started = startWave(state, getBlockPowered?.());
+    if (started) showToast(`🌊 웨이브 ${state.wave.current} 시작!`);
+    else showStartFailure();
+    return started;
+  };
+
+  btnWave.addEventListener("click", tryStartWave);
 
   btnAuto.addEventListener("click", () => {
+    if (isDecorating?.()) {
+      showToast("꾸미기를 완료한 뒤 자동 웨이브를 켜세요");
+      return;
+    }
     state.wave.auto = !state.wave.auto;
     if (state.wave.auto && !state.wave.active) {
       // 대기 중이면 즉시 시작
-      if (startWave(state)) showToast(`🌊 웨이브 ${state.wave.current} 시작!`);
+      if (!tryStartWave()) state.wave.auto = false;
     }
   });
 
@@ -42,7 +59,13 @@ export function initHud(state, { onDecorate, onReset }) {
     showToast("🧛 새 뱀파이어가 합류했습니다");
   });
 
-  btnDecorate.addEventListener("click", () => onDecorate?.());
+  btnDecorate.addEventListener("click", () => {
+    if (state.wave.active) {
+      showToast("꾸미기는 웨이브 종료 후에만 가능합니다");
+      return;
+    }
+    onDecorate?.();
+  });
 
   // 처음부터 재시작 (테스트용): 두 번 눌러 확정 — 오조작 방지
   const btnReset = document.getElementById("btnReset");
@@ -70,6 +93,8 @@ export function initHud(state, { onDecorate, onReset }) {
     btnWave.disabled = state.wave.active;
     btnWave.textContent = state.wave.active ? "⏳" : "▶";
     btnAuto.classList.toggle("on", state.wave.auto);
+    btnAuto.disabled = !!isDecorating?.();
+    btnDecorate.disabled = state.wave.active;
     elSummonCost.textContent = String(summonCost(vampireCount()));
   }
   render();

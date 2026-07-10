@@ -28,7 +28,7 @@ export function createCharacter(state, side, opts = {}) {
     w: size, h: size,
     vx: 0, vy: 0,
     dir: Math.random() < 0.5 ? -1 : 1,
-    state: opts.state ?? "IDLE",
+    state: opts.state ?? "CRAWL",
     timer: Math.random() * 2,
     _platformId: null,
     _stunUntil: 0,
@@ -55,6 +55,12 @@ export function createCharacter(state, side, opts = {}) {
     atk: opts.atk ?? baseStats.atk,
     job: null,                  // 향후 직업 분류
     skills: side === "vampire" ? ["dash"] : [], // 장착 스킬 (v1: 뱀파이어 혈귀 돌진)
+    skillPoints: side === "vampire"
+      ? Math.max(0, Number(opts.skillPoints ?? ((opts.level ?? 1) - 1)) || 0)
+      : 0,
+    learnedSkills: side === "vampire" && Array.isArray(opts.learnedSkills)
+      ? [...opts.learnedSkills]
+      : [],
     projectileSkill: opts.projectileSkill ?? null, // 인간 투사체 성장 훅(count/homing/damage/cooldown/range/speed)
     ownerVampireId: opts.ownerVampireId ?? null, // 노예 소유 뱀파이어 id
     vampireOrder: side === "vampire" ? (opts.vampireOrder ?? nextVampireOrder(state)) : null,
@@ -77,6 +83,7 @@ export function createInitialState() {
       pendingSpawns: [],  // [{ spawnAt(초, waveClock) }]
       clock: 0,           // 웨이브 경과 시계(초) — 스폰 스케줄용
       nextAutoAt: null,   // 자동 웨이브 예약 시각(clock 기준)
+      lastStartError: null,
     },
     prestige: { count: 0 }, // 향후 프리스티지 훅
     platforms: { nextId: 1, items: [] },
@@ -109,7 +116,9 @@ export function serialize(state) {
           level: c.level, exp: c.exp, maxHp: c.maxHp, hp: c.hp,
           maxMp: c.maxMp, mp: c.mp, atk: c.atk,
           ownerVampireId: c.ownerVampireId, vampireOrder: c.vampireOrder,
-          job: c.job, skills: c.skills, dead: c.dead,
+          job: c.job, skills: c.skills,
+          skillPoints: c.skillPoints, learnedSkills: c.learnedSkills,
+          dead: c.dead,
         })),
     },
   });
@@ -161,6 +170,8 @@ export function loadState(storage = globalThis.localStorage) {
       maxHp: rec.maxHp, hp: rec.hp, atk: rec.atk,
       maxMp: rec.maxMp, mp: rec.mp,
       ownerVampireId: rec.ownerVampireId, vampireOrder: rec.vampireOrder,
+      skillPoints: rec.skillPoints ?? Math.max(0, (Number(rec.level) || 1) - 1),
+      learnedSkills: rec.learnedSkills,
     });
     c.id = rec.id;
     c.dir = rec.dir === -1 ? -1 : 1;
@@ -168,6 +179,8 @@ export function loadState(storage = globalThis.localStorage) {
     c.job = rec.job ?? null;
     // 구버전 저장본은 skills가 빈 배열 — createCharacter의 기본 장착(dash)을 유지
     if (Array.isArray(rec.skills) && rec.skills.length) c.skills = rec.skills;
+    c.skillPoints = Math.max(0, Number(rec.skillPoints ?? c.skillPoints) || 0);
+    c.learnedSkills = Array.isArray(rec.learnedSkills) ? [...rec.learnedSkills] : [];
     c.dead = !!rec.dead;
   }
   // createCharacter가 nextId를 증가시키므로 저장본 값으로 재고정

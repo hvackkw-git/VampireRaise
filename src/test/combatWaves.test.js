@@ -37,7 +37,7 @@ describe("교전 (마주보고 싸우기)", () => {
     expect(vamp.state).toBe("FIGHT");
     human.x = 300; // 강제로 멀어짐
     tickCombat(state, 0.016);
-    expect(vamp.state).toBe("IDLE");
+    expect(vamp.state).toBe("CRAWL");
     expect(vamp._fightTargetId).toBeNull();
   });
 
@@ -175,6 +175,23 @@ describe("웨이브", () => {
     const spawns = events.filter((e) => e.type === "spawn");
     expect(spawns.length).toBe(humanCountForWave(1));
     expect(humansAlive(state)).toBe(spawns.length);
+  });
+
+  it("바닥까지 내려오는 경로가 없으면 웨이브를 시작하지 않는다", () => {
+    state.platforms.items = Array.from({ length: 16 }, (_, index) => ({
+      id: index + 1, x: index * 20, y: 300, blockType: "platform_block",
+    }));
+    expect(startWave(state)).toBe(false);
+    expect(state.wave.active).toBe(false);
+    expect(state.wave.lastStartError).toBe("noPath");
+  });
+
+  it("전폭 장벽에 한 칸 틈이 있으면 웨이브를 시작한다", () => {
+    state.platforms.items = Array.from({ length: 16 }, (_, index) => ({
+      id: index + 1, x: index * 20, y: 300, blockType: "platform_block",
+    })).filter((block) => block.x !== 160);
+    expect(startWave(state)).toBe(true);
+    expect(state.wave.pendingSpawns.every((spawn) => Number.isFinite(spawn.x))).toBe(true);
   });
 
   it("인간 전멸 시 클리어: 보상 지급·웨이브 증가·죽은 뱀파이어 부활", () => {

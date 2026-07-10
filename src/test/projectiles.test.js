@@ -16,7 +16,7 @@ beforeEach(() => {
 
 const put = (side, x, over = {}) => {
   const c = createCharacter(state, side, { x, y: FLOOR_Y - CHAR_SIZE, maxHp: 100, atk: 5, ...over });
-  c.state = "IDLE";
+  c.state = "CRAWL";
   c.timer = 99;
   c._pingCd = 999;
   c._dashCd = 999;

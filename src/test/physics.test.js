@@ -8,7 +8,7 @@ function makeChar(over = {}) {
   return {
     id: 1, side: "vampire",
     x: 100, y: FLOOR_Y - CHAR_SIZE, w: CHAR_SIZE, h: CHAR_SIZE,
-    vx: 0, vy: 0, dir: 1, state: "IDLE", timer: 99,
+    vx: 0, vy: 0, dir: 1, state: "CRAWL", timer: 99,
     _platformId: null, _stunUntil: 0, _stunImmuneUntil: 0,
     _spikeIgnoreUntil: 0, _warpCooldownUntil: 0,
     _blockBounces: 0, _blockBounceDecay: 0,
@@ -30,13 +30,14 @@ describe("낙하와 착지", () => {
     const c = makeChar({ y: 200, state: "FALL", vy: 0 });
     run(c, makeCtx(), 3);
     expect(c.y).toBe(FLOOR_Y - CHAR_SIZE);
-    expect(["IDLE", "CRAWL", "STAY"]).toContain(c.state);
+    expect(["CRAWL", "JUMP", "FALL"]).toContain(c.state);
   });
 
   it("낙하 중 플랫폼 윗면에 착지한다", () => {
     const plat = { id: 7, x: 100, y: 400, blockType: "platform_block" };
     const c = makeChar({ x: 100, y: 300, state: "FALL", vy: 0 });
-    run(c, makeCtx([plat]), 2);
+    const ctx = makeCtx([plat]);
+    for (let t = 0; t < 2 && c._platformId !== 7; t += 1 / 60) tickCharacter(c, ctx, 1 / 60);
     expect(c._platformId).toBe(7);
     expect(c.y).toBe(400 - CHAR_SIZE);
   });
@@ -44,7 +45,7 @@ describe("낙하와 착지", () => {
   it("플랫폼이 사라지면 자유낙하 후 바닥 착지", () => {
     const plat = { id: 7, x: 100, y: 400, blockType: "platform_block" };
     const ctx = makeCtx([plat]);
-    const c = makeChar({ x: 100, y: 400 - CHAR_SIZE, state: "IDLE", _platformId: 7 });
+    const c = makeChar({ x: 100, y: 400 - CHAR_SIZE, state: "CRAWL", _platformId: 7 });
     run(c, ctx, 0.1);
     expect(c._platformId).toBe(7);
     ctx.platforms.length = 0; // 블록 회수
@@ -200,7 +201,7 @@ describe("FIGHT 상태", () => {
     expect(c.state).toBe("FIGHT");
     ctx.platforms.length = 0;
     run(c, ctx, 0.1);
-    expect(["FALL", "IDLE"]).toContain(c.state);
+    expect(["FALL", "CRAWL"]).toContain(c.state);
   });
 });
 
@@ -210,5 +211,26 @@ describe("startJump", () => {
     startJump(c, () => 0.5);
     expect(c.state).toBe("JUMP");
     expect(c.vy).toBeLessThan(0);
+  });
+
+  it("바닥에서 최하단 배치 가능 플랫폼 높이까지 상승한다", () => {
+    const c = makeChar({ x: 120, state: "CRAWL" });
+    startJump(c, () => 0);
+    let highestFeet = c.y + c.h;
+    const ctx = makeCtx();
+    for (let t = 0; t < 1.4; t += 1 / 120) {
+      tickCharacter(c, ctx, 1 / 120);
+      highestFeet = Math.min(highestFeet, c.y + c.h);
+    }
+    expect(highestFeet).toBeLessThanOrEqual(540);
+  });
+
+  it("비전투 지상 이동에서는 IDLE이나 STAY로 멈추지 않는다", () => {
+    const c = makeChar({ timer: 0 });
+    const ctx = makeCtx();
+    for (let t = 0; t < 8; t += 1 / 60) {
+      tickCharacter(c, ctx, 1 / 60);
+      expect(["IDLE", "STAY"]).not.toContain(c.state);
+    }
   });
 });
