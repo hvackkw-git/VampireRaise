@@ -5,7 +5,9 @@ import {
   getPlatformBlockSpritePath, isLogicLayerBlock, STEALTH_BLOCK_TYPES,
   RGB_BLOCK_TINTS, CONVEYOR_ANIM_FRAMES, HOLE_ANIM_FRAMES,
 } from "../platform/platformBlockRenderer.js";
-import { TANK_W, TANK_H, CHAR_SPRITE, CHAR_SIZE, CHAR_SHEET_FRAMES } from "../constants.js";
+import {
+  TANK_W, TANK_H, CHAR_SPRITE, CHAR_SIZE, CHAR_SHEET_FRAMES, DETECT_RANGE,
+} from "../constants.js";
 
 const blockEls = new Map(); // platId → { el, img, lastSrc, lastRot }
 const charEls = new Map();  // charId → { el, sprite, hpFill, lastSide }
@@ -139,16 +141,19 @@ export function renderChars(state, nowMs, ui) {
       const el = document.createElement("div");
       el.className = "char";
       el.dataset.charId = String(c.id);
+      const detect = document.createElement("div"); // 감지 범위 원 (스프라이트 뒤)
+      detect.className = "char-detect";
       const sprite = document.createElement("div");
       sprite.className = "char-sprite";
       const hpbar = document.createElement("div");
       hpbar.className = "char-hpbar";
       const hpFill = document.createElement("i");
       hpbar.appendChild(hpFill);
+      el.appendChild(detect);
       el.appendChild(sprite);
       el.appendChild(hpbar);
       layerChars.appendChild(el);
-      entry = { el, sprite, hpFill, lastSide: null, lastFrame: -1 };
+      entry = { el, detect, sprite, hpFill, lastSide: null, lastFrame: -1 };
       charEls.set(c.id, entry);
     }
     if (entry.lastSide !== c.side) {
@@ -157,6 +162,12 @@ export function renderChars(state, nowMs, ui) {
       entry.el.className = `char side-${c.side}`;
       entry.lastSide = c.side;
       entry.lastFrame = -1;
+      // 감지 원: 캐릭터 중심 기준 반경 (진영별, 노예는 작음)
+      const r = DETECT_RANGE[c.side] ?? 0;
+      entry.detect.style.width = `${r * 2}px`;
+      entry.detect.style.height = `${r * 2}px`;
+      entry.detect.style.left = `${c.w / 2 - r}px`;
+      entry.detect.style.top = `${c.h / 2 - r}px`;
     }
     // FIGHT는 제자리지만 몸싸움 느낌이 나도록 빠르게 프레임을 돌린다
     const moving = Math.abs(c.vx) > 1 || c.state === "CRAWL" || c.state === "JUMP" || c.state === "FIGHT";
