@@ -115,7 +115,7 @@ function frame(nowMs) {
   tickPistons(platforms, signals.powered, yBounds);
 
   // 2) 감지·핑 추적(1초 갱신) → 캐릭터 물리
-  tickAggro(state, simDt);
+  tickAggro(state, simDt, Math.random, signals.powered);
   const ctx = { platforms, blockPowered: signals.powered, now: nowMs, rng: Math.random };
   for (const c of chars) tickCharacter(c, ctx, simDt);
 

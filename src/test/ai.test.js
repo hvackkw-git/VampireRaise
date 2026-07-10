@@ -264,6 +264,88 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
     expect(Math.abs(human.x - 120)).toBeLessThan(0.001);
   });
 
+  it("돌진 중 대상이 죽으면 목표로 순간이동하지 않고 그 자리에서 낙하한다", () => {
+    const vamp = put("vampire", 100);
+    const human = put("human", 100 + DETECT_RANGE.vampire - 20);
+    state.platforms.items.push({ id: 1, x: human.x, y: human.y + human.h, blockType: "platform_block" });
+    tickAggro(state, 0.016, () => 0.9);
+    expect(vamp.state).toBe("DASH");
+    const xBefore = vamp.x, yBefore = vamp.y;
+    human.dead = true;
+    tickAggro(state, 0.016, () => 0.9);
+    expect(vamp.state).toBe("FALL");        // 중단 — 스냅 착지 없음
+    expect(vamp.x).toBe(xBefore);
+    expect(vamp.y).toBe(yBefore);
+    expect(vamp._platformId).toBeNull();
+    expect(vamp._dashTargetId).toBeNull();
+    expect(vamp._dashCd).toBeGreaterThan(0); // 쿨다운은 걸린다
+  });
+
+  it("돌진이 타임아웃되면 목표로 순간이동하지 않는다", () => {
+    const vamp = put("vampire", 100);
+    const human = put("human", 100 + DETECT_RANGE.vampire - 20);
+    state.platforms.items.push({ id: 1, x: human.x, y: human.y + human.h, blockType: "platform_block" });
+    tickAggro(state, 0.016, () => 0.9);
+    expect(vamp.state).toBe("DASH");
+    const xBefore = vamp.x;
+    vamp._dashTimeLeft = 0; // 안전 타임아웃 도달
+    tickAggro(state, 0.016, () => 0.9);
+    expect(vamp.state).toBe("FALL");
+    expect(vamp.x).toBe(xBefore);
+    expect(vamp._dashCd).toBeGreaterThan(0);
+  });
+
+  it("전원 ON(투명) 게이트는 돌진 경로의 벽으로 치지 않는다", () => {
+    const a = { x: 100, y: 500, w: 32, h: 32 };
+    const b = { x: 100, y: 400, w: 32, h: 32 };
+    const clear = estimateRouteDist(a, b, []);
+    const gate = [{ id: 1, x: 100, y: 460, blockType: "gate_block" }];
+    const off = estimateRouteDist(a, b, gate);                      // 신호 없음 → 벽
+    const on = estimateRouteDist(a, b, gate, new Map([[1, true]])); // ON → 통과
+    expect(off).toBeGreaterThan(clear);
+    expect(on).toBe(clear);
+  });
+
+  it("전원 ON(투명) 게이트 윗면은 돌진 착지 목표가 아니다", () => {
+    const vamp = put("vampire", 100);
+    const human = put("human", 140);
+    state.platforms.items.push({ id: 1, x: human.x, y: human.y + human.h, blockType: "gate_block" });
+    tickAggro(state, 0.016, () => 0.9, new Map([[1, true]]));
+    expect(vamp.state).toBe("IDLE");
+    expect(vamp._dashTargetId).toBeNull();
+    expect(vamp._ping).toBeNull();
+  });
+
+  it("전원 OFF 게이트는 물리처럼 지형이다: 윗면이 돌진 착지 목표가 된다", () => {
+    const vamp = put("vampire", 100);
+    const human = put("human", 140);
+    state.platforms.items.push({ id: 1, x: human.x, y: human.y + human.h, blockType: "gate_block" });
+    tickAggro(state, 0.016, () => 0.9, new Map([[1, false]]));
+    expect(vamp.state).toBe("DASH");
+    expect(vamp._dashGoal?.platformId).toBe(1);
+  });
+
+  it("up-가시·스프링·블랙홀 윗면은 돌진 착지 목표가 아니다", () => {
+    for (const blockType of ["spike_block", "spring_block", "black_hole_block"]) {
+      state.chars.items = [];
+      const vamp = put("vampire", 100);
+      const human = put("human", 140);
+      state.platforms.items = [{ id: 1, x: human.x, y: human.y + human.h, blockType, rotation: 0 }];
+      tickAggro(state, 0.016, () => 0.9);
+      expect(vamp.state, blockType).toBe("IDLE");
+      expect(vamp._dashTargetId, blockType).toBeNull();
+      expect(vamp._ping, blockType).toBeNull();
+    }
+  });
+
+  it("옆·아래 방향 가시 윗면은 평평하므로 착지 목표가 될 수 있다", () => {
+    const vamp = put("vampire", 100);
+    const human = put("human", 140);
+    state.platforms.items.push({ id: 1, x: human.x, y: human.y + human.h, blockType: "spike_block", rotation: 90 });
+    tickAggro(state, 0.016, () => 0.9);
+    expect(vamp.state).toBe("DASH");
+  });
+
   it("노예는 돌진하지 않는다 (뱀파이어 전용 패시브)", () => {
     const slave = put("slave", 100);
     put("human", 100 + DETECT_RANGE.slave - 10); // 노예 감지 원 안
