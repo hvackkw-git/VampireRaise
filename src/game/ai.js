@@ -10,7 +10,7 @@
 
 import {
   DETECT_RANGE, PING_REFRESH_S,
-  DASH_ROUTE_MULT, TANK_W, TANK_H,
+  DASH_ROUTE_MULT, TANK_W, TANK_H, FLOOR_Y,
   DASH_SPD, DASH_COOLDOWN_S, DASH_ARRIVE_DIST, DASH_MAX_S,
 } from "../constants.js";
 import { startJump, NON_PLATFORM_BLOCK_TYPES } from "../engine/physics.js";
@@ -59,6 +59,28 @@ function cellCenter(cell) {
     x: cell.x * ROUTE_CELL + ROUTE_CELL / 2,
     y: cell.y * ROUTE_CELL + ROUTE_CELL / 2,
   };
+}
+
+function standableCenterYs(platforms, charH) {
+  const ys = new Set([FLOOR_Y - charH / 2]);
+  for (const p of platforms) {
+    if (!isSolidForRoute(p)) continue;
+    ys.add(p.y - charH / 2);
+  }
+  return [...ys];
+}
+
+function snapDashYToStandable(y, standYs) {
+  let best = y;
+  let bestDist = Infinity;
+  for (const sy of standYs) {
+    const dist = Math.abs(sy - y);
+    if (dist < bestDist) {
+      best = sy;
+      bestDist = dist;
+    }
+  }
+  return best;
 }
 
 function routeObstacles(platforms, startCell, goalCell) {
@@ -112,14 +134,24 @@ export function findDashRoute(c, t, platforms) {
     cells.push({ x, y });
   }
   cells.reverse();
-  const points = [start, ...cells.map(cellCenter), goal];
-  const path = [start];
+  const rawPoints = [start, ...cells.map(cellCenter), goal];
   let dist = 0;
-  for (const pt of points.slice(1)) {
+  for (let i = 1; i < rawPoints.length; i++) {
+    const last = rawPoints[i - 1];
+    const pt = rawPoints[i];
+    dist += Math.hypot(pt.x - last.x, pt.y - last.y);
+  }
+
+  const standYs = standableCenterYs(platforms, c.h);
+  const snappedPoints = [start, ...cells.map((cell) => {
+    const pt = cellCenter(cell);
+    return { ...pt, y: snapDashYToStandable(pt.y, standYs) };
+  }), goal];
+  const path = [start];
+  for (const pt of snappedPoints.slice(1)) {
     const last = path[path.length - 1];
     const step = Math.hypot(pt.x - last.x, pt.y - last.y);
     if (step < 0.001) continue;
-    dist += step;
     path.push(pt);
   }
   return { dist, path };
