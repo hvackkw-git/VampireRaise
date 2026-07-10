@@ -107,6 +107,19 @@ export function startJump(c, rng = Math.random, minDeg = JUMP_MIN_DEG, spanDeg =
 }
 
 /**
+ * 드롭스루: 밟고 있던 발판을 통과해 바로 아래로 내려간다 (다른 플랫포머의 아래 점프).
+ * 떠난 발판(_dropThroughId)만 착지 판정에서 무시하고 그대로 자유낙하하므로,
+ * 바로 아래 발판(또는 바닥)에 안착한다.
+ */
+export function startDrop(c) {
+  c._dropThroughId = c._platformId;
+  c._platformId = null;
+  c.state = "FALL";
+  c.vx = 0; c.vy = 0;
+  c._jumpApexY = null;
+}
+
+/**
  * 착지 판정: 이번 프레임 스윕 구간에서 캐릭터가 내려앉을 플랫폼을 찾아 처리.
  * @returns {boolean} 착지(또는 워프/기믹 발동) 여부
  */
@@ -115,6 +128,7 @@ function tryLand(c, ctx, simDt) {
   if (c.vy <= 0 || c._platformId != null) return false;
   const nextX = c.x + c.vx * simDt;
   for (const plat of platforms) {
+    if (plat.id === c._dropThroughId) continue; // 드롭스루: 방금 떠난 발판은 통과
     if (!charSweepsPlatformX(c, plat, nextX)) continue;
     if (!isTangiblePlatform(plat, blockPowered)) continue;
     // 가시 트리거 후 바닥까지 통과 (블랙홀은 정상 워프)
@@ -126,6 +140,7 @@ function tryLand(c, ctx, simDt) {
       if (tryWarp(c, plat, platforms, now)) return true;
       c.y = landY - c.h;
       c._platformId = plat.id;
+      c._dropThroughId = null; // 아래 발판에 안착 → 드롭스루 종료
       c.vy = 0; c.vx = 0; c._jumpApexY = null;
       if (plat.blockType === "spike_block" && getSpikeDir(plat.rotation ?? 0) === "up") {
         triggerSpike(c, now);
@@ -148,7 +163,7 @@ function tryLand(c, ctx, simDt) {
 function landOnFloor(c, ctx) {
   const groundY = FLOOR_Y - c.h;
   if (c.y >= groundY && c.vy > 0) {
-    c.y = groundY; c.vy = 0; c.vx = 0; c._jumpApexY = null;
+    c.y = groundY; c.vy = 0; c.vx = 0; c._jumpApexY = null; c._dropThroughId = null;
     c.state = c.state === "STUN" ? "STUN" : "CRAWL";
     if (c.state === "CRAWL") c.timer = 0.8 + (ctx.rng?.() ?? Math.random()) * 1.4;
     return true;
@@ -271,6 +286,12 @@ export function tickCharacter(c, ctx, simDt) {
       startJump(c, rng, 40, 20);
     } else if (c.timer <= 0) {
       defaultMoveDecide(c, ctx, rng);
+    } else if (c.side !== "human" && c._platformId != null
+      && aboutToLeavePlatformEdge(c, onPlat, platforms, blockPowered, simDt)) {
+      // 플랫폼 가장자리: 좁은 발판(20px)은 CRAWL 타이머가 끝나기 전에 걸어 나가
+      // 버려 defaultMoveDecide(도약 판단)가 실행되지 않는다. 바닥에서처럼 도약
+      // 기회를 주기 위해 가장자리에 닿는 프레임에 한 번 판단하게 한다.
+      defaultMoveDecide(c, ctx, rng);
     }
   }
 
@@ -341,6 +362,24 @@ function lowestJumpTarget(c, platforms, blockPowered) {
   return best;
 }
 
+/**
+ * 이번 프레임 걷기 이동으로 밟고 있던 플랫폼의 가장자리를 벗어나는지
+ * (이어서 밟을 같은 높이의 인접 발판도 없는지) 판정한다. 벗어나는 프레임에
+ * 도약 판단을 걸어 바닥에서와 동일한 점프 기회를 준다.
+ */
+function aboutToLeavePlatformEdge(c, onPlat, platforms, blockPowered, simDt) {
+  if (!onPlat) return false;
+  const nextX = c.x + c.dir * crawlSpeed(c) * simDt;
+  const hb = getCharHitbox({ x: nextX, w: c.w });
+  const overlaps = (p) => hb.x + hb.w > p.x && hb.x < p.x + PLATFORM_W;
+  if (overlaps(onPlat)) return false; // 아직 현재 발판 위
+  for (const p of platforms) {
+    if (p.id === onPlat.id || p.y !== onPlat.y) continue; // 같은 높이로 이어지는 발판만
+    if (isTangiblePlatform(p, blockPowered) && overlaps(p)) return false; // 옆 발판으로 계속 걸어감
+  }
+  return true;
+}
+
 /** 멈춤 없는 기본 이동: 인간은 걷고, 새우 진영은 주기적으로 위 플랫폼을 향해 도약한다. */
 export function defaultMoveDecide(c, ctx, rng = Math.random) {
   c.state = "CRAWL";
@@ -361,7 +400,10 @@ export function defaultMoveDecide(c, ctx, rng = Math.random) {
   }
 
   if (rng() < 0.32) {
-    startJump(c, rng);
+    // 위로 도달할 발판이 없을 때의 세로 이동. 발판 위라면 점프와 같은 빈도로
+    // 아래 발판으로 드롭스루하고(반반), 그 외에는 제자리 도약한다.
+    if (c._platformId != null && rng() < 0.5) startDrop(c);
+    else startJump(c, rng);
     return;
   }
   c.timer = 1.1 + rng() * 1.8;

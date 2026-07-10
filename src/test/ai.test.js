@@ -452,6 +452,36 @@ describe("점프 중 돌진: 공중 좌표보정 후 최단 경로 돌진", () =
   });
 });
 
+describe("하강 중 돌진: 점프+돌진과 동일 로직", () => {
+  // 공중(FALL) 상태의 뱀파이어 — 드롭스루/이탈 낙하 등으로 떨어지는 중
+  const putFaller = (x, y) => {
+    const c = put("vampire", x, { y });
+    c.state = "FALL";
+    c.vx = 0; c.vy = 40; // 낙하 중
+    c._jumpApexY = null;
+    return c;
+  };
+
+  it("하강하다 감지범위 안 적이 있으면 돌진(DASH)한다", () => {
+    const vamp = putFaller(103, FLOOR_Y - CHAR_SIZE - 37);
+    const human = put("human", 100 + DETECT_RANGE.vampire - 20);
+    state.platforms.items.push({ id: 1, x: human.x, y: human.y + human.h, blockType: "platform_block" });
+    tickAggro(state, 0.016, () => 0.9);
+    expect(vamp.state).toBe("DASH");
+    expect(vamp._dashTargetId).toBe(human.id);
+  });
+
+  it("쿨다운 중이면 하강 중 돌진하지 않는다", () => {
+    const vamp = putFaller(103, FLOOR_Y - CHAR_SIZE - 37);
+    vamp._dashCd = 999;
+    const human = put("human", 100 + DETECT_RANGE.vampire - 20);
+    state.platforms.items.push({ id: 1, x: human.x, y: human.y + human.h, blockType: "platform_block" });
+    tickAggro(state, 0.016, () => 0.9);
+    expect(vamp.state).toBe("FALL");
+    expect(vamp._dashTargetId ?? null).toBeNull();
+  });
+});
+
 describe("플랫폼 위 연속 이동", () => {
   it("아래 적에게 플랫폼 목표가 없어도 멈추지 않고 가장자리로 걸어 내려간다", () => {
     // 감지는 유클리드 거리 — 원 안에 들도록 플랫폼(y=560)과 인간(x=100)을 가깝게 배치
