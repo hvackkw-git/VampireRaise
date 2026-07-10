@@ -16,6 +16,8 @@ const projectileEls = new Map(); // projectileId → el
 /** 논리 캔버스 높이 = 수조(640) + 패널 영역(150) — Shrimprium 320×670 방식 */
 const CANVAS_H = TANK_H + PANEL_H;
 
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
 let layerLogic, layerPlatform, layerChars, layerFx, rgbTintEl, tankEl, canvasEl, canvasWrapperEl;
 let uiScale = 1;
 
@@ -246,8 +248,14 @@ export function renderPings(state) {
     }
     // 같은 대상에 여러 진영 핑이 찍히면 좌우로 살짝 벌린다
     const offset = c.side === "human" ? 5 : c.side === "slave" ? -5 : 0;
-    el.style.left = `${t.x + t.w / 2 - 4 + offset}px`;
-    el.style.top = `${t.y - 2}px`;
+    // 대상이 수조 밖(예: 상단에서 낙하 중인 인간, y<0)이거나 가장자리에 있어도
+    // 핑이 잘려 사라지지 않도록 화면 안으로 클램프한다.
+    // 상단 여백 4px는 ping-bob 애니메이션(-3px)까지 감안한 값.
+    const PING_W = 8, PING_H = 8;
+    const left = clamp(t.x + t.w / 2 - 4 + offset, 0, TANK_W - PING_W);
+    const top = clamp(t.y - 2, 4, TANK_H - PING_H);
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
   }
   for (const [key, el] of pingEls) {
     if (!seen.has(key)) { el.remove(); pingEls.delete(key); }

@@ -213,16 +213,19 @@ describe("startJump", () => {
     expect(c.vy).toBeLessThan(0);
   });
 
-  it("바닥에서 최하단 배치 가능 플랫폼 높이까지 상승한다", () => {
+  it("점프력을 낮춘 뒤: 최소 도약 높이가 이전(84px)의 약 절반이 된다", () => {
     const c = makeChar({ x: 120, state: "CRAWL" });
-    startJump(c, () => 0);
+    startJump(c, () => 0); // 최소 도약력
     let highestFeet = c.y + c.h;
     const ctx = makeCtx();
     for (let t = 0; t < 1.4; t += 1 / 120) {
       tickCharacter(c, ctx, 1 / 120);
       highestFeet = Math.min(highestFeet, c.y + c.h);
     }
-    expect(highestFeet).toBeLessThanOrEqual(540);
+    const rise = (FLOOR_Y) - highestFeet; // 바닥에서 오른 높이
+    // 이전엔 최하단 플랫폼(84px)까지 닿았으나, 점프력 절반으로 ~절반 높이만 상승한다.
+    expect(rise).toBeGreaterThan(38);
+    expect(rise).toBeLessThan(58);
   });
 
   it("비전투 지상 이동에서는 IDLE이나 STAY로 멈추지 않는다", () => {

@@ -388,19 +388,23 @@ describe("플랫폼 위 연속 이동", () => {
     expect(["IDLE", "STAY"]).not.toContain(vamp.state);
   });
 
-  it("대상이 바로 아래여도 플랫폼 윗면 목표가 없으면 핑을 찍지 않는다", () => {
+  it("위 플랫폼의 뱀파이어는 바로 아래 지면의 적에게 땅으로 돌진한다", () => {
     const plat = { id: 1, x: 100, y: 560, blockType: "platform_block" };
-    const vamp = put("vampire", 94, { y: 560 - CHAR_SIZE }); // 중심 110 = 인간 중심과 동일
-    vamp._dashCd = 999;
+    state.platforms.items = [plat];
+    const vamp = put("vampire", 94, { y: 560 - CHAR_SIZE }); // 플랫폼 위, 중심 110
     vamp._platformId = 1;
-    put("human", 94);
-    const ctx = { platforms: [plat], blockPowered: new Map(), now: 10000, rng: () => 0.9 };
-    for (let t = 0; t < 1; t += 1 / 60) {
-      tickAggro(state, 1 / 60, () => 0.9);
-      tickCharacter(vamp, ctx, 1 / 60);
-    }
-    expect(vamp._platformId).toBeNull();
-    expect(vamp.state).toBe("CRAWL");
-    expect(vamp._ping).toBeNull();
+    put("human", 94); // 바로 아래 지면 (중심 110)
+    tickAggro(state, 0.016, () => 0.9);
+    expect(vamp.state).toBe("DASH");
+    expect(vamp._dashGoal?.platformId).toBeNull(); // 플랫폼이 아닌 지면 목표
+    expect(vamp._dashGoal?.y).toBe(FLOOR_Y - CHAR_SIZE / 2);
+  });
+
+  it("평지에서는 옆의 지면 적에게 수평 돌진하지 않는다 (지면 돌진은 위→아래 전용)", () => {
+    const vamp = put("vampire", 100); // 지면
+    put("human", 100 + DETECT_RANGE.vampire - 20); // 같은 지면, 감지 원 안
+    tickAggro(state, 0.016, () => 0.9);
+    expect(vamp.state).not.toBe("DASH");
+    expect(vamp._dashTargetId ?? null).toBeNull();
   });
 });

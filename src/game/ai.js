@@ -107,6 +107,25 @@ function platformStandPoint(p, charH) {
   return { x: p.x + PLATFORM_W / 2, y: p.y - charH / 2, platformId: p.id };
 }
 
+/** 지면(바닥) 위에 서는 착지 지점 — platformId 없음 → endDash에서 자연 낙하로 안착 */
+function floorStandPoint(target, charH) {
+  return { x: target.x + target.w / 2, y: FLOOR_Y - charH / 2, platformId: null };
+}
+
+/** 대상이 지면 근처(플랫폼 없이 땅 위)에 서 있는가 — 지면을 착지 목표로 삼을지 판단 */
+function isNearFloor(target) {
+  return target.y + target.h >= FLOOR_Y - Math.max(target.h, PLATFORM_H);
+}
+
+/**
+ * 돌진 주체가 지면보다 충분히 높은 곳(위 플랫폼 등)에 있는가.
+ * 지면 착지는 "위에서 아래로 내려꽂는" 경우에만 허용 — 평지에서 옆 적에게
+ * 수평 돌진하지 않도록 한다. (여유 PLATFORM_H: 최하단 플랫폼도 지면보다 훨씬 위)
+ */
+function isElevatedAboveFloor(from) {
+  return from != null && from.y + from.h < FLOOR_Y - PLATFORM_H;
+}
+
 function isInPlatformUpperArea(target, p) {
   if (target._platformId === p.id) return true;
   const cx = target.x + target.w / 2;
@@ -120,7 +139,7 @@ function isInPlatformUpperArea(target, p) {
     && feetY >= p.y - Math.max(target.h, PLATFORM_H);
 }
 
-function nearestPlatformStandPointTo(target, platforms, charH, blockPowered = null) {
+function nearestPlatformStandPointTo(target, platforms, charH, blockPowered = null, from = null) {
   const goal = centerOf(target);
   let best = null;
   for (const p of platforms) {
@@ -131,6 +150,13 @@ function nearestPlatformStandPointTo(target, platforms, charH, blockPowered = nu
     if (!best || dist < best.dist || (dist === best.dist && p.id < best.platformId)) {
       best = { ...pt, dist };
     }
+  }
+  // 위 플랫폼에 있는 돌진 주체는 지면 근처의 적에게 바닥으로도 내려꽂을 수 있다.
+  // (평지에서 옆 적에게 수평 돌진하는 것은 막기 위해 주체가 지면보다 높을 때만)
+  if (isNearFloor(target) && isElevatedAboveFloor(from)) {
+    const fp = floorStandPoint(target, charH);
+    const dist = Math.hypot(fp.x - goal.x, fp.y - goal.y);
+    if (!best || dist < best.dist) best = { ...fp, dist };
   }
   return best;
 }
@@ -259,7 +285,7 @@ function isInDetectRange(c, enemy) {
 }
 
 function dashGoalForEnemy(c, enemy, platforms, blockPowered = null) {
-  return nearestPlatformStandPointTo(enemy, platforms, c.h, blockPowered);
+  return nearestPlatformStandPointTo(enemy, platforms, c.h, blockPowered, c);
 }
 
 function findDashRouteToTarget(c, enemy, platforms, routeMult, blockPowered = null) {
@@ -417,7 +443,7 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null) 
       if (found && found.dist <= (DETECT_RANGE[c.side] ?? 0)) {
         const pingPoint = c.side === "vampire"
           ? (firstWalkableDashRoutePoint(c, found.char, state.platforms.items, blockPowered)
-            ?? nearestPlatformStandPointTo(found.char, state.platforms.items, c.h, blockPowered))
+            ?? nearestPlatformStandPointTo(found.char, state.platforms.items, c.h, blockPowered, c))
           : null;
         if (c.side === "vampire" && !pingPoint) {
           c._ping = null;

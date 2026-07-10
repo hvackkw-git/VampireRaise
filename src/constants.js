@@ -37,8 +37,11 @@ export const CRAWL_SPD = 72;          // 걷기 속도 px/s
 export const PX_GRAVITY = 300;        // 일반 낙하 중력
 export const PX_GRAVITY_JUMP = 140;   // 점프 상승~하강 중력 (마지막 1/5 구간은 260)
 export const PX_GRAVITY_JUMP_LAND = 260;
-export const JUMP_SPEED_MIN = 210;     // 최하단 플랫폼(바닥에서 84px 위)까지 닿는 최소 도약력
-export const JUMP_SPEED_SPAN = 30;
+// 점프력을 이전(210/30) 대비 약 0.71배로 낮춰 점프가 오르는 높이를 절반으로 줄였다
+// (도약 높이 ∝ 속도², 0.71² ≈ 0.5). 최하단 플랫폼(84px)에는 더 이상 점프로 닿지 않고
+// 위·아래 이동은 뱀파이어 돌진(dash)이 담당한다.
+export const JUMP_SPEED_MIN = 148;     // 도약 최소 속도 (이전 210의 ~0.71배)
+export const JUMP_SPEED_SPAN = 21;
 export const JUMP_MIN_DEG = 52;
 export const JUMP_SPAN_DEG = 16;
 export const STUN_DURATION_MS = 5000; // 스턴 블록 효과 지속
