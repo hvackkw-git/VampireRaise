@@ -6,7 +6,7 @@ export const TANK_W = 320;
 export const TANK_H = 640;
 
 /** 하단 상시 패널 영역 높이 — 논리 캔버스 전체 높이 = TANK_H + PANEL_H */
-export const PANEL_H = 150;
+export const PANEL_H = 94;
 
 /** 바닥(지면) Y 좌표 — 캐릭터 발이 닿는 선 */
 export const FLOOR_Y = 624;

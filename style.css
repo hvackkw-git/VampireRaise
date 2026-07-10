@@ -24,8 +24,23 @@ button { font-family: inherit; color: inherit; }
 /* ── 게임 영역 내 오버레이 UI (수조와 함께 스케일) ── */
 .ui-overlay { position: absolute; z-index: 20; }
 
+/* 게임 영역 최상단: 계정 레벨·경험치 바 */
+#levelBar {
+  top: 0; left: 0; right: 0;
+  height: 15px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 6px;
+  background: rgba(20, 10, 34, 0.55);
+  pointer-events: none;
+}
+#levelBar b { font-size: 9px; color: #ffd257; font-weight: 700; white-space: nowrap; }
+#levelBar span { font-size: 8px; color: #cbb8e8; white-space: nowrap; }
+#levelBar .bar { flex: 1; height: 7px; }
+
 #hud {
-  top: 6px; left: 6px;
+  top: 19px; left: 6px;
   display: flex;
   gap: 4px;
   pointer-events: none;
@@ -55,7 +70,7 @@ button { font-family: inherit; color: inherit; }
 
 /* 핫키: 우상단 세로 열 (Shrimprium 퀵토글 스타일) */
 #hotkeys {
-  top: 6px; right: 6px;
+  top: 19px; right: 6px;
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -89,12 +104,12 @@ button { font-family: inherit; color: inherit; }
 .hotkey i:empty { display: none; }
 .hotkey-danger { border-color: #8a3040; margin-top: 8px; }
 
-/* ── 논리 캔버스 (320×790 = 수조 640 + 패널 150) — Shrimprium처럼 통째로 스케일 ── */
+/* ── 논리 캔버스 (320×734 = 수조 640 + 패널 94) — Shrimprium처럼 통째로 스케일 ── */
 .canvas-scale-wrapper { position: relative; flex: 0 0 auto; }
 #gameCanvas {
   position: absolute;
   left: 0; top: 0;
-  width: 320px; height: 790px;
+  width: 320px; height: 734px;
   transform-origin: 0 0;
   display: flex;
   flex-direction: column;
@@ -110,8 +125,8 @@ button { font-family: inherit; color: inherit; }
 
 /* ── 패널 영역: 수조와 분리된 하단 상시 카드 ── */
 #panel-region {
-  flex: 0 0 150px;
-  height: 150px;
+  flex: 0 0 94px;
+  height: 94px;
   background: #180f22;
   border-top: 2px solid #43305f;
   overflow: hidden;
@@ -365,32 +380,14 @@ button { font-family: inherit; color: inherit; }
   margin: 0 3px;
 }
 
-/* ── 상시 정보 패널 (패널 영역 내부): 1행 계정 / 2행 캐릭터 4열 ── */
+/* ── 상시 정보 패널 (패널 영역 내부): 캐릭터 4열 ── */
 #info-panel {
   height: 100%;
   padding: 6px 7px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
 }
 
-/* 1행: 계정 레벨·경험치 + 유저 ID (전체 폭) */
-.acct-row {
-  flex: 0 0 24px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0 8px;
-  background: linear-gradient(180deg, #241536, #1e1130);
-  border: 1px solid #43305f;
-  border-radius: 7px;
-  font-size: 10px;
-}
-.acct-id { color: #9c88bc; white-space: nowrap; }
-.acct-id b { color: #ffd257; font-weight: 700; letter-spacing: 0.03em; }
-.acct-level { color: #b8a4d8; white-space: nowrap; }
-.acct-level b { color: #f0e6ff; }
-.acct-exp-num { font-size: 9px; color: #cbb8e8; white-space: nowrap; }
 .bar {
   flex: 1; height: 8px;
   background: rgba(0,0,0,0.5);
@@ -400,11 +397,11 @@ button { font-family: inherit; color: inherit; }
 .bar > i { display: block; height: 100%; border-radius: 4px; transition: width 0.3s; }
 .bar-acct > i { background: linear-gradient(90deg, #b08a20, #ffd257); }
 
-/* 2행: 4열 카드 그리드 */
+/* 4열 카드 그리드 */
 .panel-grid {
   flex: 1;
   display: grid;
-  grid-template-columns: 96px 52px 84px 1fr;
+  grid-template-columns: 84px 46px 66px 88px;
   gap: 5px;
   min-height: 0;
 }
@@ -508,7 +505,7 @@ button { font-family: inherit; color: inherit; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
-#cardHotkey .slot-grid { grid-template-columns: repeat(2, 24px); gap: 3px; }
+#cardHotkey .slot-grid { grid-template-columns: repeat(3, 24px); gap: 3px; }
 .hotkey-slot {
   position: relative;
   width: 24px; height: 24px;

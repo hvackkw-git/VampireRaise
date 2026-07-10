@@ -1,7 +1,6 @@
 // src/ui/infoPanel.js
-// 하단 상시 패널 (2행×4열).
-// 1행: 계정 레벨·경험치 바 + 유저 ID (전체 폭).
-// 2행: [HP/MP/EXP 바] [데미지] [장착 스킬 2×2] [핫키 슬롯].
+// 하단 상시 패널 (1행×4열): [HP/MP/EXP 바] [데미지] [장착 스킬 2×2] [핫키 슬롯].
+// 계정 레벨·경험치 바는 게임 영역 상단(levelBar)에 별도로 표시된다.
 // 표시 대상 캐릭터는 index.js가 결정한다 — 기본은 생존 뱀파이어 중 순서(vampireOrder)가
 // 가장 빠른 캐릭터, 수조에서 캐릭터를 탭하면 그 캐릭터로 전환.
 
@@ -15,19 +14,6 @@ const SKILL_BOOK = {
 };
 const SKILL_SLOT_COUNT = 4;  // 2×2
 const HOTKEY_SLOT_COUNT = 6; // 2×3 — 핫키 기능은 추후 배정
-
-const USER_ID_KEY = "vampireraise.userid.v1";
-
-/** 이 브라우저 고유의 유저 ID — 처음 접속 시 생성해 localStorage에 보관 */
-function loadUserId(storage = globalThis.localStorage) {
-  let id = null;
-  try { id = storage?.getItem(USER_ID_KEY); } catch { /* 무시 */ }
-  if (!id) {
-    id = "VAMP-" + Math.random().toString(36).slice(2, 6).toUpperCase();
-    try { storage?.setItem(USER_ID_KEY, id); } catch { /* 무시 */ }
-  }
-  return id;
-}
 
 let els = null;
 let lastSkillKey = null; // 장착 스킬 재구성 최소화용 캐시 키
@@ -48,7 +34,6 @@ export function initInfoPanel({ onSkillTree } = {}) {
     skillName: $("skillName"),
     hotkeyGrid: $("hotkeyGrid"),
   };
-  $("acctUserId").textContent = loadUserId();
 
   els.skillSlots = Array.from({ length: SKILL_SLOT_COUNT }, () => {
     const slot = document.createElement("div");
@@ -109,11 +94,11 @@ function renderSkills(char) {
 
 /**
  * 패널 갱신 (저빈도 — index.js에서 4Hz + 선택 변경 시).
- * @param {object|null} char 2행에 비출 캐릭터 (null이면 대상 없음 표시)
- * @param {{level:number, exp:number}|null} account 계정 성장 상태
+ * @param {object|null} char 패널에 비출 캐릭터 (null이면 대상 없음 표시)
+ * @param {{level:number, exp:number}|null} account 계정 성장 상태 (상단 levelBar)
  */
 export function renderInfoPanel(char, account = null) {
-  // 1행: 계정
+  // 상단 levelBar: 계정 레벨·경험치
   if (account) {
     const need = accountExpToNext(account.level);
     els.acctLevel.textContent = `Lv.${account.level}`;
@@ -122,7 +107,7 @@ export function renderInfoPanel(char, account = null) {
     els.acctExpNum.textContent = `${account.exp} / ${need}`;
   }
 
-  // 2행: 캐릭터
+  // 캐릭터 패널
   els.panel.classList.toggle("no-char", !char);
   if (!char) {
     els.statName.textContent = "— 뱀파이어 없음 —";
