@@ -27,6 +27,7 @@ function endDash(c) {
   c._dashTargetId = null;
   c._dashRoute = null;
   c._dashRouteIndex = 0;
+  c._dashGoal = null;
   c._dashCd = DASH_COOLDOWN_S;
 }
 
@@ -44,6 +45,7 @@ const ROUTE_ROWS = Math.floor(TANK_H / ROUTE_CELL);
 const ROUTE_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
 const centerOf = (c) => ({ x: c.x + c.w / 2, y: c.y + c.h / 2 });
+const pointAsTarget = (pt, c) => ({ x: pt.x - c.w / 2, y: pt.y - c.h / 2, w: c.w, h: c.h });
 const cellKey = (x, y) => `${x},${y}`;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -59,6 +61,24 @@ function cellCenter(cell) {
     x: cell.x * ROUTE_CELL + ROUTE_CELL / 2,
     y: cell.y * ROUTE_CELL + ROUTE_CELL / 2,
   };
+}
+
+function platformStandPoint(p, charH) {
+  return { x: p.x + PLATFORM_W / 2, y: p.y - charH / 2, platformId: p.id };
+}
+
+function nearestPlatformStandPointTo(target, platforms, charH) {
+  const goal = centerOf(target);
+  let best = null;
+  for (const p of platforms) {
+    if (!isSolidForRoute(p)) continue;
+    const pt = platformStandPoint(p, charH);
+    const dist = Math.hypot(pt.x - goal.x, pt.y - goal.y);
+    if (!best || dist < best.dist || (dist === best.dist && p.id < best.platformId)) {
+      best = { ...pt, dist };
+    }
+  }
+  return best;
 }
 
 function standableCenterYs(platforms, charH) {
@@ -105,8 +125,8 @@ function routeObstacles(platforms, startCell, goalCell) {
  * 플랫폼 블록을 장애물로 보고 20px 그리드 BFS로 실제 우회 최단 경로를 구한다.
  * 반환 dist는 출발 중심→첫 셀 중심 + 셀 이동 길이 + 마지막 셀 중심→대상 중심의 실제 경로 길이다.
  */
-export function findDashRoute(c, t, platforms) {
-  const start = centerOf(c), goal = centerOf(t);
+export function findDashRoute(c, t, platforms, goalOverride = null) {
+  const start = centerOf(c), goal = goalOverride ?? centerOf(t);
   const startCell = pointToCell(start), goalCell = pointToCell(goal);
   const startKey = cellKey(startCell.x, startCell.y);
   const goalKey = cellKey(goalCell.x, goalCell.y);
@@ -166,9 +186,11 @@ function findNearestDashRoute(c, chars, platforms) {
   let best = null;
   for (const enemy of chars) {
     if (enemy === c || enemy.dead || enemy.side === c.side) continue;
-    const route = findDashRoute(c, enemy, platforms);
+    const goal = nearestPlatformStandPointTo(enemy, platforms, c.h);
+    if (!goal) continue;
+    const route = findDashRoute(c, pointAsTarget(goal, c), platforms, goal);
     if (!route || route.dist > budget || route.dist <= DASH_ARRIVE_DIST + 8) continue;
-    if (!best || route.dist < best.route.dist) best = { char: enemy, route };
+    if (!best || route.dist < best.route.dist) best = { char: enemy, route, goal };
   }
   return best;
 }
@@ -191,7 +213,8 @@ export function tickAggro(state, simDt, rng = Math.random) {
       c._dashTimeLeft = (c._dashTimeLeft ?? 0) - simDt;
       if (!t || t.dead || c._dashTimeLeft <= 0) { endDash(c); continue; }
       const cx = c.x + c.w / 2, cy = c.y + c.h / 2;
-      const tx = t.x + t.w / 2, ty = t.y + t.h / 2;
+      const goal = c._dashGoal ?? centerOf(t);
+      const tx = goal.x, ty = goal.y;
       if (Math.hypot(tx - cx, ty - cy) <= DASH_ARRIVE_DIST) { endDash(c); continue; }
       const route = c._dashRoute;
       let i = c._dashRouteIndex ?? 1;
@@ -221,6 +244,7 @@ export function tickAggro(state, simDt, rng = Math.random) {
         c.state = "DASH";
         c._dashTargetId = found.char.id;
         c._dashRoute = found.route.path;
+        c._dashGoal = found.goal;
         c._dashRouteIndex = 1;
         c._dashTimeLeft = DASH_MAX_S;
         c._ping = null;
@@ -235,10 +259,14 @@ export function tickAggro(state, simDt, rng = Math.random) {
       c._pingCd = PING_REFRESH_S;
       const found = findNearestEnemy(c, chars);
       if (found && found.dist <= (DETECT_RANGE[c.side] ?? 0)) {
-        c._ping = { targetId: found.char.id };
+        const pingPoint = c.side === "vampire"
+          ? nearestPlatformStandPointTo(found.char, state.platforms.items, c.h)
+          : null;
+        c._ping = { targetId: found.char.id, ...(pingPoint ? { x: pingPoint.x, y: pingPoint.y, platformId: pingPoint.platformId } : {}) };
         // 대상이 위에 있으면 가끔 점프로 올라가 본다
         const t = found.char;
-        const dx = (t.x + t.w / 2) - (c.x + c.w / 2);
+        const pingX = Number.isFinite(c._ping.x) ? c._ping.x : t.x + t.w / 2;
+        const dx = pingX - (c.x + c.w / 2);
         if (t.y + t.h < c.y - 4 && Math.abs(dx) < 40 && rng() < 0.3) {
           c.dir = dx >= 0 ? 1 : -1;
           startJump(c, rng);
@@ -253,7 +281,8 @@ export function tickAggro(state, simDt, rng = Math.random) {
     if (!c._ping) continue;
     const t = byId.get(c._ping.targetId);
     if (!t || t.dead) { c._ping = null; continue; }
-    const dx = (t.x + t.w / 2) - (c.x + c.w / 2);
+    const pingX = Number.isFinite(c._ping.x) ? c._ping.x : t.x + t.w / 2;
+    const dx = pingX - (c.x + c.w / 2);
     if (Math.abs(dx) < 4) {
       // 수평으로 겹침 (바로 위/아래) — 더 걸어도 가까워지지 않는 국소 최소거리
       c.state = "STAY";
