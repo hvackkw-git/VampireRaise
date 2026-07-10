@@ -14,6 +14,7 @@ import {
   DETECT_RANGE, PING_REFRESH_S,
   DASH_ROUTE_MULT, DASH_RANGED_ROUTE_MULT, DASH_RANGED_SKILL_MULT, TANK_W, TANK_H, FLOOR_Y,
   DASH_SPD, DASH_COOLDOWN_S, DASH_ARRIVE_DIST, DASH_MAX_S, DASH_MP_COST,
+  HUMAN_PROJECTILE_RANGE,
   isEnemySide,
 } from "../constants.js";
 import { startJump, NON_PLATFORM_BLOCK_TYPES } from "../engine/physics.js";
@@ -277,6 +278,17 @@ export function requestRangedDash(vampire, attackerId) {
   vampire._ping = { targetId: attackerId, ranged: true };
 }
 
+/**
+ * 인간 원거리 자세 잡기 갱신.
+ * 원거리 사거리(인식 범위) 안에 적이 들어오면 _rangedBraced를 세워 물리에서 이속을 1/4로 줄인다.
+ */
+function updateRangedBrace(c, chars) {
+  if (c.side !== "human") { c._rangedBraced = false; return; }
+  const range = c.projectileSkill?.range ?? HUMAN_PROJECTILE_RANGE ?? DETECT_RANGE.human;
+  const found = findNearestEnemy(c, chars);
+  c._rangedBraced = !!(found && found.dist <= range);
+}
+
 function isInDetectRange(c, enemy) {
   const range = DETECT_RANGE[c.side] ?? 0;
   const a = centerOf(c);
@@ -341,6 +353,7 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null) 
   let descentNavigator = null;
   for (const c of chars) {
     if (c._dashCd > 0) c._dashCd -= simDt;
+    updateRangedBrace(c, chars); // 인간: 원거리 사거리 안 적 감지 → 이속 감속 플래그
 
     // ── 돌진 조향: BFS 경로 웨이포인트를 따라 비행 ──
     if (c.state === "DASH") {

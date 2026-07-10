@@ -2,7 +2,7 @@
 // 웨이브 진행: 인간 스폰 스케줄, 클리어/패배 판정, 자동 웨이브.
 
 import {
-  TANK_W, CHAR_SIZE,
+  TANK_W, CHAR_SIZE, FLOOR_Y,
   humanCountForWave, humanStatsForWave, waveReward,
   accountExpForWave, accountExpToNext,
   HUMAN_SPAWN_INTERVAL_S, AUTO_WAVE_DELAY_S,
@@ -61,15 +61,16 @@ export function startWave(state, blockPowered = null) {
   return true;
 }
 
-/** 죽은 뱀파이어 전원 부활 (풀피, 바닥에서 재시작) */
+/** 죽은 뱀파이어 전원 부활 (풀피, 맨 아래 바닥에서 재시작) */
 export function reviveVampires(state, rng = Math.random) {
   for (const c of state.chars.items) {
     if (c.side !== "vampire" || !c.dead) continue;
     c.dead = false;
     c.hp = c.maxHp;
-    c.state = "FALL";
+    // 상단 낙하가 아니라 맨 아래(바닥)에서 바로 걷기 시작
+    c.state = "CRAWL";
     c.x = rng() * (TANK_W - CHAR_SIZE);
-    c.y = -CHAR_SIZE;
+    c.y = FLOOR_Y - c.h;
     c.vx = 0; c.vy = 0;
     c._platformId = null;
   }

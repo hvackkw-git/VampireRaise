@@ -7,6 +7,7 @@ import { tickAggro, estimateRouteDist, findDashRoute } from "../game/ai.js";
 import { tickCharacter } from "../engine/physics.js";
 import {
   DETECT_RANGE, PING_REFRESH_S, FLOOR_Y, CHAR_SIZE,
+  HUMAN_PROJECTILE_RANGE, HUMAN_RANGED_BRACE_SPEED_MULT, CRAWL_SPD,
 } from "../constants.js";
 
 let state;
@@ -406,5 +407,31 @@ describe("플랫폼 위 연속 이동", () => {
     tickAggro(state, 0.016, () => 0.9);
     expect(vamp.state).not.toBe("DASH");
     expect(vamp._dashTargetId ?? null).toBeNull();
+  });
+});
+
+describe("인간 원거리 자세 감속", () => {
+  it("원거리 사거리 안에 적이 들어오면 _rangedBraced가 서고, 이속이 1/4로 준다", () => {
+    const human = put("human", 100);
+    put("vampire", 100 + HUMAN_PROJECTILE_RANGE - 20); // 사거리 안
+    tickAggro(state, 1 / 60, () => 0.9);
+    expect(human._rangedBraced).toBe(true);
+
+    const ctx = { platforms: [], blockPowered: new Map(), now: 10000, rng: () => 0.5 };
+    human.dir = 1;
+    tickCharacter(human, ctx, 1 / 60);
+    expect(Math.abs(human.vx)).toBeCloseTo(CRAWL_SPD * HUMAN_RANGED_BRACE_SPEED_MULT, 3);
+  });
+
+  it("사거리 밖이면 감속하지 않는다 (정상 이속)", () => {
+    const human = put("human", 100);
+    put("vampire", 100 + HUMAN_PROJECTILE_RANGE + 40); // 사거리 밖
+    tickAggro(state, 1 / 60, () => 0.9);
+    expect(human._rangedBraced).toBe(false);
+
+    const ctx = { platforms: [], blockPowered: new Map(), now: 10000, rng: () => 0.5 };
+    human.dir = 1;
+    tickCharacter(human, ctx, 1 / 60);
+    expect(Math.abs(human.vx)).toBeCloseTo(CRAWL_SPD, 3);
   });
 });

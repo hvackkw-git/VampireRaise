@@ -75,6 +75,8 @@ export const ATTACK_COOLDOWN_S = 1.0; // 공격 주기(초)
 
 // ── 인간 투사체(파란새우 원거리 공격) ──
 export const HUMAN_PROJECTILE_RANGE = DETECT_RANGE.human; // 인식 범위 안에 들어온 적에게 투척
+/** 원거리 공격 사거리(인식 범위) 안에 적이 들어오면 인간은 자세를 잡느라 이속이 1/4로 준다 */
+export const HUMAN_RANGED_BRACE_SPEED_MULT = 0.25;
 export const HUMAN_PROJECTILE_SPEED = 170;
 export const HUMAN_PROJECTILE_COOLDOWN_S = 1.4;
 export const HUMAN_PROJECTILE_DAMAGE = 4;
