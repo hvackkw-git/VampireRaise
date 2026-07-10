@@ -4,9 +4,9 @@
 // 적에게 핑을 찍고, 다음 갱신까지 그 대상을 향해 걷는다. 갱신 시점에 감지 원 안에
 // 적이 없으면 핑을 지우고 랜덤 배회로 돌아간다 (감지 범위는 향후 성장 요소).
 //
-// 기본 핑 추적은 경로 탐색 없이 수평으로 걷는다. 단, 뱀파이어 돌진은 플랫폼 블록을
-// 장애물로 둔 20px 그리드 BFS 최단 경로를 계산해, 감지범위×2 예산 이내일 때만
-// 그 경로의 웨이포인트를 따라 날아간다.
+// 기본 핑 추적은 경로 탐색 없이 수평으로 걷는다. 단, 뱀파이어 돌진은 중력을
+// 무시하며, 플랫폼 블록을 장애물로 둔 20px 그리드 BFS 최단 경로가 감지범위×2
+// 예산 이내인 적에게 그 최단 경로의 웨이포인트를 따라 날아간다.
 
 import {
   DETECT_RANGE, PING_REFRESH_S,
@@ -129,6 +129,18 @@ export function estimateRouteDist(c, t, platforms) {
   return findDashRoute(c, t, platforms)?.dist ?? Infinity;
 }
 
+function findNearestDashRoute(c, chars, platforms) {
+  const budget = (DETECT_RANGE.vampire ?? 0) * DASH_ROUTE_MULT;
+  let best = null;
+  for (const enemy of chars) {
+    if (enemy === c || enemy.dead || enemy.side === c.side) continue;
+    const route = findDashRoute(c, enemy, platforms);
+    if (!route || route.dist > budget || route.dist <= DASH_ARRIVE_DIST + 8) continue;
+    if (!best || route.dist < best.route.dist) best = { char: enemy, route };
+  }
+  return best;
+}
+
 /**
  * 매 프레임 감지 틱.
  * @param {object} state
@@ -169,26 +181,19 @@ export function tickAggro(state, simDt, rng = Math.random) {
     }
 
     // ── 뱀파이어 패시브(혈귀 돌진) ──
-    // 감지는 남들과 동일한 감지 원. 플랫폼을 피해 돌아가는 BFS 경로 길이가
-    // 감지범위×2 이내일 때만 돌진. 너무 돌아가면 발동 X → 걷기.
+    // 중력을 무시한다. 직선 감지 원 밖(특히 위쪽)의 적도 플랫폼을 피해 돌아가는
+    // BFS 최단 경로가 감지범위×2 이내면 그 최단 경로로 날아간다.
     if (c.side === "vampire" && !(c._dashCd > 0)) {
-      const found = findNearestEnemy(c, chars);
-      if (found
-        && found.dist <= (DETECT_RANGE.vampire ?? 0)
-        && found.dist > DASH_ARRIVE_DIST + 8) {
-        const route = findDashRoute(c, found.char, state.platforms.items);
-        if (!route || route.dist > DETECT_RANGE.vampire * DASH_ROUTE_MULT) {
-          // 인식은 유지하되, 실제 우회 경로가 예산을 넘으면 돌진하지 않는다.
-        } else {
-          c.state = "DASH";
-          c._dashTargetId = found.char.id;
-          c._dashRoute = route.path;
-          c._dashRouteIndex = 1;
-          c._dashTimeLeft = DASH_MAX_S;
-          c._ping = null;
-          c._platformId = null;
-          continue;
-        }
+      const found = findNearestDashRoute(c, chars, state.platforms.items);
+      if (found) {
+        c.state = "DASH";
+        c._dashTargetId = found.char.id;
+        c._dashRoute = found.route.path;
+        c._dashRouteIndex = 1;
+        c._dashTimeLeft = DASH_MAX_S;
+        c._ping = null;
+        c._platformId = null;
+        continue;
       }
     }
 
