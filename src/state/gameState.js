@@ -2,15 +2,23 @@
 // 게임 상태 생성·저장·복원 (localStorage)
 
 import {
-  TANK_W, FLOOR_Y, CHAR_SIZE, CHAR_SPRITES, VAMPIRE_BASE, INITIAL_VAMPIRE_COUNT,
+  TANK_W, FLOOR_Y, CHAR_SIZE, CHAR_SPRITES, VAMPIRE_BASE, SLAVE_BASE, INITIAL_VAMPIRE_COUNT,
 } from "../constants.js";
 
 export const SAVE_KEY = "vampireraise.save.v1";
 
 /** 캐릭터 레코드 생성 */
+function nextVampireOrder(state) {
+  const orders = state.chars.items
+    .filter((c) => c.side === "vampire")
+    .map((c) => Number(c.vampireOrder) || 0);
+  return (orders.length ? Math.max(...orders) : 0) + 1;
+}
+
 export function createCharacter(state, side, opts = {}) {
   const id = state.chars.nextId++;
   const size = CHAR_SPRITES[side]?.size ?? CHAR_SIZE;
+  const baseStats = side === "slave" ? SLAVE_BASE : VAMPIRE_BASE;
   const c = {
     id,
     side,                       // 'vampire' | 'human' | 'slave'
@@ -38,11 +46,13 @@ export function createCharacter(state, side, opts = {}) {
     // ── 성장 ──
     level: opts.level ?? 1,
     exp: 0,
-    maxHp: opts.maxHp ?? VAMPIRE_BASE.maxHp,
-    hp: opts.hp ?? opts.maxHp ?? VAMPIRE_BASE.maxHp,
-    atk: opts.atk ?? VAMPIRE_BASE.atk,
+    maxHp: opts.maxHp ?? baseStats.maxHp,
+    hp: opts.hp ?? opts.maxHp ?? baseStats.maxHp,
+    atk: opts.atk ?? baseStats.atk,
     job: null,                  // 향후 직업 분류
     skills: [],                 // 향후 스킬트리
+    ownerVampireId: opts.ownerVampireId ?? null, // 노예 소유 뱀파이어 id
+    vampireOrder: side === "vampire" ? (opts.vampireOrder ?? nextVampireOrder(state)) : null,
     dead: false,
   };
   state.chars.items.push(c);
@@ -89,6 +99,7 @@ export function serialize(state) {
         .map((c) => ({
           id: c.id, side: c.side, x: c.x, y: c.y, dir: c.dir,
           level: c.level, exp: c.exp, maxHp: c.maxHp, hp: c.hp, atk: c.atk,
+          ownerVampireId: c.ownerVampireId, vampireOrder: c.vampireOrder,
           job: c.job, skills: c.skills, dead: c.dead,
         })),
     },
@@ -134,6 +145,7 @@ export function loadState(storage = globalThis.localStorage) {
     const c = createCharacter(state, rec.side, {
       x: rec.x, y: rec.y, level: rec.level,
       maxHp: rec.maxHp, hp: rec.hp, atk: rec.atk,
+      ownerVampireId: rec.ownerVampireId, vampireOrder: rec.vampireOrder,
     });
     c.id = rec.id;
     c.dir = rec.dir === -1 ? -1 : 1;

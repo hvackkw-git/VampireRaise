@@ -85,6 +85,9 @@ export const LEVELUP_ATK_GAIN = 2;
 /** 뱀파이어 초기 스탯 */
 export const VAMPIRE_BASE = { maxHp: 60, atk: 8 };
 
+/** 좀비(노예) 기본 스탯 — 향후 소유 뱀파이어 스킬트리로 보정 */
+export const SLAVE_BASE = { maxHp: 5, hpDecayPerSecond: 1 };
+
 // ── 웨이브 ──
 /** 웨이브 N의 인간 수 */
 export function humanCountForWave(n) {

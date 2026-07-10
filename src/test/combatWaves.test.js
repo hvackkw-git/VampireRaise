@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { createInitialState, createCharacter } from "../state/gameState.js";
 import { tickCombat, grantExp, infectToSlave } from "../game/combat.js";
 import { startWave, tickWaves, vampireSideAlive, humansAlive } from "../game/waves.js";
-import { humanCountForWave, humanStatsForWave, expToNext } from "../constants.js";
+import { humanCountForWave, humanStatsForWave, expToNext, SLAVE_BASE } from "../constants.js";
 
 let state;
 beforeEach(() => {
@@ -72,7 +72,7 @@ describe("전투와 전염", () => {
     expect(events.some((e) => e.type === "hit")).toBe(true);
   });
 
-  it("인간이 뱀파이어에게 죽으면 노예로 전염된다", () => {
+  it("인간이 뱀파이어에게 막타를 맞으면 소유 노예로 전염된다", () => {
     const vamp = state.chars.items[0];
     vamp._atkCd = 0;
     vamp.atk = 999;
@@ -81,8 +81,44 @@ describe("전투와 전염", () => {
     });
     const events = tickCombat(state, 0.1);
     expect(human.side).toBe("slave");
-    expect(human.hp).toBe(human.maxHp);
-    expect(events.some((e) => e.type === "infect")).toBe(true);
+    expect(human.ownerVampireId).toBe(vamp.id);
+    expect(human.maxHp).toBe(SLAVE_BASE.maxHp);
+    expect(human.hp).toBe(SLAVE_BASE.maxHp);
+    expect(events.some((e) => e.type === "infect" && e.owner === vamp)).toBe(true);
+  });
+
+  it("노예가 인간을 죽여도 전염시키지 않는다", () => {
+    state.chars.items = [];
+    const slave = createCharacter(state, "slave", { x: 100, y: 100, maxHp: 30, atk: 999 });
+    slave._atkCd = 0;
+    const human = createCharacter(state, "human", { x: 110, y: 100, maxHp: 5, atk: 1 });
+    const events = tickCombat(state, 0.1);
+    expect(human.side).toBe("human");
+    expect(human.dead).toBe(true);
+    expect(state.chars.items.includes(human)).toBe(false);
+    expect(events.some((e) => e.type === "infect")).toBe(false);
+  });
+
+  it("여러 뱀파이어가 같은 틱에 인간을 죽이면 순번이 앞선 뱀파이어가 소유한다", () => {
+    state.chars.items = [];
+    const late = createCharacter(state, "vampire", { x: 100, y: 100, maxHp: 30, atk: 10, vampireOrder: 2 });
+    const early = createCharacter(state, "vampire", { x: 120, y: 100, maxHp: 30, atk: 10, vampireOrder: 1 });
+    const human = createCharacter(state, "human", { x: 110, y: 100, maxHp: 15, atk: 1 });
+    late._atkCd = 0;
+    early._atkCd = 0;
+    tickCombat(state, 0.1);
+    expect(human.side).toBe("slave");
+    expect(human.ownerVampireId).toBe(early.id);
+  });
+
+  it("웨이브 도중에만 노예 체력이 초당 1 감소한다", () => {
+    const slave = createCharacter(state, "slave", { maxHp: 5, hp: 5 });
+    state.wave.active = false;
+    tickCombat(state, 1);
+    expect(slave.hp).toBe(5);
+    state.wave.active = true;
+    tickCombat(state, 1.5);
+    expect(slave.hp).toBe(3.5);
   });
 
   it("뱀파이어 사망은 dead 마크로 보존(부활 대상), 노예는 제거", () => {
@@ -117,7 +153,7 @@ describe("전투와 전염", () => {
     human.hp = 0;
     infectToSlave(human);
     expect(human.side).toBe("slave");
-    expect(human.hp).toBe(30);
+    expect(human.hp).toBe(SLAVE_BASE.maxHp);
     expect(human.dead).toBe(false);
   });
 });

@@ -6,7 +6,7 @@
 import {
   ENGAGE_RANGE, FIGHT_BREAK_RANGE, ENGAGE_MAX_DY, ATTACK_COOLDOWN_S, isEnemySide,
   expToNext, expForKill, LEVELUP_HP_GAIN, LEVELUP_ATK_GAIN, KILL_BLOOD_REWARD,
-  CHAR_SPRITES,
+  CHAR_SPRITES, SLAVE_BASE,
 } from "../constants.js";
 
 const center = (c) => ({ x: c.x + c.w / 2, y: c.y + c.h / 2 });
@@ -49,12 +49,14 @@ export function grantExp(c, amount, events) {
 }
 
 /** 인간 → 노예 전염 (스프라이트 크기가 다르면 발 위치를 유지하며 박스 교체) */
-export function infectToSlave(c) {
+export function infectToSlave(c, ownerVampire = null) {
   c.side = "slave";
+  c.ownerVampireId = ownerVampire?.id ?? null;
   const size = CHAR_SPRITES.slave?.size ?? c.h;
   c.y += c.h - size; // 발(y+h) 고정
   c.w = size;
   c.h = size;
+  c.maxHp = SLAVE_BASE.maxHp;
   c.hp = c.maxHp;
   c.dead = false;
   c.state = "IDLE";
@@ -62,6 +64,31 @@ export function infectToSlave(c) {
   c.vx = 0; c.vy = 0;
   c._fightTargetId = null;
   c._ping = null;
+}
+
+function vampireOrder(c) {
+  return Number.isFinite(c?.vampireOrder) ? c.vampireOrder : Infinity;
+}
+
+function chooseZombieOwner(hitRecords, human) {
+  return hitRecords
+    .filter((r) => r.target === human && r.attacker.side === "vampire")
+    .map((r) => r.attacker)
+    .sort((a, b) => vampireOrder(a) - vampireOrder(b) || a.id - b.id)[0] ?? null;
+}
+
+function tickSlaveDecay(state, simDt, events) {
+  if (!state.wave.active) return;
+  for (const c of state.chars.items) {
+    if (c.dead || c.side !== "slave") continue;
+    c.hp -= SLAVE_BASE.hpDecayPerSecond * simDt;
+    if (c.hp > 0) continue;
+    c.hp = 0;
+    c.dead = true;
+    c.state = "DEAD";
+    c._fightTargetId = null;
+    events.push({ type: "kill", target: c, decay: true });
+  }
 }
 
 /** 교전 진입: 멈춰서 대상을 마주본다 (핑 추적 종료) */
@@ -110,6 +137,7 @@ export function tickCombat(state, simDt) {
   }
 
   // 2) 교전 유지·공격
+  const hitRecords = [];
   for (const c of chars) {
     if (c.dead || c.state !== "FIGHT") continue;
     const t = byId.get(c._fightTargetId);
@@ -120,19 +148,29 @@ export function tickCombat(state, simDt) {
     c.dir = t.x + t.w / 2 >= c.x + c.w / 2 ? 1 : -1;
     if (c._atkCd > 0) continue;
     c._atkCd = ATTACK_COOLDOWN_S;
-    t.hp -= c.atk;
-    events.push({ type: "hit", attacker: c, target: t, dmg: c.atk });
-    if (t.hp > 0) continue;
+    hitRecords.push({ attacker: c, target: t, dmg: c.atk });
+  }
 
-    // ── 처치 ──
+  for (const r of hitRecords) {
+    if (r.attacker.dead || r.target.dead) continue;
+    r.target.hp -= r.dmg;
+    events.push({ type: "hit", attacker: r.attacker, target: r.target, dmg: r.dmg });
+  }
+
+  const killed = [...new Set(hitRecords.map((r) => r.target))].filter((t) => !t.dead && t.hp <= 0);
+  for (const t of killed) {
     t.hp = 0;
-    grantExp(c, expForKill(t.level), events);
-    disengage(c);
-    if (t.side === "human") {
+    const owner = t.side === "human" ? chooseZombieOwner(hitRecords, t) : null;
+    const killer = owner ?? hitRecords.find((r) => r.target === t)?.attacker;
+    if (killer) {
+      grantExp(killer, expForKill(t.level), events);
+      disengage(killer);
+    }
+    if (t.side === "human" && owner) {
       state.blood += KILL_BLOOD_REWARD;
       events.push({ type: "kill", target: t });
-      infectToSlave(t);
-      events.push({ type: "infect", char: t });
+      infectToSlave(t, owner);
+      events.push({ type: "infect", char: t, owner });
     } else {
       t.dead = true;
       t.state = "DEAD";
@@ -140,6 +178,8 @@ export function tickCombat(state, simDt) {
       events.push({ type: "kill", target: t });
     }
   }
+
+  tickSlaveDecay(state, simDt, events);
 
   // 노예/인간 시체는 제거 (뱀파이어 시체는 부활 대상으로 보존)
   state.chars.items = state.chars.items.filter((c) => !c.dead || c.side === "vampire");
