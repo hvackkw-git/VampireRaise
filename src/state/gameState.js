@@ -43,6 +43,7 @@ export function createCharacter(state, side, opts = {}) {
     _dashTimeLeft: 0,
     _dashCd: 0,
     _atkCd: Math.random(),      // 첫 공격 타이밍 분산
+    _projectileCd: Math.random(), // 인간 투사체 첫 발사 타이밍 분산
     // ── 성장 ──
     level: opts.level ?? 1,
     exp: 0,
@@ -51,6 +52,7 @@ export function createCharacter(state, side, opts = {}) {
     atk: opts.atk ?? baseStats.atk,
     job: null,                  // 향후 직업 분류
     skills: [],                 // 향후 스킬트리
+    projectileSkill: opts.projectileSkill ?? null, // 인간 투사체 성장 훅(count/homing/damage/cooldown/range/speed)
     ownerVampireId: opts.ownerVampireId ?? null, // 노예 소유 뱀파이어 id
     vampireOrder: side === "vampire" ? (opts.vampireOrder ?? nextVampireOrder(state)) : null,
     dead: false,
@@ -75,6 +77,7 @@ export function createInitialState() {
     prestige: { count: 0 }, // 향후 프리스티지 훅
     platforms: { nextId: 1, items: [] },
     chars: { nextId: 1, items: [] },
+    projectiles: { nextId: 1, items: [] },
   };
   for (let i = 0; i < INITIAL_VAMPIRE_COUNT; i++) createCharacter(state, "vampire");
   return state;
