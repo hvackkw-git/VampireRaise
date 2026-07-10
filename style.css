@@ -188,6 +188,8 @@ button { font-family: inherit; color: inherit; }
 }
 .char.side-human .char-hpbar > i { background: #4d9fdc; }
 .char.side-slave .char-hpbar > i { background: #9a68d8; }
+/* 좀비(24px, topPad 8): 몸통 위에 맞춰 바를 올린다 */
+.char.side-slave .char-hpbar { top: 4px; left: 2px; right: 2px; }
 
 /* 돌진 잔상 */
 .char-ghost {

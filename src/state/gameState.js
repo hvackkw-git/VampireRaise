@@ -2,7 +2,7 @@
 // 게임 상태 생성·저장·복원 (localStorage)
 
 import {
-  TANK_W, FLOOR_Y, CHAR_SIZE, VAMPIRE_BASE, INITIAL_VAMPIRE_COUNT,
+  TANK_W, FLOOR_Y, CHAR_SIZE, CHAR_SPRITES, VAMPIRE_BASE, INITIAL_VAMPIRE_COUNT,
 } from "../constants.js";
 
 export const SAVE_KEY = "vampireraise.save.v1";
@@ -10,12 +10,13 @@ export const SAVE_KEY = "vampireraise.save.v1";
 /** 캐릭터 레코드 생성 */
 export function createCharacter(state, side, opts = {}) {
   const id = state.chars.nextId++;
+  const size = CHAR_SPRITES[side]?.size ?? CHAR_SIZE;
   const c = {
     id,
     side,                       // 'vampire' | 'human' | 'slave'
-    x: opts.x ?? Math.random() * (TANK_W - CHAR_SIZE),
-    y: opts.y ?? FLOOR_Y - CHAR_SIZE,
-    w: CHAR_SIZE, h: CHAR_SIZE,
+    x: opts.x ?? Math.random() * (TANK_W - size),
+    y: opts.y ?? FLOOR_Y - size,
+    w: size, h: size,
     vx: 0, vy: 0,
     dir: Math.random() < 0.5 ? -1 : 1,
     state: opts.state ?? "IDLE",

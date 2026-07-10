@@ -8,22 +8,23 @@ export const TANK_H = 640;
 /** 바닥(지면) Y 좌표 — 캐릭터 발이 닿는 선 */
 export const FLOOR_Y = 624;
 
-/** 캐릭터 표시 크기(px). 스프라이트 32×32 */
+/** 기본 캐릭터 크기(px) — 스폰 좌표 계산 등에 사용 */
 export const CHAR_SIZE = 32;
-/** 걷기 스프라이트 시트 프레임 수 (shrimp-4frame: 32×32 × 8프레임) */
-export const CHAR_SHEET_FRAMES = 8;
-/**
- * 스프라이트 상단 투명 여백(px, 32px 프레임 기준) — Shrimprium SHRIMP_SPRITE_TOP_PAD 이식.
- * 새우 몸통은 프레임 아래쪽 ~14px에만 그려져 있으므로, 세로 충돌은 이 여백을 제외한
- * "몸통"(높이 32-18=14px)으로 판정한다 → 1칸(20px) 통로를 위아래로 지나갈 수 있다.
- */
-export const CHAR_SPRITE_TOP_PAD = 18;
 
-/** 진영별 임시 스프라이트 (Shrimprium 새우 재활용) */
-export const CHAR_SPRITE = {
-  vampire: "assets/shrimp_variants/shrimp-4frame-cherry_red.png",
-  human:   "assets/shrimp_variants/shrimp-4frame-blue_velvet.png",
-  slave:   "assets/shrimp_variants/shrimp-4frame-black_king.png",
+/**
+ * 진영별 스프라이트 설정. 어셋 교체 시 여기만 바꾸면 된다.
+ * - size: 프레임 한 변(px). 캐릭터 논리 박스(w/h)도 이 값.
+ * - frames: 걷기 프레임 수 (가로 스트립).
+ * - topPad: 프레임 상단 투명 여백(px) — 세로 충돌은 이 여백을 제외한 "몸통"으로
+ *   판정한다 (Shrimprium SHRIMP_SPRITE_TOP_PAD 방식). 몸통 높이 ≤ 20px이면
+ *   1칸 통로를 위아래로 지나갈 수 있다.
+ * 기본 방향은 왼쪽 (렌더러가 dir>0일 때 좌우 반전).
+ */
+export const CHAR_SPRITES = {
+  vampire: { src: "assets/shrimp_variants/shrimp-4frame-cherry_red.png", size: 32, frames: 8, topPad: 18 },
+  human:   { src: "assets/shrimp_variants/shrimp-4frame-blue_velvet.png", size: 32, frames: 8, topPad: 18 },
+  // 인체형 좀비 더미 (tools/generate_zombie_dummy.py) — 몸통 하단 16px, 폭 ≤20px
+  slave:   { src: "assets/chars/zombie_walk.png", size: 24, frames: 8, topPad: 8 },
 };
 
 // ── 이동 물리 (Shrimprium 새우 물리 이식값) ──
