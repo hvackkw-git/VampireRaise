@@ -172,6 +172,21 @@ button { font-family: inherit; color: inherit; }
 .char.side-human .char-hpbar > i { background: #4d9fdc; }
 .char.side-slave .char-hpbar > i { background: #9a68d8; }
 
+/* 돌진 잔상 */
+.char-ghost {
+  position: absolute;
+  width: 32px; height: 32px;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  pointer-events: none;
+  filter: saturate(1.6) brightness(1.25);
+  animation: ghost-fade 0.4s linear forwards;
+}
+@keyframes ghost-fade {
+  from { opacity: 0.55; }
+  to   { opacity: 0; }
+}
+
 /* 핑 마커 (테스트용): 추적 대상 머리 위 표시 */
 .ping-mark {
   position: absolute;

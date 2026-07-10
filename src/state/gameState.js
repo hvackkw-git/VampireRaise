@@ -30,6 +30,9 @@ export function createCharacter(state, side, opts = {}) {
     _fightTargetId: null,       // 교전 대상 (FIGHT 상태)
     _ping: null,                // 추적 핑 { targetId } — 1초마다 갱신
     _pingCd: Math.random(),     // 핑 갱신 시차 분산
+    _dashTargetId: null,        // 혈귀 돌진 대상 (뱀파이어 패시브)
+    _dashTimeLeft: 0,
+    _dashCd: 0,
     _atkCd: Math.random(),      // 첫 공격 타이밍 분산
     // ── 성장 ──
     level: opts.level ?? 1,
