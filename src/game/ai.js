@@ -271,6 +271,21 @@ function findDashRouteToTarget(c, enemy, platforms, routeMult, blockPowered = nu
   return { char: enemy, route, goal };
 }
 
+function firstWalkableDashRoutePoint(c, enemy, platforms, blockPowered = null) {
+  const detectRange = DETECT_RANGE[c.side] ?? 0;
+  const budget = detectRange * dashRouteMultiplier(c);
+  const goal = dashGoalForEnemy(c, enemy, platforms, blockPowered);
+  if (!goal) return null;
+  const route = findDashRoute(c, pointAsTarget(goal, c), platforms, goal, blockPowered);
+  if (!route || route.dist <= budget) return null;
+
+  const cx = c.x + c.w / 2;
+  for (const pt of route.path.slice(1)) {
+    if (Math.abs(pt.x - cx) >= 4) return { ...pt, platformId: goal.platformId };
+  }
+  return { ...goal };
+}
+
 function findNearestDashRoute(c, chars, platforms, blockPowered = null) {
   let best = null;
   for (const enemy of chars) {
@@ -382,7 +397,8 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null) 
       const found = findNearestEnemy(c, chars);
       if (found && found.dist <= (DETECT_RANGE[c.side] ?? 0)) {
         const pingPoint = c.side === "vampire"
-          ? nearestPlatformStandPointTo(found.char, state.platforms.items, c.h, blockPowered)
+          ? (firstWalkableDashRoutePoint(c, found.char, state.platforms.items, blockPowered)
+            ?? nearestPlatformStandPointTo(found.char, state.platforms.items, c.h, blockPowered))
           : null;
         if (c.side === "vampire" && !pingPoint) {
           c._ping = null;
