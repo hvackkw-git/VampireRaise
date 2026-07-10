@@ -21,7 +21,7 @@ function overlapsFallLine(centerX, cell) {
   return centerX + HITBOX_HALF > cell.x && centerX - HITBOX_HALF < cell.x + PLATFORM_W;
 }
 
-function buildNavigation(platforms, blockPowered = null) {
+function buildNavigation(platforms, blockPowered = null, goalX = null) {
   const tangible = platforms.filter((p) => isTangiblePlatform(p, blockPowered));
   const cellsByKey = new Map();
   for (const block of tangible) {
@@ -85,7 +85,9 @@ function buildNavigation(platforms, blockPowered = null) {
       if (!landing) continue;
       let tailDistance;
       if (landing.floor) {
-        tailDistance = FLOOR_Y - segment.y;
+        // 바닥에 닿은 뒤 목표(베이스) x까지 걸어가는 거리까지 포함해 최소 경로를 고른다.
+        tailDistance = (FLOOR_Y - segment.y)
+          + (goalX == null ? 0 : Math.abs(targetX - goalX));
       } else {
         const next = planFromSegment(landing.segment, targetX);
         if (!next) continue;
@@ -131,8 +133,8 @@ export function hasHumanDescentPath(platforms, blockPowered = null) {
   return findHumanSpawnRoutes(platforms, blockPowered).length > 0;
 }
 
-export function createHumanDescentNavigator(platforms, blockPowered = null) {
-  const nav = buildNavigation(platforms, blockPowered);
+export function createHumanDescentNavigator(platforms, blockPowered = null, goalX = null) {
+  const nav = buildNavigation(platforms, blockPowered, goalX);
   return {
     findStep(char) {
       if (char?._platformId == null) return null;

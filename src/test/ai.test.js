@@ -77,17 +77,17 @@ describe("핑 추적", () => {
     expect(vamp._ping).toBeNull();
   });
 
-  it("서로의 원에 들어오면 인간은 직접, 뱀파이어는 플랫폼 윗면에 핑을 찍는다", () => {
+  it("인간은 적을 쫓지 않고 베이스(왼쪽 아래 존)를 향해 행군한다", () => {
     const vamp = put("vampire", 100);
     vamp._dashCd = 999;
     const human = put("human", 160);
     state.platforms.items.push({ id: 1, x: human.x, y: human.y + human.h, blockType: "platform_block" });
     tickAggro(state, 0.016, () => 0.9);
-    expect(vamp._ping?.targetId).toBe(human.id);
+    expect(vamp._ping?.targetId).toBe(human.id);   // 뱀파이어는 여전히 인간을 감지·추적
     expect(vamp._ping?.platformId).toBe(1);
-    expect(human._ping?.targetId).toBe(vamp.id);
+    expect(human._ping).toBeNull();                // 인간은 핑 없이 베이스로 행군
+    expect(human.dir).toBe(-1);                    // 베이스는 왼쪽
     expect(vamp.dir).toBe(1);
-    expect(human.dir).toBe(-1);
   });
 
   it("노예는 감지 반경이 작다: 같은 거리에서 뱀파이어는 보지만 노예는 못 본다", () => {
