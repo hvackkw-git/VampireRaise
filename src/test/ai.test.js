@@ -162,6 +162,19 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
     expect(flewUp).toBe(true);
   });
 
+  it("위쪽 플랫폼으로 돌진할 때 경로 Y를 착지 가능한 높이에 맞춘다", () => {
+    const plat = { id: 1, x: 120, y: 520, blockType: "platform_block" };
+    const vamp = put("vampire", 120);
+    put("human", 120, { y: 520 - CHAR_SIZE, _platformId: 1 });
+    state.platforms.items.push(plat);
+
+    tickAggro(state, 0.016, () => 0.9);
+
+    expect(vamp.state).toBe("DASH");
+    expect(vamp._dashRoute.some((pt) => pt.y === plat.y - CHAR_SIZE / 2)).toBe(true);
+    expect(vamp._dashRoute.some((pt) => pt.y === plat.y + 10)).toBe(false);
+  });
+
   it("대상에 도달하면 돌진이 끝나고(낙하) 쿨다운이 걸린다", () => {
     const vamp = put("vampire", 100);
     put("human", 100 + DETECT_RANGE.vampire - 20);
