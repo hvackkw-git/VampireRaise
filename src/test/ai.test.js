@@ -235,6 +235,27 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
     expect(ended).toBe(true);
   });
 
+  it("위쪽 플랫폼 목표에 도달하면 떨어지지 않고 플랫폼 위에 안착한다", () => {
+    const plat = { id: 1, x: 120, y: FLOOR_Y - CHAR_SIZE - 70 + CHAR_SIZE, blockType: "platform_block" };
+    const vamp = put("vampire", 100);
+    const human = put("human", 120, { y: plat.y - CHAR_SIZE, _platformId: plat.id });
+    state.platforms.items.push(plat);
+    const ctx = { platforms: state.platforms.items, blockPowered: new Map(), now: 10000, rng: () => 0.9 };
+
+    let ended = false;
+    for (let t = 0; t < 3; t += 1 / 60) {
+      tickAggro(state, 1 / 60, () => 0.9);
+      tickCharacter(vamp, ctx, 1 / 60);
+      if (vamp._dashTargetId == null && vamp._dashCd > 0) { ended = true; break; }
+    }
+
+    expect(ended).toBe(true);
+    expect(vamp._platformId).toBe(plat.id);
+    expect(vamp.y).toBe(plat.y - CHAR_SIZE);
+    expect(Math.abs(vamp.x + vamp.w / 2 - (plat.x + 10))).toBeLessThan(0.001);
+    expect(Math.abs(human.x - 120)).toBeLessThan(0.001);
+  });
+
   it("노예는 돌진하지 않는다 (뱀파이어 전용 패시브)", () => {
     const slave = put("slave", 100);
     put("human", 100 + DETECT_RANGE.slave - 10); // 노예 감지 원 안
