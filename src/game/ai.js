@@ -7,6 +7,8 @@
 // 기본 핑 추적은 경로 탐색 없이 수평으로 걷는다. 단, 뱀파이어 돌진은 중력을
 // 무시하며, 플랫폼 블록을 장애물로 둔 20px 그리드 BFS 최단 경로가 감지범위×2
 // 예산 이내인 적에게 그 최단 경로의 웨이포인트를 따라 날아간다.
+// 지형 기준은 물리와 동일: 전원 ON(투명) 게이트는 벽이 아니고, up-가시·스프링·
+// 블랙홀 윗면은 착지 목표로 삼지 않는다. 돌진 중단 시에는 제자리에서 낙하한다.
 
 import {
   DETECT_RANGE, PING_REFRESH_S,
@@ -15,17 +17,22 @@ import {
   isEnemySide,
 } from "../constants.js";
 import { startJump, NON_PLATFORM_BLOCK_TYPES } from "../engine/physics.js";
-import { isLogicLayerBlock, PLATFORM_W, PLATFORM_H } from "../platform/platformBlockRenderer.js";
+import { isLogicLayerBlock, getSpikeDir, PLATFORM_W, PLATFORM_H } from "../platform/platformBlockRenderer.js";
 import { findNearestEnemy, aliveChars } from "./combat.js";
 
 /** 감지·추적이 동작하는 상태 (지상 행동 중일 때만 주변을 살핀다) */
 const AWARE_STATES = new Set(["IDLE", "STAY", "CRAWL"]);
 
-/** 돌진 종료: 플랫폼 목표면 윗면에 스냅 착지하고, 목표 플랫폼이 없으면 공중 낙하를 만들지 않는다. */
-function endDash(c, platforms = []) {
+/**
+ * 돌진 종료.
+ * - 도착(arrived): 목표 플랫폼 윗면에 스냅 착지.
+ * - 중단(대상 사망·타임아웃·목표 플랫폼 소실): 그 자리에서 멈추고 자연 낙하 —
+ *   목표 지점으로 순간이동하지 않는다.
+ */
+function endDash(c, platforms = [], { arrived = false, blockPowered = null } = {}) {
   const goal = c._dashGoal;
-  const goalPlatform = goal?.platformId != null
-    ? platforms.find((p) => p.id === goal.platformId)
+  const goalPlatform = arrived && goal?.platformId != null
+    ? platforms.find((p) => p.id === goal.platformId && isSolidForRoute(p, blockPowered))
     : null;
   if (goalPlatform) {
     c.x = goal.x - c.w / 2;
@@ -34,7 +41,8 @@ function endDash(c, platforms = []) {
     c.state = "IDLE";
     c.timer = 0.2;
   } else {
-    c.state = "IDLE";
+    // 중단(또는 착지면 소실): 현재 위치에서 정지 후 자연 낙하
+    c.state = "FALL";
     c.timer = 0.2;
     c._platformId = null;
   }
@@ -46,11 +54,27 @@ function endDash(c, platforms = []) {
   c._dashCd = DASH_COOLDOWN_S;
 }
 
-/** 우회 거리 추정에서 지형(벽)으로 치는 블록: 플랫폼 레이어의 밟을 수 있는 블록 */
-function isSolidForRoute(p) {
+/**
+ * 우회 거리 추정에서 지형(벽)으로 치는 블록 — 물리 isTangible과 동일 기준.
+ * 게이트는 논리 레이어지만 지형이기도 하다: OFF면 벽(밟을 수 있음), ON(투명)이면 통과.
+ */
+function isSolidForRoute(p, blockPowered = null) {
+  if (p.blockType === "gate_block") return !blockPowered?.get(p.id);
   if (isLogicLayerBlock(p.blockType)) return false;
   if (p.blockType === "white_hole_block") return false;
   if (NON_PLATFORM_BLOCK_TYPES.has(p.blockType)) return false;
+  return true;
+}
+
+/**
+ * 돌진 착지·핑 목표로 삼을 수 있는 "안전하게 설 수 있는" 윗면인가.
+ * up-가시(밟는 즉시 발동)·스프링(튕겨냄)·블랙홀(밟으면 워프) 윗면은 목표에서 제외 —
+ * 돌진 착지는 tryLand 기믹 판정을 거치지 않으므로 애초에 목표로 잡지 않는다.
+ */
+function isStandableGoalTop(p) {
+  if (p.blockType === "spring_block") return false;
+  if (p.blockType === "black_hole_block") return false;
+  if (p.blockType === "spike_block" && getSpikeDir(p.rotation ?? 0) === "up") return false;
   return true;
 }
 
@@ -95,11 +119,12 @@ function isInPlatformUpperArea(target, p) {
     && feetY >= p.y - Math.max(target.h, PLATFORM_H);
 }
 
-function nearestPlatformStandPointTo(target, platforms, charH) {
+function nearestPlatformStandPointTo(target, platforms, charH, blockPowered = null) {
   const goal = centerOf(target);
   let best = null;
   for (const p of platforms) {
-    if (!isSolidForRoute(p) || !isInPlatformUpperArea(target, p)) continue;
+    if (!isSolidForRoute(p, blockPowered) || !isStandableGoalTop(p)) continue;
+    if (!isInPlatformUpperArea(target, p)) continue;
     const pt = platformStandPoint(p, charH);
     const dist = Math.hypot(pt.x - goal.x, pt.y - goal.y);
     if (!best || dist < best.dist || (dist === best.dist && p.id < best.platformId)) {
@@ -109,10 +134,10 @@ function nearestPlatformStandPointTo(target, platforms, charH) {
   return best;
 }
 
-function standableCenterYs(platforms, charH) {
+function standableCenterYs(platforms, charH, blockPowered = null) {
   const ys = new Set([FLOOR_Y - charH / 2]);
   for (const p of platforms) {
-    if (!isSolidForRoute(p)) continue;
+    if (!isSolidForRoute(p, blockPowered)) continue;
     ys.add(p.y - charH / 2);
   }
   return [...ys];
@@ -131,10 +156,10 @@ function snapDashYToStandable(y, standYs) {
   return best;
 }
 
-function routeObstacles(platforms, startCell, goalCell) {
+function routeObstacles(platforms, startCell, goalCell, blockPowered = null) {
   const blocked = new Set();
   for (const p of platforms) {
-    if (!isSolidForRoute(p)) continue;
+    if (!isSolidForRoute(p, blockPowered)) continue;
     const minX = clamp(Math.floor(p.x / ROUTE_CELL), 0, ROUTE_COLS - 1);
     const maxX = clamp(Math.floor((p.x + PLATFORM_W - 1) / ROUTE_CELL), 0, ROUTE_COLS - 1);
     const minY = clamp(Math.floor(p.y / ROUTE_CELL), 0, ROUTE_ROWS - 1);
@@ -153,12 +178,12 @@ function routeObstacles(platforms, startCell, goalCell) {
  * 플랫폼 블록을 장애물로 보고 20px 그리드 BFS로 실제 우회 최단 경로를 구한다.
  * 반환 dist는 출발 중심→첫 셀 중심 + 셀 이동 길이 + 마지막 셀 중심→대상 중심의 실제 경로 길이다.
  */
-export function findDashRoute(c, t, platforms, goalOverride = null) {
+export function findDashRoute(c, t, platforms, goalOverride = null, blockPowered = null) {
   const start = centerOf(c), goal = goalOverride ?? centerOf(t);
   const startCell = pointToCell(start), goalCell = pointToCell(goal);
   const startKey = cellKey(startCell.x, startCell.y);
   const goalKey = cellKey(goalCell.x, goalCell.y);
-  const blocked = routeObstacles(platforms, startCell, goalCell);
+  const blocked = routeObstacles(platforms, startCell, goalCell, blockPowered);
   const queue = [startCell];
   const prev = new Map([[startKey, null]]);
   for (let head = 0; head < queue.length; head++) {
@@ -190,7 +215,7 @@ export function findDashRoute(c, t, platforms, goalOverride = null) {
     dist += Math.hypot(pt.x - last.x, pt.y - last.y);
   }
 
-  const standYs = standableCenterYs(platforms, c.h);
+  const standYs = standableCenterYs(platforms, c.h, blockPowered);
   const snappedPoints = [start, ...cells.map((cell) => {
     const pt = cellCenter(cell);
     return { ...pt, y: snapDashYToStandable(pt.y, standYs) };
@@ -205,8 +230,8 @@ export function findDashRoute(c, t, platforms, goalOverride = null) {
   return { dist, path };
 }
 
-export function estimateRouteDist(c, t, platforms) {
-  return findDashRoute(c, t, platforms)?.dist ?? Infinity;
+export function estimateRouteDist(c, t, platforms, blockPowered = null) {
+  return findDashRoute(c, t, platforms, null, blockPowered)?.dist ?? Infinity;
 }
 
 function dashRouteMultiplier(c) {
@@ -220,20 +245,20 @@ function isInDetectRange(c, enemy) {
   return Math.hypot(b.x - a.x, b.y - a.y) <= range;
 }
 
-function dashGoalForEnemy(c, enemy, platforms) {
-  return nearestPlatformStandPointTo(enemy, platforms, c.h);
+function dashGoalForEnemy(c, enemy, platforms, blockPowered = null) {
+  return nearestPlatformStandPointTo(enemy, platforms, c.h, blockPowered);
 }
 
-function findNearestDashRoute(c, chars, platforms) {
+function findNearestDashRoute(c, chars, platforms, blockPowered = null) {
   const detectRange = DETECT_RANGE[c.side] ?? 0;
   const budget = detectRange * dashRouteMultiplier(c);
   let best = null;
   for (const enemy of chars) {
     if (enemy === c || enemy.dead || !isEnemySide(c.side, enemy.side)) continue;
     if (!isInDetectRange(c, enemy)) continue;
-    const goal = dashGoalForEnemy(c, enemy, platforms);
+    const goal = dashGoalForEnemy(c, enemy, platforms, blockPowered);
     if (!goal) continue;
-    const route = findDashRoute(c, pointAsTarget(goal, c), platforms, goal);
+    const route = findDashRoute(c, pointAsTarget(goal, c), platforms, goal, blockPowered);
     if (!route || route.dist > budget || route.dist <= DASH_ARRIVE_DIST + 8) continue;
     if (!best || route.dist < best.route.dist || (route.dist === best.route.dist && enemy.id < best.char.id)) {
       best = { char: enemy, route, goal };
@@ -247,8 +272,9 @@ function findNearestDashRoute(c, chars, platforms) {
  * @param {object} state
  * @param {number} simDt 초
  * @param {() => number} rng
+ * @param {Map<number, boolean>|null} blockPowered 이번 프레임 신호 결과 — 게이트 투명화 반영용
  */
-export function tickAggro(state, simDt, rng = Math.random) {
+export function tickAggro(state, simDt, rng = Math.random, blockPowered = null) {
   const chars = aliveChars(state);
   const byId = new Map(chars.map((c) => [c.id, c]));
   for (const c of chars) {
@@ -258,12 +284,18 @@ export function tickAggro(state, simDt, rng = Math.random) {
     if (c.state === "DASH") {
       const t = byId.get(c._dashTargetId);
       c._dashTimeLeft = (c._dashTimeLeft ?? 0) - simDt;
-      if (!t || t.dead || c._dashTimeLeft <= 0) { endDash(c, state.platforms.items); continue; }
+      if (!t || t.dead || c._dashTimeLeft <= 0) {
+        endDash(c, state.platforms.items, { blockPowered }); // 중단 — 제자리 낙하
+        continue;
+      }
       const cx = c.x + c.w / 2, cy = c.y + c.h / 2;
       const goal = c._dashGoal ?? centerOf(t);
       const tx = goal.x, ty = goal.y;
       const arriveDist = goal.platformId != null ? 4 : DASH_ARRIVE_DIST;
-      if (Math.hypot(tx - cx, ty - cy) <= arriveDist) { endDash(c, state.platforms.items); continue; }
+      if (Math.hypot(tx - cx, ty - cy) <= arriveDist) {
+        endDash(c, state.platforms.items, { arrived: true, blockPowered });
+        continue;
+      }
       const route = c._dashRoute;
       let i = c._dashRouteIndex ?? 1;
       while (route && i < route.length - 1 && Math.hypot(route[i].x - cx, route[i].y - cy) <= 8) i++;
@@ -287,7 +319,7 @@ export function tickAggro(state, simDt, rng = Math.random) {
     // 중력을 무시한다. 감지 원 안의 적 중 플랫폼을 피해 돌아가는 BFS 최단 경로가
     // 감지범위×배율 이내인 가장 짧은 대상에게 그 최단 경로로 날아간다.
     if (c.side === "vampire" && !(c._dashCd > 0)) {
-      const found = findNearestDashRoute(c, chars, state.platforms.items);
+      const found = findNearestDashRoute(c, chars, state.platforms.items, blockPowered);
       if (found) {
         c.state = "DASH";
         c._dashTargetId = found.char.id;
@@ -308,7 +340,7 @@ export function tickAggro(state, simDt, rng = Math.random) {
       const found = findNearestEnemy(c, chars);
       if (found && found.dist <= (DETECT_RANGE[c.side] ?? 0)) {
         const pingPoint = c.side === "vampire"
-          ? nearestPlatformStandPointTo(found.char, state.platforms.items, c.h)
+          ? nearestPlatformStandPointTo(found.char, state.platforms.items, c.h, blockPowered)
           : null;
         if (c.side === "vampire" && !pingPoint) {
           c._ping = null;
