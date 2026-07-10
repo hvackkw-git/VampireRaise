@@ -208,7 +208,8 @@ function snapDashYToStandable(y, standYs) {
   return best;
 }
 
-function routeObstacles(platforms, startCell, goalCell, blockPowered = null) {
+/** 플랫폼(벽)이 점유한 그리드 셀 집합. isSolidForRoute와 동일 기준. */
+function platformBlockedCells(platforms, blockPowered = null) {
   const blocked = new Set();
   for (const p of platforms) {
     if (!isSolidForRoute(p, blockPowered)) continue;
@@ -220,10 +221,36 @@ function routeObstacles(platforms, startCell, goalCell, blockPowered = null) {
       for (let x = minX; x <= maxX; x++) blocked.add(cellKey(x, y));
     }
   }
+  return blocked;
+}
+
+function routeObstacles(platforms, startCell, goalCell, blockPowered = null) {
+  const blocked = platformBlockedCells(platforms, blockPowered);
   // 캐릭터가 이미 겹친 출발/도착 셀은 탐색 가능해야 한다.
   blocked.delete(cellKey(startCell.x, startCell.y));
   blocked.delete(cellKey(goalCell.x, goalCell.y));
   return blocked;
+}
+
+/** 블록 셀이면 가장 가까운 빈 셀을, 아니면 자기 자신을 반환 (링 확장 탐색). */
+function nearestFreeCell(cell, blocked) {
+  if (!blocked.has(cellKey(cell.x, cell.y))) return cell;
+  const maxR = Math.max(ROUTE_COLS, ROUTE_ROWS);
+  for (let r = 1; r <= maxR; r++) {
+    let best = null, bestD = Infinity;
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; // 현재 링 테두리만
+        const nx = cell.x + dx, ny = cell.y + dy;
+        if (nx < 0 || nx >= ROUTE_COLS || ny < 0 || ny >= ROUTE_ROWS) continue;
+        if (blocked.has(cellKey(nx, ny))) continue;
+        const d = dx * dx + dy * dy;
+        if (d < bestD) { bestD = d; best = { x: nx, y: ny }; }
+      }
+    }
+    if (best) return best;
+  }
+  return cell; // 판 전체가 막힘 (사실상 없음)
 }
 
 /**
@@ -368,9 +395,14 @@ function findNearestDashRoute(c, chars, platforms, blockPowered = null) {
  * 공중(점프) 좌표를 그리드에 맞춘 "돌진 좌표보정 시작 위치"(중심 좌표).
  * BFS는 이 보정 위치에서 목표까지의 경로를 계산하고, 실제 비행은 공중 현재 위치에서
  * 이 위치로 먼저 이동(좌표보정)한 뒤 그 경로를 따른다.
+ *
+ * 중요: 보정 위치가 플랫폼 블록 셀 안에 찍히면 안 된다. 공중 중심이 블록 셀에 겹쳐
+ * 있으면(1칸 통로·플랫폼 옆 스침) 가장 가까운 빈 셀 중심으로 밀어낸다.
  */
-function jumpDashStartCenter(c) {
-  return cellCenter(pointToCell(centerOf(c)));
+function jumpDashStartCenter(c, platforms, blockPowered = null) {
+  const blocked = platformBlockedCells(platforms, blockPowered);
+  const cell = nearestFreeCell(pointToCell(centerOf(c)), blocked);
+  return cellCenter(cell);
 }
 
 /**
@@ -383,7 +415,7 @@ function findJumpDashRouteToTarget(c, enemy, platforms, routeMult, blockPowered 
   const budget = detectRange * routeMult;
   const goal = dashGoalForEnemy(c, enemy, platforms, blockPowered);
   if (!goal) return null;
-  const startCenter = jumpDashStartCenter(c);
+  const startCenter = jumpDashStartCenter(c, platforms, blockPowered);
   const startChar = { x: startCenter.x - c.w / 2, y: startCenter.y - c.h / 2, w: c.w, h: c.h };
   const route = findDashRoute(startChar, pointAsTarget(goal, c), platforms, goal, blockPowered);
   if (!route || route.dist > budget || route.dist <= DASH_ARRIVE_DIST + 8) return null;

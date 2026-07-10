@@ -426,6 +426,30 @@ describe("점프 중 돌진: 공중 좌표보정 후 최단 경로 돌진", () =
     expect(vamp.state).toBe("JUMP");
     expect(vamp._dashTargetId ?? null).toBeNull();
   });
+
+  it("좌표보정 시작 위치는 플랫폼 블록 속에 찍히지 않는다 (빈 셀로 밀어냄)", () => {
+    // 공중 중심이 벽 블록 셀(5,22)=중심(110,450) 안에 겹친 상태로 배치
+    const wall = { id: 1, x: 100, y: 440, blockType: "platform_block" };
+    const targetPlat = { id: 2, x: 100, y: 540, blockType: "platform_block" };
+    state.platforms.items.push(wall, targetPlat);
+    const vamp = putJumper(94, 434); // 중심 (110, 450) → 벽 셀 내부
+    const human = put("human", 94, { y: targetPlat.y - CHAR_SIZE, _platformId: 2 }); // 중심 (110,524), dist 74<90
+
+    tickAggro(state, 0.016, () => 0.9);
+
+    expect(vamp.state).toBe("DASH");
+    const path = vamp._dashRoute;
+    // path[0]은 실제 공중 위치(벽 안일 수 있음), path[1]은 좌표보정 시작 위치
+    const start = path[1];
+    const insideWall = start.x >= wall.x && start.x < wall.x + 20
+      && start.y >= wall.y && start.y < wall.y + 20;
+    expect(insideWall).toBe(false);
+    // 다른 어떤 solid 플랫폼 블록 속에도 있지 않다
+    for (const p of state.platforms.items) {
+      const inside = start.x >= p.x && start.x < p.x + 20 && start.y >= p.y && start.y < p.y + 20;
+      expect(inside, `start in block ${p.id}`).toBe(false);
+    }
+  });
 });
 
 describe("플랫폼 위 연속 이동", () => {
