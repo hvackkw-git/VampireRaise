@@ -15,7 +15,7 @@
 <body>
   <div id="app">
     <div class="game-root">
-      <!-- Shrimprium 방식: 수조(640) + 패널 영역(130)을 한 논리 캔버스(320×770)로 묶어 통째로 스케일 -->
+      <!-- Shrimprium 방식: 수조(640) + 패널 영역(150)을 한 논리 캔버스(320×790)로 묶어 통째로 스케일 -->
       <div class="canvas-scale-wrapper" id="canvasWrapper">
         <div id="gameCanvas">
         <div class="tank-area" id="tankWrapper">
@@ -47,7 +47,7 @@
         </div>
         </div>
 
-        <!-- 패널 영역: 수조와 분리된 하단 상시 영역 (수질 패널 자리 → 캐릭터 정보) -->
+        <!-- 패널 영역: 수조와 분리된 하단 상시 패널 (2행 — 계정 / 캐릭터 4열) -->
         <div id="panel-region">
           <div id="decorate-bar" class="hidden">
             <div class="decorate-controls" id="decorateControls">
@@ -64,8 +64,36 @@
             <div class="decorate-palette" id="decoratePalette"></div>
           </div>
           <section id="info-panel">
-            <div id="infoDefault" class="info-default">캐릭터를 탭하면 정보가 표시됩니다</div>
-            <div id="infoChar" class="info-char hidden"></div>
+            <!-- 1행: 계정 레벨·경험치 + 유저 ID -->
+            <div class="acct-row">
+              <span class="acct-id">👤 <b id="acctUserId">—</b></span>
+              <span class="acct-level">계정 <b id="acctLevel">Lv.1</b></span>
+              <div class="bar bar-acct"><i id="acctExpFill" style="width:0%"></i></div>
+              <span class="acct-exp-num" id="acctExpNum">0 / 80</span>
+            </div>
+            <!-- 2행: [스탯 바] [데미지] [장착 스킬] [핫키] — 기본은 1번 뱀파이어, 탭으로 전환 -->
+            <div class="panel-grid">
+              <div class="panel-card" id="cardStat">
+                <div class="card-title card-title-name" id="statName">—</div>
+                <div class="stat-row"><span class="stat-label">HP</span><div class="stat-bar sb-hp"><i id="pHpFill"></i><em id="pHpNum"></em></div></div>
+                <div class="stat-row"><span class="stat-label">MP</span><div class="stat-bar sb-mp"><i id="pMpFill"></i><em id="pMpNum"></em></div></div>
+                <div class="stat-row"><span class="stat-label">EXP</span><div class="stat-bar sb-exp"><i id="pExpFill"></i><em id="pExpNum"></em></div></div>
+              </div>
+              <div class="panel-card card-center" id="cardDmg">
+                <div class="card-title">데미지</div>
+                <div class="dmg-value" id="pAtk">—</div>
+                <div class="dmg-sub">⚔ 공격력</div>
+              </div>
+              <div class="panel-card" id="cardSkill">
+                <div class="card-title">장착 스킬</div>
+                <div class="slot-grid" id="skillGrid"></div>
+                <div class="skill-name" id="skillName"></div>
+              </div>
+              <div class="panel-card" id="cardHotkey">
+                <div class="card-title">핫키</div>
+                <div class="slot-grid" id="hotkeyGrid"></div>
+              </div>
+            </div>
           </section>
         </div>
         </div>

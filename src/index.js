@@ -10,7 +10,7 @@ import {
 import {
   tickTimers, tickRepeaters, tickGates, tickSensors, tickPistons,
 } from "./platform/logicBlocks.js";
-import { TANK_W, TANK_H } from "./constants.js";
+import { TANK_W, TANK_H, MP_REGEN_PER_S } from "./constants.js";
 import { createInitialState, loadState, saveState } from "./state/gameState.js";
 import { tickCharacter } from "./engine/physics.js";
 import { tickAggro } from "./game/ai.js";
@@ -25,7 +25,30 @@ import { initInfoPanel, renderInfoPanel } from "./ui/infoPanel.js";
 import { initHud } from "./ui/hud.js";
 
 const state = loadState() ?? createInitialState();
-const ui = { decorateMode: false, selectedBlockId: null, selectedCharId: null };
+const ui = { decorateMode: false, selectedBlockId: null, selectedCharId: null, panelCharId: null };
+
+/**
+ * 패널 2행이 비출 캐릭터.
+ * 직접 탭한 캐릭터가 살아있으면 그 캐릭터, 아니면 생존 뱀파이어 중
+ * 순서(vampireOrder)가 가장 빠른 캐릭터 (1번 사망 시 2번, 3번… 자동 전환).
+ */
+function panelChar() {
+  const manual = state.chars.items.find((c) => c.id === ui.selectedCharId && !c.dead);
+  if (manual) return manual;
+  ui.selectedCharId = null;
+  let best = null;
+  for (const c of state.chars.items) {
+    if (c.dead || c.side !== "vampire") continue;
+    if (!best || (c.vampireOrder ?? Infinity) < (best.vampireOrder ?? Infinity)) best = c;
+  }
+  return best;
+}
+
+function updatePanel() {
+  const focus = panelChar();
+  ui.panelCharId = focus?.id ?? null;
+  renderInfoPanel(focus, state.account);
+}
 
 initTankView();
 initInfoPanel();
@@ -38,7 +61,7 @@ const hud = initHud(state, {
       decorate.exit();
     } else {
       ui.selectedCharId = null;
-      renderInfoPanel(null);
+      updatePanel();
       decorate.enter();
     }
   },
@@ -46,9 +69,11 @@ const hud = initHud(state, {
     if (decorate.active) decorate.exit();
     ui.selectedCharId = null;
     ui.selectedBlockId = null;
-    renderInfoPanel(null);
+    updatePanel();
   },
 });
+
+updatePanel(); // 첫 페인트 — 이후는 4Hz 갱신
 
 // ── 캐릭터 탭 선택 (일반 모드) ──
 document.getElementById("tank").addEventListener("pointerdown", (ev) => {
@@ -64,8 +89,9 @@ document.getElementById("tank").addEventListener("pointerdown", (ev) => {
       if (d < hitD) { hit = c; hitD = d; }
     }
   }
+  // 탭한 캐릭터로 패널 전환, 빈 곳 탭이면 기본(1번 뱀파이어)으로 복귀
   ui.selectedCharId = hit ? hit.id : null;
-  renderInfoPanel(hit);
+  updatePanel();
 });
 
 // ── 리콜 블록: 60초마다 뱀파이어 진영 1명을 블록 위로 소환 ──
@@ -117,7 +143,11 @@ function frame(nowMs) {
   // 2) 감지·핑 추적(1초 갱신) → 캐릭터 물리
   tickAggro(state, simDt, Math.random, signals.powered);
   const ctx = { platforms, blockPowered: signals.powered, now: nowMs, rng: Math.random };
-  for (const c of chars) tickCharacter(c, ctx, simDt);
+  for (const c of chars) {
+    tickCharacter(c, ctx, simDt);
+    // MP 자연 재생 (돌진 등 스킬 사용으로 소모)
+    if (c.maxMp) c.mp = Math.min(c.maxMp, (c.mp ?? c.maxMp) + MP_REGEN_PER_S * simDt);
+  }
 
   // 3) 전투·전염 → 4) 웨이브
   const combatEvents = tickCombat(state, simDt);
@@ -127,6 +157,7 @@ function frame(nowMs) {
     if (ev.type === "clear") showToast(`✅ 웨이브 클리어! +🩸 ${ev.reward}`);
     else if (ev.type === "defeat") showToast("💀 전멸… 웨이브 1부터 다시 시작합니다");
     else if (ev.type === "autostart") showToast(`🌊 웨이브 ${ev.wave} 시작!`);
+    else if (ev.type === "acctlevel") showToast(`🌟 계정 레벨 ${ev.level} 달성!`);
   }
   tickRecall(gameClock);
 
@@ -141,9 +172,7 @@ function frame(nowMs) {
   if (uiAccum >= 0.25 || combatEvents.length || waveEvents.length) {
     uiAccum = 0;
     hud.render();
-    const sel = state.chars.items.find((c) => c.id === ui.selectedCharId && !c.dead) ?? null;
-    if (!sel) ui.selectedCharId = null;
-    renderInfoPanel(sel);
+    updatePanel();
   }
 
   saveAccum += simDt;

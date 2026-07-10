@@ -89,12 +89,12 @@ button { font-family: inherit; color: inherit; }
 .hotkey i:empty { display: none; }
 .hotkey-danger { border-color: #8a3040; margin-top: 8px; }
 
-/* ── 논리 캔버스 (320×770 = 수조 640 + 패널 130) — Shrimprium처럼 통째로 스케일 ── */
+/* ── 논리 캔버스 (320×790 = 수조 640 + 패널 150) — Shrimprium처럼 통째로 스케일 ── */
 .canvas-scale-wrapper { position: relative; flex: 0 0 auto; }
 #gameCanvas {
   position: absolute;
   left: 0; top: 0;
-  width: 320px; height: 770px;
+  width: 320px; height: 790px;
   transform-origin: 0 0;
   display: flex;
   flex-direction: column;
@@ -110,8 +110,8 @@ button { font-family: inherit; color: inherit; }
 
 /* ── 패널 영역: 수조와 분리된 하단 상시 카드 ── */
 #panel-region {
-  flex: 0 0 130px;
-  height: 130px;
+  flex: 0 0 150px;
+  height: 150px;
   background: #180f22;
   border-top: 2px solid #43305f;
   overflow: hidden;
@@ -178,6 +178,13 @@ button { font-family: inherit; color: inherit; }
   border: 1px solid rgba(154, 104, 216, 0.3);
 }
 .char.stunned .char-sprite { filter: grayscale(1) brightness(0.55); }
+/* 패널이 비추는 캐릭터(자동 포커스)는 은은하게, 직접 탭한 캐릭터는 금색으로 표시 */
+.char.focused::after {
+  content: "";
+  position: absolute; inset: -3px;
+  border: 1px dashed rgba(255, 210, 87, 0.35);
+  border-radius: 6px;
+}
 .char.selected::after {
   content: "";
   position: absolute; inset: -3px;
@@ -325,49 +332,157 @@ button { font-family: inherit; color: inherit; }
   margin: 0 3px;
 }
 
-/* ── 캐릭터 정보 패널 (패널 영역 내부, 수질 패널 대체) ── */
+/* ── 상시 정보 패널 (패널 영역 내부): 1행 계정 / 2행 캐릭터 4열 ── */
 #info-panel {
   height: 100%;
-  padding: 7px 10px;
-  overflow-y: auto;
+  padding: 6px 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
-.info-default {
-  color: #8a76a8;
-  font-size: 11px;
-  text-align: center;
-  padding-top: 44px;
+
+/* 1행: 계정 레벨·경험치 + 유저 ID (전체 폭) */
+.acct-row {
+  flex: 0 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 8px;
+  background: linear-gradient(180deg, #241536, #1e1130);
+  border: 1px solid #43305f;
+  border-radius: 7px;
+  font-size: 10px;
 }
-.info-char { font-size: 11px; }
-.info-head {
-  display: flex; align-items: baseline; gap: 8px;
-  margin-bottom: 6px;
-}
-.info-name { font-size: 14px; font-weight: 700; }
-.info-job { color: #b8a4d8; font-size: 11px; }
-.info-row { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
-.info-label { width: 46px; color: #9c88bc; font-size: 11px; }
+.acct-id { color: #9c88bc; white-space: nowrap; }
+.acct-id b { color: #ffd257; font-weight: 700; letter-spacing: 0.03em; }
+.acct-level { color: #b8a4d8; white-space: nowrap; }
+.acct-level b { color: #f0e6ff; }
+.acct-exp-num { font-size: 9px; color: #cbb8e8; white-space: nowrap; }
 .bar {
   flex: 1; height: 8px;
   background: rgba(0,0,0,0.5);
   border-radius: 4px;
   overflow: hidden;
 }
-.bar > i { display: block; height: 100%; border-radius: 4px; }
-.bar-hp > i { background: linear-gradient(90deg, #c03048, #e04858); }
-.bar-exp > i { background: linear-gradient(90deg, #7a50c0, #a880e8); }
-.bar-num { font-size: 10px; color: #cbb8e8; min-width: 64px; text-align: right; }
-.info-skill-title { margin-top: 4px; font-size: 10px; color: #9c88bc; }
-.skill-tree { display: flex; gap: 5px; margin-top: 3px; }
-.skill-node {
-  width: 22px; height: 22px;
-  display: flex; align-items: center; justify-content: center;
+.bar > i { display: block; height: 100%; border-radius: 4px; transition: width 0.3s; }
+.bar-acct > i { background: linear-gradient(90deg, #b08a20, #ffd257); }
+
+/* 2행: 4열 카드 그리드 */
+.panel-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 96px 52px 84px 1fr;
+  gap: 5px;
+  min-height: 0;
+}
+.panel-card {
+  background: #1f1330;
+  border: 1px solid #3c2a56;
+  border-radius: 7px;
+  padding: 4px 5px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+.card-title {
+  flex: 0 0 auto;
+  font-size: 9px;
+  color: #8a76a8;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+.card-title-name { font-size: 10px; color: #f0e6ff; }
+#info-panel.no-char .panel-card { opacity: 0.55; }
+
+/* 1열: HP/MP/EXP 바 */
+.stat-row { display: flex; align-items: center; gap: 4px; margin-top: 3px; }
+.stat-label {
+  flex: 0 0 20px;
+  font-size: 8px;
+  color: #9c88bc;
+  text-align: right;
+}
+.stat-bar {
+  position: relative;
+  flex: 1;
+  height: 12px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.stat-bar > i { display: block; height: 100%; transition: width 0.25s; }
+.stat-bar > em {
+  position: absolute; inset: 0;
+  font-style: normal;
+  font-size: 8px;
+  line-height: 12px;
+  text-align: center;
+  color: #fff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.75);
+}
+.sb-hp > i { background: linear-gradient(90deg, #c03048, #e04858); }
+.sb-mp > i { background: linear-gradient(90deg, #2a5fb0, #4d9fdc); }
+.sb-exp > i { background: linear-gradient(90deg, #7a50c0, #a880e8); }
+
+/* 2열: 데미지 */
+.card-center { align-items: center; text-align: center; }
+.dmg-value {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: #ff8898;
+  text-shadow: 0 0 8px rgba(224, 72, 88, 0.45);
+}
+.dmg-sub { flex: 0 0 auto; font-size: 8px; color: #6a5888; padding-bottom: 2px; }
+
+/* 3~4열: 슬롯 그리드 (스킬 2×2 / 핫키 2×3) */
+.slot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 26px);
+  gap: 4px;
+  justify-content: center;
+  align-content: start;
+}
+.skill-slot, .hotkey-slot {
+  width: 26px; height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+}
+.skill-slot {
+  background: #2c1430;
+  border: 1px solid #7a3050;
+  box-shadow: inset 0 0 5px rgba(224, 72, 88, 0.25);
+}
+.skill-slot img { width: 20px; height: 20px; image-rendering: pixelated; }
+.skill-slot.locked {
   background: #241536;
   border: 1px dashed #55396b;
-  border-radius: 5px;
-  font-size: 11px;
-  opacity: 0.65;
+  box-shadow: none;
+  opacity: 0.6;
 }
-.skill-hint { margin-top: 4px; font-size: 10px; color: #6a5888; }
+.skill-name {
+  margin-top: 3px;
+  font-size: 8px;
+  color: #d8a0b0;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#cardHotkey .slot-grid { grid-template-columns: repeat(2, 24px); gap: 3px; }
+.hotkey-slot {
+  width: 24px; height: 24px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px dashed #4a3866;
+  font-size: 9px;
+  color: #55437a;
+}
 
 /* ── 토스트 ── */
 #toast-layer {

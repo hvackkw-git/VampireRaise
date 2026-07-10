@@ -1,55 +1,126 @@
 // src/ui/infoPanel.js
-// 캐릭터 정보 패널 — 수조 아래 분리된 패널 영역에 상시 표시 (Shrimprium 수질 패널 자리).
-// 캐릭터 선택 시 레벨·직업·경험치·HP·공격력 + 스킬트리 자리, 미선택 시 안내 문구.
+// 하단 상시 패널 (2행×4열).
+// 1행: 계정 레벨·경험치 바 + 유저 ID (전체 폭).
+// 2행: [HP/MP/EXP 바] [데미지] [장착 스킬 2×2] [핫키 슬롯].
+// 표시 대상 캐릭터는 index.js가 결정한다 — 기본은 생존 뱀파이어 중 순서(vampireOrder)가
+// 가장 빠른 캐릭터, 수조에서 캐릭터를 탭하면 그 캐릭터로 전환.
 
-import { expToNext } from "../constants.js";
+import { expToNext, accountExpToNext } from "../constants.js";
 
-const SIDE_LABEL = { vampire: "🧛 뱀파이어", human: "🙍 인간", slave: "🧟 노예" };
-const SKILL_SLOTS = 5;
+const SIDE_ICON = { vampire: "🧛", human: "🙍", slave: "🧟" };
 
-let defaultEl, charEl;
+/** 스킬 도감 — 장착 스킬 슬롯에 표시할 이름·스프라이트 */
+const SKILL_BOOK = {
+  dash: { name: "혈귀 돌진", icon: "assets/skills/skill_dash.png" },
+};
+const SKILL_SLOT_COUNT = 4;  // 2×2
+const HOTKEY_SLOT_COUNT = 6; // 2×3 — 핫키 기능은 추후 배정
+
+const USER_ID_KEY = "vampireraise.userid.v1";
+
+/** 이 브라우저 고유의 유저 ID — 처음 접속 시 생성해 localStorage에 보관 */
+function loadUserId(storage = globalThis.localStorage) {
+  let id = null;
+  try { id = storage?.getItem(USER_ID_KEY); } catch { /* 무시 */ }
+  if (!id) {
+    id = "VAMP-" + Math.random().toString(36).slice(2, 6).toUpperCase();
+    try { storage?.setItem(USER_ID_KEY, id); } catch { /* 무시 */ }
+  }
+  return id;
+}
+
+let els = null;
+let lastSkillKey = null; // 장착 스킬 재구성 최소화용 캐시 키
 
 export function initInfoPanel() {
-  defaultEl = document.getElementById("infoDefault");
-  charEl = document.getElementById("infoChar");
+  const $ = (id) => document.getElementById(id);
+  els = {
+    panel: $("info-panel"),
+    acctLevel: $("acctLevel"),
+    acctExpFill: $("acctExpFill"),
+    acctExpNum: $("acctExpNum"),
+    statName: $("statName"),
+    hpFill: $("pHpFill"), hpNum: $("pHpNum"),
+    mpFill: $("pMpFill"), mpNum: $("pMpNum"),
+    expFill: $("pExpFill"), expNum: $("pExpNum"),
+    atk: $("pAtk"),
+    skillGrid: $("skillGrid"),
+    skillName: $("skillName"),
+    hotkeyGrid: $("hotkeyGrid"),
+  };
+  $("acctUserId").textContent = loadUserId();
+
+  els.skillSlots = Array.from({ length: SKILL_SLOT_COUNT }, () => {
+    const slot = document.createElement("div");
+    slot.className = "skill-slot locked";
+    els.skillGrid.appendChild(slot);
+    return slot;
+  });
+  for (let i = 0; i < HOTKEY_SLOT_COUNT; i++) {
+    const slot = document.createElement("div");
+    slot.className = "hotkey-slot";
+    slot.textContent = String(i + 1);
+    els.hotkeyGrid.appendChild(slot);
+  }
+  lastSkillKey = null;
+}
+
+function setBar(fill, num, cur, max) {
+  const pct = max > 0 ? Math.max(0, Math.min(100, (cur / max) * 100)) : 0;
+  fill.style.width = `${pct}%`;
+  num.textContent = `${Math.ceil(cur)}/${max}`;
+}
+
+function renderSkills(char) {
+  const equipped = (char?.skills ?? []).filter((s) => SKILL_BOOK[s]);
+  const key = char ? `${char.id}:${equipped.join(",")}` : "none";
+  if (key === lastSkillKey) return;
+  lastSkillKey = key;
+  els.skillSlots.forEach((slot, i) => {
+    const skill = SKILL_BOOK[equipped[i]];
+    slot.classList.toggle("locked", !skill);
+    slot.title = skill ? skill.name : "빈 슬롯";
+    slot.innerHTML = skill
+      ? `<img src="${skill.icon}" alt="${skill.name}" draggable="false">`
+      : "";
+  });
+  els.skillName.textContent = equipped.length
+    ? equipped.map((s) => SKILL_BOOK[s].name).join(" · ")
+    : "장착 스킬 없음";
 }
 
 /**
- * 선택 캐릭터 정보 갱신. char가 null이면 기본 안내 문구.
- * (매 프레임이 아니라 저빈도 호출 — index.js에서 4Hz + 선택 변경 시)
+ * 패널 갱신 (저빈도 — index.js에서 4Hz + 선택 변경 시).
+ * @param {object|null} char 2행에 비출 캐릭터 (null이면 대상 없음 표시)
+ * @param {{level:number, exp:number}|null} account 계정 성장 상태
  */
-export function renderInfoPanel(char) {
-  if (!char || char.dead) {
-    defaultEl.classList.remove("hidden");
-    charEl.classList.add("hidden");
+export function renderInfoPanel(char, account = null) {
+  // 1행: 계정
+  if (account) {
+    const need = accountExpToNext(account.level);
+    els.acctLevel.textContent = `Lv.${account.level}`;
+    els.acctExpFill.style.width =
+      `${Math.max(0, Math.min(100, (account.exp / need) * 100))}%`;
+    els.acctExpNum.textContent = `${account.exp} / ${need}`;
+  }
+
+  // 2행: 캐릭터
+  els.panel.classList.toggle("no-char", !char);
+  if (!char) {
+    els.statName.textContent = "— 뱀파이어 없음 —";
+    setBar(els.hpFill, els.hpNum, 0, 0);
+    setBar(els.mpFill, els.mpNum, 0, 0);
+    setBar(els.expFill, els.expNum, 0, 0);
+    els.atk.textContent = "—";
+    renderSkills(null);
     return;
   }
-  defaultEl.classList.add("hidden");
-  charEl.classList.remove("hidden");
-  const need = expToNext(char.level);
-  const hpPct = Math.max(0, Math.min(100, (char.hp / char.maxHp) * 100));
-  const expPct = Math.max(0, Math.min(100, (char.exp / need) * 100));
-  const skillNodes = Array.from({ length: SKILL_SLOTS }, () => `<div class="skill-node">🔒</div>`).join("");
-  charEl.innerHTML = `
-    <div class="info-head">
-      <span class="info-name">${SIDE_LABEL[char.side] ?? char.side} #${char.id}</span>
-      <span class="info-job">Lv.${char.level} · 직업: ${char.job ?? "미분류"}</span>
-    </div>
-    <div class="info-row">
-      <span class="info-label">HP</span>
-      <div class="bar bar-hp"><i style="width:${hpPct}%"></i></div>
-      <span class="bar-num">${Math.ceil(char.hp)} / ${char.maxHp}</span>
-    </div>
-    <div class="info-row">
-      <span class="info-label">EXP</span>
-      <div class="bar bar-exp"><i style="width:${expPct}%"></i></div>
-      <span class="bar-num">${char.exp} / ${need}</span>
-    </div>
-    <div class="info-row">
-      <span class="info-label">공격력</span>
-      <span>${char.atk}</span>
-    </div>
-    <div class="info-skill-title">스킬트리 <span class="skill-hint">— 직업 분류 후 개방</span></div>
-    <div class="skill-tree">${skillNodes}</div>
-  `;
+  const order = Number.isFinite(char.vampireOrder) ? `${char.vampireOrder}번 ` : "";
+  els.statName.textContent =
+    `${SIDE_ICON[char.side] ?? ""} ${order}Lv.${char.level}`;
+  setBar(els.hpFill, els.hpNum, char.hp, char.maxHp);
+  setBar(els.mpFill, els.mpNum, char.mp ?? 0, char.maxMp ?? 0);
+  setBar(els.expFill, els.expNum, char.exp, expToNext(char.level));
+  els.atk.textContent = String(char.atk);
+  renderSkills(char);
 }

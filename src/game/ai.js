@@ -13,7 +13,7 @@
 import {
   DETECT_RANGE, PING_REFRESH_S,
   DASH_ROUTE_MULT, TANK_W, TANK_H, FLOOR_Y,
-  DASH_SPD, DASH_COOLDOWN_S, DASH_ARRIVE_DIST, DASH_MAX_S,
+  DASH_SPD, DASH_COOLDOWN_S, DASH_ARRIVE_DIST, DASH_MAX_S, DASH_MP_COST,
   isEnemySide,
 } from "../constants.js";
 import { startJump, NON_PLATFORM_BLOCK_TYPES } from "../engine/physics.js";
@@ -322,6 +322,7 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null) 
       const found = findNearestDashRoute(c, chars, state.platforms.items, blockPowered);
       if (found) {
         c.state = "DASH";
+        c.mp = Math.max(0, (c.mp ?? 0) - DASH_MP_COST);
         c._dashTargetId = found.char.id;
         c._dashRoute = found.route.path;
         c._dashGoal = found.goal;
