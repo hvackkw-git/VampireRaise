@@ -24,13 +24,15 @@ const put = (side, x, over = {}) => {
 };
 
 describe("핑 추적", () => {
-  it("감지 원 안의 최근접 적에게 핑을 찍고 그쪽으로 걷는다", () => {
+  it("뱀파이어는 플랫폼 윗면을 찾은 적에게만 핑을 찍고 그쪽으로 걷는다", () => {
     const vamp = put("vampire", 100);
     vamp._dashCd = 999; // 돌진 배제 — 걷기 추적 검증
     put("human", 100 + DETECT_RANGE.vampire + 40);      // 원 밖 (무시)
     const near = put("human", 100 + DETECT_RANGE.vampire - 20); // 원 안
+    state.platforms.items.push({ id: 1, x: near.x, y: near.y + near.h, blockType: "platform_block" });
     tickAggro(state, 0.016, () => 0.9);
     expect(vamp._ping?.targetId).toBe(near.id);
+    expect(vamp._ping?.platformId).toBe(1);
     expect(vamp.state).toBe("CRAWL");
     expect(vamp.dir).toBe(1);
   });
@@ -62,6 +64,7 @@ describe("핑 추적", () => {
     const vamp = put("vampire", 100);
     vamp._dashCd = 999;
     const human = put("human", 160);
+    state.platforms.items.push({ id: 1, x: human.x, y: human.y + human.h, blockType: "platform_block" });
     tickAggro(state, 0.016, () => 0.9);
     expect(vamp._ping?.targetId).toBe(human.id);
     // 대상이 멀리 도망 — 갱신 전까지는 핑 유지
@@ -73,12 +76,14 @@ describe("핑 추적", () => {
     expect(vamp._ping).toBeNull();
   });
 
-  it("서로의 원에 들어오면 양쪽 다 핑을 찍는다", () => {
+  it("서로의 원에 들어오면 인간은 직접, 뱀파이어는 플랫폼 윗면에 핑을 찍는다", () => {
     const vamp = put("vampire", 100);
     vamp._dashCd = 999;
     const human = put("human", 160);
+    state.platforms.items.push({ id: 1, x: human.x, y: human.y + human.h, blockType: "platform_block" });
     tickAggro(state, 0.016, () => 0.9);
     expect(vamp._ping?.targetId).toBe(human.id);
+    expect(vamp._ping?.platformId).toBe(1);
     expect(human._ping?.targetId).toBe(vamp.id);
     expect(vamp.dir).toBe(1);
     expect(human.dir).toBe(-1);
@@ -90,7 +95,8 @@ describe("핑 추적", () => {
     const vamp = put("vampire", 100);
     vamp._dashCd = 999;
     const slave = put("slave", 100);
-    put("human", 100 + d);
+    const human = put("human", 100 + d);
+    state.platforms.items.push({ id: 1, x: human.x, y: human.y + human.h, blockType: "platform_block" });
     tickAggro(state, 0.016, () => 0.9);
     expect(vamp._ping).not.toBeNull();
     expect(slave._ping).toBeNull();
@@ -135,15 +141,16 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
     expect(vamp._dashTargetId).toBeNull();
   });
 
-  it("대상이 플랫폼 위쪽 영역에 없으면 적 중심을 목표로 돌진한다", () => {
+  it("대상이 플랫폼 위쪽 영역에 없으면 공중 목표로 돌진하지 않는다", () => {
     const vamp = put("vampire", 100);
     const human = put("human", 140);
     state.platforms.items.push({ id: 1, x: human.x, y: human.y + 16, blockType: "platform_block" });
 
     tickAggro(state, 0.016, () => 0.9);
 
-    expect(vamp.state).toBe("DASH");
-    expect(vamp._dashGoal).toEqual({ x: human.x + human.w / 2, y: human.y + human.h / 2 });
+    expect(vamp.state).toBe("IDLE");
+    expect(vamp._dashTargetId).toBeNull();
+    expect(vamp._ping).toBeNull();
   });
 
   it("우회 거리가 예산(×2)을 넘으면 돌진하지 않는다", () => {
@@ -154,14 +161,15 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
     expect(vamp._ping).toBeNull();
   });
 
-  it("인간 근처에 플랫폼 블록이 없어도 감지 원 안이면 BFS 경로로 돌진한다", () => {
+  it("인간 근처에 플랫폼 블록이 없으면 뱀파이어 핑과 돌진을 시작하지 않는다", () => {
     const vamp = put("vampire", 80);
     put("human", 140);
 
     tickAggro(state, 0.016, () => 0.9);
 
-    expect(vamp.state).toBe("DASH");
+    expect(vamp.state).toBe("IDLE");
     expect(vamp._ping).toBeNull();
+    expect(vamp._dashTargetId).toBeNull();
   });
 
   it("BFS 우회 거리: 플랫폼 블록을 피해 돌아가는 실제 최단 경로를 계산한다", () => {
@@ -196,16 +204,16 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
     expect(flewUp).toBe(true);
   });
 
-  it("감지 원 안의 적이 2마리 이상이면 BFS 경로가 더 짧은 대상에게 돌진한다", () => {
+  it("감지 원 안의 적이 2마리 이상이어도 플랫폼 윗면 목표가 있는 대상에게만 돌진한다", () => {
     const vamp = put("vampire", 100);
     const nearBlocked = put("human", 100, { y: FLOOR_Y - CHAR_SIZE - 70 });
-    const farClear = put("human", 165);
+    put("human", 165); // 플랫폼 윗면 목표가 없으므로 제외
     state.platforms.items.push({ id: 1, x: nearBlocked.x, y: nearBlocked.y + CHAR_SIZE, blockType: "platform_block" });
 
     tickAggro(state, 0.016, () => 0.9);
 
     expect(vamp.state).toBe("DASH");
-    expect(vamp._dashTargetId).toBe(farClear.id);
+    expect(vamp._dashTargetId).toBe(nearBlocked.id);
   });
 
   it("위쪽 플랫폼으로 돌진할 때 경로 Y를 착지 가능한 높이에 맞춘다", () => {
@@ -235,6 +243,27 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
     expect(ended).toBe(true);
   });
 
+  it("위쪽 플랫폼 목표에 도달하면 떨어지지 않고 플랫폼 위에 안착한다", () => {
+    const plat = { id: 1, x: 120, y: FLOOR_Y - CHAR_SIZE - 70 + CHAR_SIZE, blockType: "platform_block" };
+    const vamp = put("vampire", 100);
+    const human = put("human", 120, { y: plat.y - CHAR_SIZE, _platformId: plat.id });
+    state.platforms.items.push(plat);
+    const ctx = { platforms: state.platforms.items, blockPowered: new Map(), now: 10000, rng: () => 0.9 };
+
+    let ended = false;
+    for (let t = 0; t < 3; t += 1 / 60) {
+      tickAggro(state, 1 / 60, () => 0.9);
+      tickCharacter(vamp, ctx, 1 / 60);
+      if (vamp._dashTargetId == null && vamp._dashCd > 0) { ended = true; break; }
+    }
+
+    expect(ended).toBe(true);
+    expect(vamp._platformId).toBe(plat.id);
+    expect(vamp.y).toBe(plat.y - CHAR_SIZE);
+    expect(Math.abs(vamp.x + vamp.w / 2 - (plat.x + 10))).toBeLessThan(0.001);
+    expect(Math.abs(human.x - 120)).toBeLessThan(0.001);
+  });
+
   it("노예는 돌진하지 않는다 (뱀파이어 전용 패시브)", () => {
     const slave = put("slave", 100);
     put("human", 100 + DETECT_RANGE.slave - 10); // 노예 감지 원 안
@@ -244,7 +273,7 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
 });
 
 describe("플랫폼 위 최단거리 추적 (경로 탐색 없음)", () => {
-  it("플랫폼 위에서 아래 적을 인식하면 수평으로 걷다가 가장자리에서 떨어진다", () => {
+  it("플랫폼 위에서 아래 적에게 플랫폼 윗면 목표가 없으면 제자리에 머문다", () => {
     // 감지는 유클리드 거리 — 원 안에 들도록 플랫폼(y=560)과 인간(x=100)을 가깝게 배치
     const plat = { id: 1, x: 140, y: 560, blockType: "platform_block" };
     const vamp = put("vampire", 140, { y: 560 - CHAR_SIZE });
@@ -257,13 +286,13 @@ describe("플랫폼 위 최단거리 추적 (경로 탐색 없음)", () => {
       tickAggro(state, 1 / 60, () => 0.9);
       tickCharacter(vamp, ctx, 1 / 60);
     }
-    // 가장자리를 넘어 떨어져 바닥에 도달했어야 한다
-    expect(vamp._platformId).toBeNull();
-    expect(vamp.y).toBe(FLOOR_Y - CHAR_SIZE);
-    expect(vamp.x).toBeLessThan(140); // 대상 방향(왼쪽)으로 이동함
+    // 뱀파이어 핑은 플랫폼 윗면만 허용하므로 아래 바닥의 적에게 뛰어내리지 않는다.
+    expect(vamp._platformId).toBe(1);
+    expect(vamp.y).toBe(560 - CHAR_SIZE);
+    expect(vamp.x).toBe(140);
   });
 
-  it("대상이 바로 아래면 제자리에 멈춘다 (국소 최소거리)", () => {
+  it("대상이 바로 아래여도 플랫폼 윗면 목표가 없으면 핑을 찍지 않는다", () => {
     const plat = { id: 1, x: 100, y: 560, blockType: "platform_block" };
     const vamp = put("vampire", 94, { y: 560 - CHAR_SIZE }); // 중심 110 = 인간 중심과 동일
     vamp._dashCd = 999;
@@ -275,6 +304,7 @@ describe("플랫폼 위 최단거리 추적 (경로 탐색 없음)", () => {
       tickCharacter(vamp, ctx, 1 / 60);
     }
     expect(vamp._platformId).toBe(1);
-    expect(vamp.state).toBe("STAY");
+    expect(vamp.state).toBe("IDLE");
+    expect(vamp._ping).toBeNull();
   });
 });

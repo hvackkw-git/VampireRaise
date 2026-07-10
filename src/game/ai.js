@@ -21,9 +21,23 @@ import { findNearestEnemy, aliveChars } from "./combat.js";
 /** 감지·추적이 동작하는 상태 (지상 행동 중일 때만 주변을 살핀다) */
 const AWARE_STATES = new Set(["IDLE", "STAY", "CRAWL"]);
 
-/** 돌진 종료: 그 자리에서 낙하 → 착지 후 교전/재탐색. 쿨다운 시작 */
-function endDash(c) {
-  c.state = "FALL";
+/** 돌진 종료: 플랫폼 목표면 윗면에 스냅 착지하고, 목표 플랫폼이 없으면 공중 낙하를 만들지 않는다. */
+function endDash(c, platforms = []) {
+  const goal = c._dashGoal;
+  const goalPlatform = goal?.platformId != null
+    ? platforms.find((p) => p.id === goal.platformId)
+    : null;
+  if (goalPlatform) {
+    c.x = goal.x - c.w / 2;
+    c.y = goalPlatform.y - c.h;
+    c._platformId = goalPlatform.id;
+    c.state = "IDLE";
+    c.timer = 0.2;
+  } else {
+    c.state = "IDLE";
+    c.timer = 0.2;
+    c._platformId = null;
+  }
   c.vx = 0; c.vy = 0;
   c._dashTargetId = null;
   c._dashRoute = null;
@@ -207,8 +221,7 @@ function isInDetectRange(c, enemy) {
 }
 
 function dashGoalForEnemy(c, enemy, platforms) {
-  const platformGoal = nearestPlatformStandPointTo(enemy, platforms, c.h);
-  return platformGoal ?? centerOf(enemy);
+  return nearestPlatformStandPointTo(enemy, platforms, c.h);
 }
 
 function findNearestDashRoute(c, chars, platforms) {
@@ -219,6 +232,7 @@ function findNearestDashRoute(c, chars, platforms) {
     if (enemy === c || enemy.dead || !isEnemySide(c.side, enemy.side)) continue;
     if (!isInDetectRange(c, enemy)) continue;
     const goal = dashGoalForEnemy(c, enemy, platforms);
+    if (!goal) continue;
     const route = findDashRoute(c, pointAsTarget(goal, c), platforms, goal);
     if (!route || route.dist > budget || route.dist <= DASH_ARRIVE_DIST + 8) continue;
     if (!best || route.dist < best.route.dist || (route.dist === best.route.dist && enemy.id < best.char.id)) {
@@ -244,11 +258,12 @@ export function tickAggro(state, simDt, rng = Math.random) {
     if (c.state === "DASH") {
       const t = byId.get(c._dashTargetId);
       c._dashTimeLeft = (c._dashTimeLeft ?? 0) - simDt;
-      if (!t || t.dead || c._dashTimeLeft <= 0) { endDash(c); continue; }
+      if (!t || t.dead || c._dashTimeLeft <= 0) { endDash(c, state.platforms.items); continue; }
       const cx = c.x + c.w / 2, cy = c.y + c.h / 2;
       const goal = c._dashGoal ?? centerOf(t);
       const tx = goal.x, ty = goal.y;
-      if (Math.hypot(tx - cx, ty - cy) <= DASH_ARRIVE_DIST) { endDash(c); continue; }
+      const arriveDist = goal.platformId != null ? 4 : DASH_ARRIVE_DIST;
+      if (Math.hypot(tx - cx, ty - cy) <= arriveDist) { endDash(c, state.platforms.items); continue; }
       const route = c._dashRoute;
       let i = c._dashRouteIndex ?? 1;
       while (route && i < route.length - 1 && Math.hypot(route[i].x - cx, route[i].y - cy) <= 8) i++;
@@ -295,6 +310,10 @@ export function tickAggro(state, simDt, rng = Math.random) {
         const pingPoint = c.side === "vampire"
           ? nearestPlatformStandPointTo(found.char, state.platforms.items, c.h)
           : null;
+        if (c.side === "vampire" && !pingPoint) {
+          c._ping = null;
+          continue;
+        }
         c._ping = { targetId: found.char.id, ...(pingPoint ? { x: pingPoint.x, y: pingPoint.y, platformId: pingPoint.platformId } : {}) };
         // 대상이 위에 있으면 가끔 점프로 올라가 본다
         const t = found.char;
