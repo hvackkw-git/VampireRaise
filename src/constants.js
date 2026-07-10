@@ -47,12 +47,9 @@ export const PING_REFRESH_S = 1.0;
 
 // ── 뱀파이어 패시브: 혈귀 돌진 ──
 // 감지는 다른 유닛과 동일하게 감지 원(DETECT_RANGE) 그대로.
-// 다만 걸어가면 플랫폼 블록 때문에 돌아가야 하므로, "우회 거리 추정치"가
-// 감지범위×2 이내면 중력을 무시하고 최단거리(직선)로 돌진한다.
-// 너무 돌아가야 하면(예산 초과) 발동하지 않고 그냥 걸어간다.
-export const DASH_ROUTE_MULT = 2;       // 발동 조건: 우회 거리 ≤ DETECT_RANGE.vampire × 2
-export const DASH_CLIMB_COST = 2;       // 우회 거리 추정: 수직 1px = 2px 취급 (기어오르는 비용)
-export const DASH_BLOCK_DETOUR_PX = 40; // 직선 경로를 가로막는 블록 1개당 우회 가산(px)
+// 플랫폼 블록을 피해 돌아가는 BFS 최단 경로의 실제 길이가 감지범위×2 이내면
+// 그 경로를 따라 돌진한다. 너무 돌아가야 하면(예산 초과) 발동하지 않고 걷는다.
+export const DASH_ROUTE_MULT = 2;       // 발동 조건: BFS 경로 길이 ≤ DETECT_RANGE.vampire × 2
 export const DASH_SPD = 260;            // 돌진 속도 px/s
 export const DASH_COOLDOWN_S = 2.0;     // 돌진 재사용 대기(초)
 export const DASH_ARRIVE_DIST = 26;     // 이 거리까지 접근하면 돌진 종료(낙하 → 교전)

@@ -3,10 +3,10 @@
 // 범위 이탈 시 배회 복귀, 노예는 감지 반경이 작다, 플랫폼 위에서는 그냥 걷다 떨어진다.
 import { describe, it, expect, beforeEach } from "vitest";
 import { createInitialState, createCharacter } from "../state/gameState.js";
-import { tickAggro, estimateRouteDist } from "../game/ai.js";
+import { tickAggro, estimateRouteDist, findDashRoute } from "../game/ai.js";
 import { tickCharacter } from "../engine/physics.js";
 import {
-  DETECT_RANGE, PING_REFRESH_S, FLOOR_Y, CHAR_SIZE, DASH_BLOCK_DETOUR_PX,
+  DETECT_RANGE, PING_REFRESH_S, FLOOR_Y, CHAR_SIZE,
 } from "../constants.js";
 
 let state;
@@ -108,28 +108,32 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
     expect(vamp._ping).toBeNull();
   });
 
-  it("감지됐어도 너무 돌아가야 하면(우회 예산 초과) 발동하지 않고 걷는다", () => {
-    // 인간이 바로 위(수직 85px)에 있고, 사이를 블록이 가로막음:
-    // 우회 추정 = 85×2 + 블록 가산 40 = 210 > 예산 180 → 돌진 X → 핑 걷기(STAY: 바로 위)
-    const vampY = FLOOR_Y - CHAR_SIZE;
-    const vamp = put("vampire", 100);
-    put("human", 100, { y: vampY - 85 });
-    const midY = vampY + CHAR_SIZE / 2 - 42; // 두 중심 사이
-    state.platforms.items.push({ id: 1, x: 100, y: Math.round(midY / 20) * 20, blockType: "platform_block" });
+  it("감지됐어도 실제 BFS 우회 경로가 예산을 넘으면 발동하지 않고 걷는다", () => {
+    // 감지 원 안에 있지만 두꺼운 플랫폼 벽을 돌아가야 하는 배치:
+    // ×2 예산은 직선 추정이 아니라 BFS가 찾은 실제 우회 경로 길이에 적용된다.
+    const vamp = put("vampire", 80);
+    put("human", 140);
+    for (let y = 540; y <= 620; y += 20) {
+      state.platforms.items.push({ id: y, x: 120, y, blockType: "platform_block" });
+    }
+    expect(estimateRouteDist(vamp, state.chars.items.find((c) => c.side === "human"), state.platforms.items))
+      .toBeGreaterThan(DETECT_RANGE.vampire * 2);
     tickAggro(state, 0.016, () => 0.9);
     expect(vamp.state).not.toBe("DASH");
     expect(vamp._ping).not.toBeNull(); // 인식은 했고 (감지 원 안)
   });
 
-  it("우회 거리 추정: 경로를 막는 블록마다 가산된다", () => {
+  it("BFS 우회 거리: 플랫폼 블록을 피해 돌아가는 실제 최단 경로를 계산한다", () => {
     const a = { x: 100, y: 500, w: 32, h: 32 };
     const b = { x: 100, y: 400, w: 32, h: 32 };
     const clear = estimateRouteDist(a, b, []);
-    const blocked = estimateRouteDist(a, b, [
+    const blockedRoute = findDashRoute(a, b, [
       { id: 1, x: 100, y: 460, blockType: "platform_block" },
     ]);
-    expect(blocked).toBe(clear + DASH_BLOCK_DETOUR_PX);
-    // 논리 레이어 블록(레드스톤)은 벽이 아니므로 가산 없음
+    expect(blockedRoute.dist).toBeGreaterThan(clear);
+    expect(blockedRoute.path.some((pt) => pt.x >= 100 && pt.x < 120 && pt.y >= 460 && pt.y < 480))
+      .toBe(false);
+    // 논리 레이어 블록(레드스톤)은 벽이 아니므로 경로 길이 변화 없음
     const wire = estimateRouteDist(a, b, [
       { id: 1, x: 100, y: 460, blockType: "redstone_block" },
     ]);

@@ -4,13 +4,13 @@
 // 적에게 핑을 찍고, 다음 갱신까지 그 대상을 향해 걷는다. 갱신 시점에 감지 원 안에
 // 적이 없으면 핑을 지우고 랜덤 배회로 돌아간다 (감지 범위는 향후 성장 요소).
 //
-// 이동은 "물리적 최단거리" 시도일 뿐 경로 탐색이 아니다: 플랫폼 위에서 아래 적을
-// 인식하면 그냥 수평으로 걸어가고, 멍청해서 가장자리를 넘어 떨어질 수도 있다
-// (→ 함정 설계 요소). 대상이 바로 위/아래면 제자리에 멈춰 마주 본다(국소 최소거리).
+// 기본 핑 추적은 경로 탐색 없이 수평으로 걷는다. 단, 뱀파이어 돌진은 플랫폼 블록을
+// 장애물로 둔 20px 그리드 BFS 최단 경로를 계산해, 감지범위×2 예산 이내일 때만
+// 그 경로의 웨이포인트를 따라 날아간다.
 
 import {
   DETECT_RANGE, PING_REFRESH_S,
-  DASH_ROUTE_MULT, DASH_CLIMB_COST, DASH_BLOCK_DETOUR_PX,
+  DASH_ROUTE_MULT, TANK_W, TANK_H,
   DASH_SPD, DASH_COOLDOWN_S, DASH_ARRIVE_DIST, DASH_MAX_S,
 } from "../constants.js";
 import { startJump, NON_PLATFORM_BLOCK_TYPES } from "../engine/physics.js";
@@ -25,6 +25,8 @@ function endDash(c) {
   c.state = "FALL";
   c.vx = 0; c.vy = 0;
   c._dashTargetId = null;
+  c._dashRoute = null;
+  c._dashRouteIndex = 0;
   c._dashCd = DASH_COOLDOWN_S;
 }
 
@@ -36,29 +38,95 @@ function isSolidForRoute(p) {
   return true;
 }
 
-/**
- * 걸어갈 때의 우회 거리 추정 (단순 휴리스틱, 경로 탐색 아님):
- *   수평 거리 + 수직 거리×기어오르기 비용 + 직선 경로를 가로막는 블록당 우회 가산.
- * 돌진 발동 판정(예산 = 감지범위×2)에 쓴다.
- */
-export function estimateRouteDist(c, t, platforms) {
-  const cx = c.x + c.w / 2, cy = c.y + c.h / 2;
-  const tx = t.x + t.w / 2, ty = t.y + t.h / 2;
-  const dx = tx - cx, dy = ty - cy;
-  const direct = Math.hypot(dx, dy);
-  const hit = new Set();
-  const steps = Math.max(1, Math.ceil(direct / 8));
-  for (let i = 1; i < steps; i++) {
-    const px = cx + (dx * i) / steps;
-    const py = cy + (dy * i) / steps;
-    for (const p of platforms) {
-      if (!isSolidForRoute(p)) continue;
-      if (px >= p.x && px < p.x + PLATFORM_W && py >= p.y && py < p.y + PLATFORM_H) {
-        hit.add(p.id);
-      }
+const ROUTE_CELL = PLATFORM_W;
+const ROUTE_COLS = Math.floor(TANK_W / ROUTE_CELL);
+const ROUTE_ROWS = Math.floor(TANK_H / ROUTE_CELL);
+const ROUTE_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+const centerOf = (c) => ({ x: c.x + c.w / 2, y: c.y + c.h / 2 });
+const cellKey = (x, y) => `${x},${y}`;
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+function pointToCell(pt) {
+  return {
+    x: clamp(Math.floor(pt.x / ROUTE_CELL), 0, ROUTE_COLS - 1),
+    y: clamp(Math.floor(pt.y / ROUTE_CELL), 0, ROUTE_ROWS - 1),
+  };
+}
+
+function cellCenter(cell) {
+  return {
+    x: cell.x * ROUTE_CELL + ROUTE_CELL / 2,
+    y: cell.y * ROUTE_CELL + ROUTE_CELL / 2,
+  };
+}
+
+function routeObstacles(platforms, startCell, goalCell) {
+  const blocked = new Set();
+  for (const p of platforms) {
+    if (!isSolidForRoute(p)) continue;
+    const minX = clamp(Math.floor(p.x / ROUTE_CELL), 0, ROUTE_COLS - 1);
+    const maxX = clamp(Math.floor((p.x + PLATFORM_W - 1) / ROUTE_CELL), 0, ROUTE_COLS - 1);
+    const minY = clamp(Math.floor(p.y / ROUTE_CELL), 0, ROUTE_ROWS - 1);
+    const maxY = clamp(Math.floor((p.y + PLATFORM_H - 1) / ROUTE_CELL), 0, ROUTE_ROWS - 1);
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) blocked.add(cellKey(x, y));
     }
   }
-  return Math.abs(dx) + Math.abs(dy) * DASH_CLIMB_COST + hit.size * DASH_BLOCK_DETOUR_PX;
+  // 캐릭터가 이미 겹친 출발/도착 셀은 탐색 가능해야 한다.
+  blocked.delete(cellKey(startCell.x, startCell.y));
+  blocked.delete(cellKey(goalCell.x, goalCell.y));
+  return blocked;
+}
+
+/**
+ * 플랫폼 블록을 장애물로 보고 20px 그리드 BFS로 실제 우회 최단 경로를 구한다.
+ * 반환 dist는 출발 중심→첫 셀 중심 + 셀 이동 길이 + 마지막 셀 중심→대상 중심의 실제 경로 길이다.
+ */
+export function findDashRoute(c, t, platforms) {
+  const start = centerOf(c), goal = centerOf(t);
+  const startCell = pointToCell(start), goalCell = pointToCell(goal);
+  const startKey = cellKey(startCell.x, startCell.y);
+  const goalKey = cellKey(goalCell.x, goalCell.y);
+  const blocked = routeObstacles(platforms, startCell, goalCell);
+  const queue = [startCell];
+  const prev = new Map([[startKey, null]]);
+  for (let head = 0; head < queue.length; head++) {
+    const cur = queue[head];
+    const curKey = cellKey(cur.x, cur.y);
+    if (curKey === goalKey) break;
+    for (const [dx, dy] of ROUTE_DIRS) {
+      const nx = cur.x + dx, ny = cur.y + dy;
+      if (nx < 0 || nx >= ROUTE_COLS || ny < 0 || ny >= ROUTE_ROWS) continue;
+      const nk = cellKey(nx, ny);
+      if (blocked.has(nk) || prev.has(nk)) continue;
+      prev.set(nk, curKey);
+      queue.push({ x: nx, y: ny });
+    }
+  }
+  if (!prev.has(goalKey)) return null;
+
+  const cells = [];
+  for (let k = goalKey; k; k = prev.get(k)) {
+    const [x, y] = k.split(",").map(Number);
+    cells.push({ x, y });
+  }
+  cells.reverse();
+  const points = [start, ...cells.map(cellCenter), goal];
+  const path = [start];
+  let dist = 0;
+  for (const pt of points.slice(1)) {
+    const last = path[path.length - 1];
+    const step = Math.hypot(pt.x - last.x, pt.y - last.y);
+    if (step < 0.001) continue;
+    dist += step;
+    path.push(pt);
+  }
+  return { dist, path };
+}
+
+export function estimateRouteDist(c, t, platforms) {
+  return findDashRoute(c, t, platforms)?.dist ?? Infinity;
 }
 
 /**
@@ -73,18 +141,24 @@ export function tickAggro(state, simDt, rng = Math.random) {
   for (const c of chars) {
     if (c._dashCd > 0) c._dashCd -= simDt;
 
-    // ── 돌진 조향: 대상을 향해 직선 비행 (중력·지형 무시는 physics가 처리) ──
+    // ── 돌진 조향: BFS 경로 웨이포인트를 따라 비행 ──
     if (c.state === "DASH") {
       const t = byId.get(c._dashTargetId);
       c._dashTimeLeft = (c._dashTimeLeft ?? 0) - simDt;
       if (!t || t.dead || c._dashTimeLeft <= 0) { endDash(c); continue; }
       const cx = c.x + c.w / 2, cy = c.y + c.h / 2;
       const tx = t.x + t.w / 2, ty = t.y + t.h / 2;
-      const d = Math.hypot(tx - cx, ty - cy);
-      if (d <= DASH_ARRIVE_DIST) { endDash(c); continue; }
-      c.vx = ((tx - cx) / d) * DASH_SPD;
-      c.vy = ((ty - cy) / d) * DASH_SPD;
-      c.dir = tx >= cx ? 1 : -1;
+      if (Math.hypot(tx - cx, ty - cy) <= DASH_ARRIVE_DIST) { endDash(c); continue; }
+      const route = c._dashRoute;
+      let i = c._dashRouteIndex ?? 1;
+      while (route && i < route.length - 1 && Math.hypot(route[i].x - cx, route[i].y - cy) <= 8) i++;
+      const wp = route?.[i] ?? { x: tx, y: ty };
+      c._dashRouteIndex = i;
+      const d = Math.hypot(wp.x - cx, wp.y - cy);
+      if (d <= 0.001) { c.vx = 0; c.vy = 0; continue; }
+      c.vx = ((wp.x - cx) / d) * DASH_SPD;
+      c.vy = ((wp.y - cy) / d) * DASH_SPD;
+      c.dir = wp.x >= cx ? 1 : -1;
       continue;
     }
 
@@ -95,21 +169,26 @@ export function tickAggro(state, simDt, rng = Math.random) {
     }
 
     // ── 뱀파이어 패시브(혈귀 돌진) ──
-    // 감지는 남들과 동일한 감지 원. 걸어가면 돌아가야 하는 우회 거리가
-    // 감지범위×2 이내일 때만 중력 무시 직선 돌진. 너무 돌아가면 발동 X → 걷기.
+    // 감지는 남들과 동일한 감지 원. 플랫폼을 피해 돌아가는 BFS 경로 길이가
+    // 감지범위×2 이내일 때만 돌진. 너무 돌아가면 발동 X → 걷기.
     if (c.side === "vampire" && !(c._dashCd > 0)) {
       const found = findNearestEnemy(c, chars);
       if (found
         && found.dist <= (DETECT_RANGE.vampire ?? 0)
-        && found.dist > DASH_ARRIVE_DIST + 8
-        && estimateRouteDist(c, found.char, state.platforms.items)
-           <= DETECT_RANGE.vampire * DASH_ROUTE_MULT) {
-        c.state = "DASH";
-        c._dashTargetId = found.char.id;
-        c._dashTimeLeft = DASH_MAX_S;
-        c._ping = null;
-        c._platformId = null;
-        continue;
+        && found.dist > DASH_ARRIVE_DIST + 8) {
+        const route = findDashRoute(c, found.char, state.platforms.items);
+        if (!route || route.dist > DETECT_RANGE.vampire * DASH_ROUTE_MULT) {
+          // 인식은 유지하되, 실제 우회 경로가 예산을 넘으면 돌진하지 않는다.
+        } else {
+          c.state = "DASH";
+          c._dashTargetId = found.char.id;
+          c._dashRoute = route.path;
+          c._dashRouteIndex = 1;
+          c._dashTimeLeft = DASH_MAX_S;
+          c._ping = null;
+          c._platformId = null;
+          continue;
+        }
       }
     }
 
