@@ -1,6 +1,6 @@
 // 캐릭터 물리 테스트: 착지·이탈 낙하·측면 반전·스프링·워프·스턴
 import { describe, it, expect } from "vitest";
-import { tickCharacter, startJump } from "../engine/physics.js";
+import { tickCharacter, startJump, startDrop } from "../engine/physics.js";
 import { FLOOR_Y, CHAR_SIZE, CHAR_SPRITES } from "../constants.js";
 import { CHAR_HITBOX_W } from "../platform/platformBlockRenderer.js";
 
@@ -228,6 +228,43 @@ describe("플랫폼 위 도약", () => {
     const c = makeChar({ x: 101, y: 400 - CHAR_SIZE, dir: 1, state: "CRAWL", _platformId: 1, timer: 99 });
     tickCharacter(c, ctx, 1 / 60);
     expect(c.state).toBe("CRAWL");
+  });
+});
+
+describe("드롭스루 (아래 발판으로 내려가기)", () => {
+  it("밟던 발판을 통과해 바로 아래 발판에 안착한다", () => {
+    const upper = { id: 1, x: 100, y: 400, blockType: "platform_block" };
+    const lower = { id: 2, x: 100, y: 480, blockType: "platform_block" };
+    const ctx = makeCtx([upper, lower]);
+    const c = makeChar({ x: 100, y: 400 - CHAR_SIZE, state: "CRAWL", _platformId: 1 });
+    startDrop(c);
+    expect(c.state).toBe("FALL");
+    expect(c._platformId).toBeNull();
+    for (let t = 0; t < 2 && c._platformId == null; t += 1 / 60) tickCharacter(c, ctx, 1 / 60);
+    expect(c._platformId).toBe(2); // 위(1)를 통과해 아래(2)에 착지
+    expect(c.y).toBe(480 - CHAR_SIZE);
+    expect(c._dropThroughId).toBeNull(); // 착지 후 드롭스루 종료
+  });
+
+  it("아래 발판이 없으면 바닥까지 내려간다", () => {
+    const upper = { id: 1, x: 100, y: 400, blockType: "platform_block" };
+    const ctx = makeCtx([upper]);
+    const c = makeChar({ x: 100, y: 400 - CHAR_SIZE, state: "CRAWL", _platformId: 1 });
+    startDrop(c);
+    run(c, ctx, 3);
+    expect(c._platformId).toBeNull();
+    expect(c.y).toBe(FLOOR_Y - CHAR_SIZE);
+    expect(c._dropThroughId).toBeNull();
+  });
+
+  it("드롭 직후 같은 발판에 다시 착지하지 않는다", () => {
+    const upper = { id: 1, x: 100, y: 400, blockType: "platform_block" };
+    const ctx = makeCtx([upper]);
+    const c = makeChar({ x: 100, y: 400 - CHAR_SIZE, state: "CRAWL", _platformId: 1 });
+    startDrop(c);
+    run(c, ctx, 0.3);
+    expect(c._platformId).not.toBe(1); // 떠난 발판으로 되돌아 착지 금지
+    expect(c.y + CHAR_SIZE).toBeGreaterThan(400); // 발판 아래로 내려갔다
   });
 });
 

@@ -10,7 +10,7 @@
 // 지형 기준은 물리와 동일: 전원 ON(투명) 게이트는 벽이 아니고, up-가시·스프링·
 // 블랙홀 윗면은 착지 목표로 삼지 않는다. 돌진 중단 시에는 제자리에서 낙하한다.
 //
-// 점프 중에도 돌진할 수 있다. 공중 좌표는 그리드에서 벗어나 있으므로, 현재 돌진
+// 점프·하강(드롭스루) 중에도 돌진할 수 있다. 공중 좌표는 그리드에서 벗어나 있으므로, 현재 돌진
 // 규칙(그리드/착지 가능 지점 기준 BFS 경로)을 지키기 위해 먼저 공중 위치를 그리드에
 // 맞춘 "돌진 시작 위치"로 좌표보정한 뒤, 그 보정 위치에서 목표까지 최단 경로를
 // 계산한다. 실제 비행 경로는 [공중 현재 위치 → 좌표보정 시작 위치 → …BFS 경로… → 목표].
@@ -78,6 +78,7 @@ function beginDash(c, found) {
   c._dashTimeLeft = DASH_MAX_S;
   c._platformId = null;
   c._jumpApexY = null; // 점프 중 돌진 진입 시 잔여 점프 상태 정리
+  c._dropThroughId = null; // 하강(드롭스루) 중 돌진 진입 시 잔여 드롭 상태 정리
 }
 
 /**
@@ -485,6 +486,17 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null) 
     // ── 점프(공중) 중 돌진: 적이 감지범위에 들어오면 좌표보정 후 최단 경로로 돌진 ──
     // 공중 위치를 그리드 "돌진 시작 위치"로 좌표보정한 뒤, 보정 위치→목표 BFS 경로를 따른다.
     if (c.state === "JUMP" && c.side === "vampire" && !(c._dashCd > 0)) {
+      const found = findNearestJumpDashRoute(c, chars, state.platforms.items, blockPowered);
+      if (found) {
+        beginDash(c, found);
+        c._ping = null;
+        continue;
+      }
+    }
+
+    // ── 하강(드롭스루 등 공중 낙하) 중 돌진: 점프+돌진과 동일 로직 ──
+    // 공중 좌표를 그리드 "돌진 시작 위치"로 좌표보정한 뒤, 보정 위치→목표 BFS 경로를 따른다.
+    if (c.state === "FALL" && c.side === "vampire" && !(c._dashCd > 0)) {
       const found = findNearestJumpDashRoute(c, chars, state.platforms.items, blockPowered);
       if (found) {
         beginDash(c, found);

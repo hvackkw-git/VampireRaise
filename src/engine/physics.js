@@ -107,6 +107,19 @@ export function startJump(c, rng = Math.random, minDeg = JUMP_MIN_DEG, spanDeg =
 }
 
 /**
+ * 드롭스루: 밟고 있던 발판을 통과해 바로 아래로 내려간다 (다른 플랫포머의 아래 점프).
+ * 떠난 발판(_dropThroughId)만 착지 판정에서 무시하고 그대로 자유낙하하므로,
+ * 바로 아래 발판(또는 바닥)에 안착한다.
+ */
+export function startDrop(c) {
+  c._dropThroughId = c._platformId;
+  c._platformId = null;
+  c.state = "FALL";
+  c.vx = 0; c.vy = 0;
+  c._jumpApexY = null;
+}
+
+/**
  * 착지 판정: 이번 프레임 스윕 구간에서 캐릭터가 내려앉을 플랫폼을 찾아 처리.
  * @returns {boolean} 착지(또는 워프/기믹 발동) 여부
  */
@@ -115,6 +128,7 @@ function tryLand(c, ctx, simDt) {
   if (c.vy <= 0 || c._platformId != null) return false;
   const nextX = c.x + c.vx * simDt;
   for (const plat of platforms) {
+    if (plat.id === c._dropThroughId) continue; // 드롭스루: 방금 떠난 발판은 통과
     if (!charSweepsPlatformX(c, plat, nextX)) continue;
     if (!isTangiblePlatform(plat, blockPowered)) continue;
     // 가시 트리거 후 바닥까지 통과 (블랙홀은 정상 워프)
@@ -126,6 +140,7 @@ function tryLand(c, ctx, simDt) {
       if (tryWarp(c, plat, platforms, now)) return true;
       c.y = landY - c.h;
       c._platformId = plat.id;
+      c._dropThroughId = null; // 아래 발판에 안착 → 드롭스루 종료
       c.vy = 0; c.vx = 0; c._jumpApexY = null;
       if (plat.blockType === "spike_block" && getSpikeDir(plat.rotation ?? 0) === "up") {
         triggerSpike(c, now);
@@ -148,7 +163,7 @@ function tryLand(c, ctx, simDt) {
 function landOnFloor(c, ctx) {
   const groundY = FLOOR_Y - c.h;
   if (c.y >= groundY && c.vy > 0) {
-    c.y = groundY; c.vy = 0; c.vx = 0; c._jumpApexY = null;
+    c.y = groundY; c.vy = 0; c.vx = 0; c._jumpApexY = null; c._dropThroughId = null;
     c.state = c.state === "STUN" ? "STUN" : "CRAWL";
     if (c.state === "CRAWL") c.timer = 0.8 + (ctx.rng?.() ?? Math.random()) * 1.4;
     return true;
@@ -385,7 +400,10 @@ export function defaultMoveDecide(c, ctx, rng = Math.random) {
   }
 
   if (rng() < 0.32) {
-    startJump(c, rng);
+    // 위로 도달할 발판이 없을 때의 세로 이동. 발판 위라면 점프와 같은 빈도로
+    // 아래 발판으로 드롭스루하고(반반), 그 외에는 제자리 도약한다.
+    if (c._platformId != null && rng() < 0.5) startDrop(c);
+    else startJump(c, rng);
     return;
   }
   c.timer = 1.1 + rng() * 1.8;
