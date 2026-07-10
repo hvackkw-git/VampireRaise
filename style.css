@@ -397,39 +397,6 @@ button { font-family: inherit; color: inherit; }
 #info-panel.squad-mode #cardSkill { display: none; }
 #info-panel.squad-mode #cardFaces { display: flex; }
 #info-panel.squad-mode .panel-grid { grid-template-columns: 1fr 88px; }
-.face-grid {
-  grid-template-columns: repeat(6, 26px);
-  gap: 3px;
-  justify-content: center;
-  align-content: center;
-}
-.face-slot {
-  position: relative;
-  width: 26px; height: 26px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 5px;
-  background: #241536;
-  border: 1px solid #55396b;
-  font-size: 14px;
-  color: inherit;
-  cursor: pointer;
-  padding: 0;
-}
-.face-slot.empty {
-  background: #1c1229;
-  border: 1px dashed #3c2a56;
-  opacity: 0.45;
-  cursor: default;
-}
-.face-slot small {
-  position: absolute;
-  right: 1px; bottom: 0;
-  font-size: 6px;
-  color: #cbb8e8;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.8);
-}
 
 /* 1열: HP/MP/EXP 바 */
 .stat-row { display: flex; align-items: center; gap: 4px; margin-top: 3px; }
@@ -511,6 +478,39 @@ button { font-family: inherit; color: inherit; }
   text-overflow: ellipsis;
 }
 #cardHotkey .slot-grid { grid-template-columns: repeat(3, 24px); gap: 3px; }
+.face-grid {
+  grid-template-columns: repeat(6, 26px);
+  gap: 3px;
+  justify-content: center;
+  align-content: center;
+}
+.face-slot {
+  position: relative;
+  width: 26px; height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  background: #241536;
+  border: 1px solid #55396b;
+  font-size: 14px;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+.face-slot.empty {
+  background: #1c1229;
+  border: 1px dashed #3c2a56;
+  opacity: 0.45;
+  cursor: default;
+}
+.face-slot small {
+  position: absolute;
+  right: 1px; bottom: 0;
+  font-size: 6px;
+  color: #cbb8e8;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.8);
+}
 .hotkey-slot {
   position: relative;
   width: 24px; height: 24px;
