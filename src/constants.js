@@ -37,12 +37,17 @@ export const DETECT_RANGE = { vampire: 90, human: 120, slave: 55 };
 export const PING_REFRESH_S = 1.0;
 
 // ── 뱀파이어 패시브: 혈귀 돌진 ──
-// 감지범위×2 안에 적이 있으면 중력을 무시하고 최단거리(직선)로 돌진한다.
-export const DASH_RANGE_MULT = 2;    // 돌진 발동 거리 = DETECT_RANGE.vampire × 2
-export const DASH_SPD = 260;         // 돌진 속도 px/s
-export const DASH_COOLDOWN_S = 2.0;  // 돌진 재사용 대기(초)
-export const DASH_ARRIVE_DIST = 26;  // 이 거리까지 접근하면 돌진 종료(낙하 → 교전)
-export const DASH_MAX_S = 1.5;       // 돌진 최대 지속(초) — 안전 타임아웃
+// 감지는 다른 유닛과 동일하게 감지 원(DETECT_RANGE) 그대로.
+// 다만 걸어가면 플랫폼 블록 때문에 돌아가야 하므로, "우회 거리 추정치"가
+// 감지범위×2 이내면 중력을 무시하고 최단거리(직선)로 돌진한다.
+// 너무 돌아가야 하면(예산 초과) 발동하지 않고 그냥 걸어간다.
+export const DASH_ROUTE_MULT = 2;       // 발동 조건: 우회 거리 ≤ DETECT_RANGE.vampire × 2
+export const DASH_CLIMB_COST = 2;       // 우회 거리 추정: 수직 1px = 2px 취급 (기어오르는 비용)
+export const DASH_BLOCK_DETOUR_PX = 40; // 직선 경로를 가로막는 블록 1개당 우회 가산(px)
+export const DASH_SPD = 260;            // 돌진 속도 px/s
+export const DASH_COOLDOWN_S = 2.0;     // 돌진 재사용 대기(초)
+export const DASH_ARRIVE_DIST = 26;     // 이 거리까지 접근하면 돌진 종료(낙하 → 교전)
+export const DASH_MAX_S = 1.5;          // 돌진 최대 지속(초) — 안전 타임아웃
 
 // ── 전투 (교전형: 만나면 마주보고 멈춰서 싸운다) ──
 export const ENGAGE_RANGE = 34;       // 교전 시작 거리 (중심 간 px)

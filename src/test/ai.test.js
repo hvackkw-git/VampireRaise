@@ -3,10 +3,10 @@
 // 범위 이탈 시 배회 복귀, 노예는 감지 반경이 작다, 플랫폼 위에서는 그냥 걷다 떨어진다.
 import { describe, it, expect, beforeEach } from "vitest";
 import { createInitialState, createCharacter } from "../state/gameState.js";
-import { tickAggro } from "../game/ai.js";
+import { tickAggro, estimateRouteDist } from "../game/ai.js";
 import { tickCharacter } from "../engine/physics.js";
 import {
-  DETECT_RANGE, PING_REFRESH_S, FLOOR_Y, CHAR_SIZE, DASH_RANGE_MULT,
+  DETECT_RANGE, PING_REFRESH_S, FLOOR_Y, CHAR_SIZE, DASH_BLOCK_DETOUR_PX,
 } from "../constants.js";
 
 let state;
@@ -93,24 +93,52 @@ describe("핑 추적", () => {
 });
 
 describe("뱀파이어 패시브: 혈귀 돌진", () => {
-  it("감지범위×2 안의 적에게 돌진(DASH)한다 — 일반 감지 밖이어도", () => {
+  it("감지 원 안의 적 + 우회 거리가 예산(×2) 이내면 돌진(DASH)한다", () => {
     const vamp = put("vampire", 100);
-    const far = 100 + DETECT_RANGE.vampire + 30; // 감지 밖, ×2 안
-    put("human", far);
+    put("human", 100 + DETECT_RANGE.vampire - 20); // 감지 원 안, 평지 (우회 = 직선)
     tickAggro(state, 0.016, () => 0.9);
     expect(vamp.state).toBe("DASH");
   });
 
-  it("감지범위×2 밖이면 돌진하지 않는다", () => {
+  it("감지 원 밖이면 돌진하지 않는다 (감지는 다른 유닛과 동일)", () => {
     const vamp = put("vampire", 0);
-    put("human", DETECT_RANGE.vampire * DASH_RANGE_MULT + 60);
+    put("human", DETECT_RANGE.vampire + 30); // 원 밖 — 예전 ×2 발동 거리였던 위치
     tickAggro(state, 0.016, () => 0.9);
     expect(vamp.state).toBe("IDLE");
+    expect(vamp._ping).toBeNull();
+  });
+
+  it("감지됐어도 너무 돌아가야 하면(우회 예산 초과) 발동하지 않고 걷는다", () => {
+    // 인간이 바로 위(수직 85px)에 있고, 사이를 블록이 가로막음:
+    // 우회 추정 = 85×2 + 블록 가산 40 = 210 > 예산 180 → 돌진 X → 핑 걷기(STAY: 바로 위)
+    const vampY = FLOOR_Y - CHAR_SIZE;
+    const vamp = put("vampire", 100);
+    put("human", 100, { y: vampY - 85 });
+    const midY = vampY + CHAR_SIZE / 2 - 42; // 두 중심 사이
+    state.platforms.items.push({ id: 1, x: 100, y: Math.round(midY / 20) * 20, blockType: "platform_block" });
+    tickAggro(state, 0.016, () => 0.9);
+    expect(vamp.state).not.toBe("DASH");
+    expect(vamp._ping).not.toBeNull(); // 인식은 했고 (감지 원 안)
+  });
+
+  it("우회 거리 추정: 경로를 막는 블록마다 가산된다", () => {
+    const a = { x: 100, y: 500, w: 32, h: 32 };
+    const b = { x: 100, y: 400, w: 32, h: 32 };
+    const clear = estimateRouteDist(a, b, []);
+    const blocked = estimateRouteDist(a, b, [
+      { id: 1, x: 100, y: 460, blockType: "platform_block" },
+    ]);
+    expect(blocked).toBe(clear + DASH_BLOCK_DETOUR_PX);
+    // 논리 레이어 블록(레드스톤)은 벽이 아니므로 가산 없음
+    const wire = estimateRouteDist(a, b, [
+      { id: 1, x: 100, y: 460, blockType: "redstone_block" },
+    ]);
+    expect(wire).toBe(clear);
   });
 
   it("중력을 무시하고 위쪽 대상에게도 직선으로 날아간다", () => {
     const vamp = put("vampire", 100);
-    put("human", 130, { y: FLOOR_Y - CHAR_SIZE - 120 }); // 위쪽 공중/플랫폼 위치
+    put("human", 120, { y: FLOOR_Y - CHAR_SIZE - 70 }); // 직선 ~73 < 90, 우회 160 ≤ 180
     const ctx = { platforms: [], blockPowered: new Map(), now: 10000, rng: () => 0.9 };
     const y0 = vamp.y;
     let flewUp = false;
@@ -124,7 +152,7 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
 
   it("대상에 도달하면 돌진이 끝나고(낙하) 쿨다운이 걸린다", () => {
     const vamp = put("vampire", 100);
-    put("human", 100 + DETECT_RANGE.vampire + 30);
+    put("human", 100 + DETECT_RANGE.vampire - 20);
     const ctx = { platforms: [], blockPowered: new Map(), now: 10000, rng: () => 0.9 };
     let ended = false;
     for (let t = 0; t < 3; t += 1 / 60) {
@@ -137,9 +165,9 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
 
   it("노예는 돌진하지 않는다 (뱀파이어 전용 패시브)", () => {
     const slave = put("slave", 100);
-    put("human", 100 + DETECT_RANGE.slave + 20); // 노예 감지 밖·×2 개념 없음
+    put("human", 100 + DETECT_RANGE.slave - 10); // 노예 감지 원 안
     tickAggro(state, 0.016, () => 0.9);
-    expect(slave.state).toBe("IDLE");
+    expect(slave.state).toBe("CRAWL"); // 핑 걷기만 한다
   });
 });
 
