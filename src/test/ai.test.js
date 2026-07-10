@@ -3,10 +3,10 @@
 // 범위 이탈 시 배회 복귀, 노예는 감지 반경이 작다, 플랫폼 위에서는 그냥 걷다 떨어진다.
 import { describe, it, expect, beforeEach } from "vitest";
 import { createInitialState, createCharacter } from "../state/gameState.js";
-import { tickAggro, estimateRouteDist } from "../game/ai.js";
+import { tickAggro, findDashPath, bodyCenter } from "../game/ai.js";
 import { tickCharacter } from "../engine/physics.js";
 import {
-  DETECT_RANGE, PING_REFRESH_S, FLOOR_Y, CHAR_SIZE, DASH_BLOCK_DETOUR_PX,
+  DETECT_RANGE, PING_REFRESH_S, FLOOR_Y, CHAR_SIZE,
 } from "../constants.js";
 
 let state;
@@ -108,32 +108,67 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
     expect(vamp._ping).toBeNull();
   });
 
-  it("감지됐어도 너무 돌아가야 하면(우회 예산 초과) 발동하지 않고 걷는다", () => {
-    // 인간이 바로 위(수직 85px)에 있고, 사이를 블록이 가로막음:
-    // 우회 추정 = 85×2 + 블록 가산 40 = 210 > 예산 180 → 돌진 X → 핑 걷기(STAY: 바로 위)
-    const vampY = FLOOR_Y - CHAR_SIZE;
+  it("감지됐어도 대상이 봉쇄돼 있으면(경로 없음) 발동하지 않고 걷는다", () => {
+    // 인간(감지 원 안, 60px 옆)이 사방이 블록으로 막힌 방 안에 있음 → 경로 없음
     const vamp = put("vampire", 100);
-    put("human", 100, { y: vampY - 85 });
-    const midY = vampY + CHAR_SIZE / 2 - 42; // 두 중심 사이
-    state.platforms.items.push({ id: 1, x: 100, y: Math.round(midY / 20) * 20, blockType: "platform_block" });
+    const human = put("human", 160, { y: FLOOR_Y - CHAR_SIZE });
+    const hc = bodyCenter(human);
+    const col = Math.floor(hc.x / 20), row = Math.floor(hc.y / 20);
+    for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      state.platforms.items.push({
+        id: 100 + dc * 10 + dr, x: (col + dc) * 20, y: (row + dr) * 20, blockType: "platform_block",
+      });
+    }
     tickAggro(state, 0.016, () => 0.9);
     expect(vamp.state).not.toBe("DASH");
-    expect(vamp._ping).not.toBeNull(); // 인식은 했고 (감지 원 안)
+    expect(vamp._ping).not.toBeNull(); // 인식은 했고 (감지 원 안) → 걸어간다
   });
 
-  it("우회 거리 추정: 경로를 막는 블록마다 가산된다", () => {
-    const a = { x: 100, y: 500, w: 32, h: 32 };
-    const b = { x: 100, y: 400, w: 32, h: 32 };
-    const clear = estimateRouteDist(a, b, []);
-    const blocked = estimateRouteDist(a, b, [
-      { id: 1, x: 100, y: 460, blockType: "platform_block" },
-    ]);
-    expect(blocked).toBe(clear + DASH_BLOCK_DETOUR_PX);
-    // 논리 레이어 블록(레드스톤)은 벽이 아니므로 가산 없음
-    const wire = estimateRouteDist(a, b, [
-      { id: 1, x: 100, y: 460, blockType: "redstone_block" },
-    ]);
-    expect(wire).toBe(clear);
+  it("findDashPath: 벽을 돌아가는 경로를 만들고, 예산 초과면 null", () => {
+    const from = { x: 50, y: 610 };
+    const to = { x: 150, y: 610 };
+    // 사이 기둥 (col 5 = x100, 바닥 근처 rows 28~31)
+    const wall = [28, 29, 30, 31].map((row, i) => ({
+      id: i + 1, x: 100, y: row * 20, blockType: "platform_block",
+    }));
+    const clear = findDashPath(from, to, [], 400);
+    expect(clear).not.toBeNull();
+    const around = findDashPath(from, to, wall, 400);
+    expect(around).not.toBeNull();
+    // 돌아가는 경로는 직선보다 길다
+    expect(around.lengthPx).toBeGreaterThan(clear.lengthPx);
+    // 웨이포인트가 벽 칸을 지나지 않는다
+    for (const wp of around.waypoints) {
+      const col = Math.floor(wp.x / 20), row = Math.floor(wp.y / 20);
+      expect(wall.some((w) => w.x / 20 === col && w.y / 20 === row)).toBe(false);
+    }
+    // 예산이 부족하면 null (직선 5칸 거리인데 예산 3칸)
+    expect(findDashPath(from, to, [], 60)).toBeNull();
+    // 논리 레이어 블록(레드스톤)은 벽이 아니다 → 직선 그대로
+    const wires = wall.map((w) => ({ ...w, blockType: "redstone_block" }));
+    const throughWires = findDashPath(from, to, wires, 400);
+    expect(throughWires.lengthPx).toBe(clear.lengthPx);
+  });
+
+  it("돌진이 사이 블록을 관통하지 않고 돌아서 날아간다", () => {
+    const vamp = put("vampire", 100);
+    put("human", 180); // dx 80 — 감지 원 안
+    const row = Math.floor(bodyCenter(vamp).y / 20);
+    const blockCol = 7; // x=140, 둘 사이 기둥 1칸
+    state.platforms.items.push({ id: 1, x: blockCol * 20, y: row * 20, blockType: "platform_block" });
+    const ctx = { platforms: state.platforms.items, blockPowered: new Map(), now: 10000, rng: () => 0.9 };
+    let dashed = false, violated = false;
+    for (let t = 0; t < 2; t += 1 / 60) {
+      tickAggro(state, 1 / 60, () => 0.9);
+      tickCharacter(vamp, ctx, 1 / 60);
+      if (vamp.state === "DASH") {
+        dashed = true;
+        const b = bodyCenter(vamp);
+        if (Math.floor(b.x / 20) === blockCol && Math.floor(b.y / 20) === row) violated = true;
+      }
+    }
+    expect(dashed).toBe(true);
+    expect(violated).toBe(false); // 경로가 블록 칸을 우회함
   });
 
   it("중력을 무시하고 위쪽 대상에게도 직선으로 날아간다", () => {
