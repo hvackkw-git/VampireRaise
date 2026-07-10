@@ -23,7 +23,7 @@ import {
   setCoreCounter,
 } from "./ui/tankView.js";
 import { createDecorateMode } from "./decorate/decorateMode.js";
-import { initInfoPanel, renderInfoPanel } from "./ui/infoPanel.js";
+import { initInfoPanel, renderInfoPanel, renderSquadPanel } from "./ui/infoPanel.js";
 import { initSkillTreePanel } from "./ui/skillTreePanel.js";
 import { initHud } from "./ui/hud.js";
 
@@ -50,7 +50,14 @@ function panelChar() {
 function updatePanel() {
   const focus = panelChar();
   ui.panelCharId = focus?.id ?? null;
-  renderInfoPanel(focus, state.account);
+  // ui.selectedCharId는 panelChar()가 직접 탭한 캐릭터일 때만 유지하고,
+  // 자동 선택(폴백)인 경우 null로 되돌린다 — 이를 이용해 표시 모드를 가른다.
+  if (ui.selectedCharId != null) {
+    renderInfoPanel(focus, state.account);
+  } else {
+    const vampires = state.chars.items.filter((c) => !c.dead && c.side === "vampire");
+    renderSquadPanel(vampires, state.account);
+  }
   skillTreePanel?.render();
 }
 

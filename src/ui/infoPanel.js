@@ -1,8 +1,8 @@
 // src/ui/infoPanel.js
-// 하단 상시 패널 (1행×4열): [HP/MP/EXP 바] [데미지] [장착 스킬 2×2] [핫키 슬롯].
+// 하단 상시 패널 (1행×4열): [HP/MP/EXP 바] [데미지] [장착 스킬 2×2] [핫키 2×3].
 // 계정 레벨·경험치 바는 게임 영역 상단(levelBar)에 별도로 표시된다.
-// 표시 대상 캐릭터는 index.js가 결정한다 — 기본은 생존 뱀파이어 중 순서(vampireOrder)가
-// 가장 빠른 캐릭터, 수조에서 캐릭터를 탭하면 그 캐릭터로 전환.
+// 표시 대상 캐릭터는 index.js가 결정한다 — 직접 탭한 캐릭터가 있으면 그 캐릭터,
+// 없으면(선택 해제 상태) renderSquadPanel로 생존 뱀파이어 전체 현황을 보여준다.
 
 import { expToNext, accountExpToNext } from "../constants.js";
 
@@ -13,7 +13,6 @@ const SKILL_BOOK = {
   dash: { name: "혈귀 돌진", icon: "assets/skills/skill_dash.png" },
 };
 const SKILL_SLOT_COUNT = 4;  // 2×2
-const HOTKEY_SLOT_COUNT = 6; // 2×3 — 핫키 기능은 추후 배정
 
 let els = null;
 let lastSkillKey = null; // 장착 스킬 재구성 최소화용 캐시 키
@@ -26,13 +25,15 @@ export function initInfoPanel({ onSkillTree } = {}) {
     acctExpFill: $("acctExpFill"),
     acctExpNum: $("acctExpNum"),
     statName: $("statName"),
+    statRowExp: $("statRowExp"),
     hpFill: $("pHpFill"), hpNum: $("pHpNum"),
     mpFill: $("pMpFill"), mpNum: $("pMpNum"),
     expFill: $("pExpFill"), expNum: $("pExpNum"),
     atk: $("pAtk"),
+    dmgSub: $("dmgSub"),
     skillGrid: $("skillGrid"),
     skillName: $("skillName"),
-    hotkeyGrid: $("hotkeyGrid"),
+    btnSkillTree: $("btnSkillTree"),
   };
 
   els.skillSlots = Array.from({ length: SKILL_SLOT_COUNT }, () => {
@@ -41,29 +42,12 @@ export function initInfoPanel({ onSkillTree } = {}) {
     els.skillGrid.appendChild(slot);
     return slot;
   });
-  els.hotkeySlots = Array.from({ length: HOTKEY_SLOT_COUNT }, (_, i) => {
-    const slot = document.createElement("button");
-    slot.type = "button";
-    slot.className = "hotkey-slot";
-    if (i === 0) {
-      slot.classList.add("assigned");
-      slot.title = "스킬 트리";
-      slot.setAttribute("aria-label", "핫키 1: 스킬 트리");
-      slot.innerHTML = '<span class="hotkey-glyph">✦</span><small>1</small>';
-      slot.addEventListener("click", () => onSkillTree?.());
-    } else {
-      slot.textContent = String(i + 1);
-      slot.title = "빈 핫키";
-      slot.disabled = true;
-    }
-    els.hotkeyGrid.appendChild(slot);
-    return slot;
-  });
+  els.btnSkillTree.addEventListener("click", () => onSkillTree?.());
   lastSkillKey = null;
   return {
     setSkillTreeOpen(open) {
-      els.hotkeySlots[0].classList.toggle("on", open);
-      els.hotkeySlots[0].setAttribute("aria-pressed", String(open));
+      els.btnSkillTree.classList.toggle("on", open);
+      els.btnSkillTree.setAttribute("aria-pressed", String(open));
     },
   };
 }
@@ -109,6 +93,8 @@ export function renderInfoPanel(char, account = null) {
 
   // 캐릭터 패널
   els.panel.classList.toggle("no-char", !char);
+  els.statRowExp.classList.remove("hidden");
+  els.dmgSub.textContent = "⚔ 공격력";
   if (!char) {
     els.statName.textContent = "— 뱀파이어 없음 —";
     setBar(els.hpFill, els.hpNum, 0, 0);
@@ -126,4 +112,35 @@ export function renderInfoPanel(char, account = null) {
   setBar(els.expFill, els.expNum, char.exp, expToNext(char.level));
   els.atk.textContent = String(char.atk);
   renderSkills(char);
+}
+
+/**
+ * 선택한 캐릭터가 없을 때(탭 해제 상태) 보여주는 뱀파이어 전체 현황 —
+ * 스타크래프트에서 여러 유닛을 선택했을 때 나오는 부대 합산 체력·마나 바와 동일한 개념.
+ * @param {object[]} vampires 생존 뱀파이어 목록
+ * @param {{level:number, exp:number}|null} account 계정 성장 상태 (상단 levelBar)
+ */
+export function renderSquadPanel(vampires, account = null) {
+  if (account) {
+    const need = accountExpToNext(account.level);
+    els.acctLevel.textContent = `Lv.${account.level}`;
+    els.acctExpFill.style.width =
+      `${Math.max(0, Math.min(100, (account.exp / need) * 100))}%`;
+    els.acctExpNum.textContent = `${account.exp} / ${need}`;
+  }
+
+  if (!vampires.length) {
+    renderInfoPanel(null);
+    return;
+  }
+
+  els.panel.classList.remove("no-char");
+  els.statRowExp.classList.add("hidden"); // 부대 단위로는 경험치가 무의미
+  els.statName.textContent = `🧛 ×${vampires.length}`;
+  const sum = (f) => vampires.reduce((s, c) => s + f(c), 0);
+  setBar(els.hpFill, els.hpNum, sum((c) => c.hp), sum((c) => c.maxHp));
+  setBar(els.mpFill, els.mpNum, sum((c) => c.mp ?? 0), sum((c) => c.maxMp ?? 0));
+  els.dmgSub.textContent = "⚔ 총 공격력";
+  els.atk.textContent = String(sum((c) => c.atk));
+  renderSkills(null);
 }
