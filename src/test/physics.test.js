@@ -205,6 +205,32 @@ describe("FIGHT 상태", () => {
   });
 });
 
+describe("플랫폼 위 도약", () => {
+  it("좁은 발판 위 뱀파이어는 가장자리에서 위 발판으로 도약한다 (바닥처럼)", () => {
+    // CRAWL 타이머를 길게 잡아 타이머 만료 도약 경로를 차단 → 가장자리 판단만으로
+    // 점프해야 통과한다. 발판(y=400)에서 뛰므로 발이 바닥보다 훨씬 높은 채로 JUMP.
+    const lower = { id: 1, x: 100, y: 400, blockType: "platform_block" };
+    const upper = { id: 2, x: 108, y: 360, blockType: "platform_block" };
+    const ctx = makeCtx([lower, upper]);
+    const c = makeChar({ x: 100, y: 400 - CHAR_SIZE, dir: 1, state: "CRAWL", _platformId: 1, timer: 99 });
+    let jumpedFromPlatform = false;
+    for (let t = 0; t < 1; t += 1 / 60) {
+      tickCharacter(c, ctx, 1 / 60);
+      if (c.state === "JUMP" && c.y + c.h < FLOOR_Y - 50) { jumpedFromPlatform = true; break; }
+    }
+    expect(jumpedFromPlatform).toBe(true);
+  });
+
+  it("가장자리에 닿기 전(발판 위)에는 도약이 발동하지 않는다", () => {
+    // 발판 위(다음 프레임에도 발판을 밟는 위치): 아직 가장자리가 아니므로 걷기를 유지한다.
+    const plat = { id: 1, x: 100, y: 400, blockType: "platform_block" };
+    const ctx = makeCtx([plat]);
+    const c = makeChar({ x: 101, y: 400 - CHAR_SIZE, dir: 1, state: "CRAWL", _platformId: 1, timer: 99 });
+    tickCharacter(c, ctx, 1 / 60);
+    expect(c.state).toBe("CRAWL");
+  });
+});
+
 describe("startJump", () => {
   it("위쪽으로 발사한다", () => {
     const c = makeChar();

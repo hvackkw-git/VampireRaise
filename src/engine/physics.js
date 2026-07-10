@@ -271,6 +271,12 @@ export function tickCharacter(c, ctx, simDt) {
       startJump(c, rng, 40, 20);
     } else if (c.timer <= 0) {
       defaultMoveDecide(c, ctx, rng);
+    } else if (c.side !== "human" && c._platformId != null
+      && aboutToLeavePlatformEdge(c, onPlat, platforms, blockPowered, simDt)) {
+      // 플랫폼 가장자리: 좁은 발판(20px)은 CRAWL 타이머가 끝나기 전에 걸어 나가
+      // 버려 defaultMoveDecide(도약 판단)가 실행되지 않는다. 바닥에서처럼 도약
+      // 기회를 주기 위해 가장자리에 닿는 프레임에 한 번 판단하게 한다.
+      defaultMoveDecide(c, ctx, rng);
     }
   }
 
@@ -339,6 +345,24 @@ function lowestJumpTarget(c, platforms, blockPowered) {
     }
   }
   return best;
+}
+
+/**
+ * 이번 프레임 걷기 이동으로 밟고 있던 플랫폼의 가장자리를 벗어나는지
+ * (이어서 밟을 같은 높이의 인접 발판도 없는지) 판정한다. 벗어나는 프레임에
+ * 도약 판단을 걸어 바닥에서와 동일한 점프 기회를 준다.
+ */
+function aboutToLeavePlatformEdge(c, onPlat, platforms, blockPowered, simDt) {
+  if (!onPlat) return false;
+  const nextX = c.x + c.dir * crawlSpeed(c) * simDt;
+  const hb = getCharHitbox({ x: nextX, w: c.w });
+  const overlaps = (p) => hb.x + hb.w > p.x && hb.x < p.x + PLATFORM_W;
+  if (overlaps(onPlat)) return false; // 아직 현재 발판 위
+  for (const p of platforms) {
+    if (p.id === onPlat.id || p.y !== onPlat.y) continue; // 같은 높이로 이어지는 발판만
+    if (isTangiblePlatform(p, blockPowered) && overlaps(p)) return false; // 옆 발판으로 계속 걸어감
+  }
+  return true;
 }
 
 /** 멈춤 없는 기본 이동: 인간은 걷고, 새우 진영은 주기적으로 위 플랫폼을 향해 도약한다. */
