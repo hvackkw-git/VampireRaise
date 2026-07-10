@@ -12,12 +12,16 @@ import {
 const blockEls = new Map(); // platId → { el, img, lastSrc, lastRot }
 const charEls = new Map();  // charId → { el, sprite, hpFill, lastSide }
 
-let layerLogic, layerPlatform, layerChars, layerFx, rgbTintEl, tankEl, wrapperEl;
-let tankScale = 1;
+/** 논리 캔버스 높이 = 수조(640) + 패널 영역(130) — Shrimprium 320×670 방식 */
+const CANVAS_H = TANK_H + 130;
+
+let layerLogic, layerPlatform, layerChars, layerFx, rgbTintEl, tankEl, canvasEl, canvasWrapperEl;
+let uiScale = 1;
 
 export function initTankView() {
   tankEl = document.getElementById("tank");
-  wrapperEl = document.getElementById("tankWrapper");
+  canvasEl = document.getElementById("gameCanvas");
+  canvasWrapperEl = document.getElementById("canvasWrapper");
   layerLogic = document.getElementById("layerLogic");
   layerPlatform = document.getElementById("layerPlatform");
   layerChars = document.getElementById("layerChars");
@@ -27,24 +31,24 @@ export function initTankView() {
   window.addEventListener("resize", resizeTank);
 }
 
-/** 뷰포트에 맞춰 수조 스케일 조정 — 모든 UI가 수조 내 오버레이라 화면을 꽉 채운다 */
+/** 뷰포트에 맞춰 논리 캔버스(수조+패널) 전체를 한 스케일로 조정 */
 export function resizeTank() {
   const root = document.querySelector(".game-root");
-  if (!root || !tankEl || !wrapperEl) return;
+  if (!root || !canvasEl || !canvasWrapperEl) return;
   const availW = root.clientWidth;
   const availH = root.clientHeight;
-  tankScale = Math.min(availW / TANK_W, availH / TANK_H);
-  wrapperEl.style.width = `${TANK_W * tankScale}px`;
-  wrapperEl.style.height = `${TANK_H * tankScale}px`;
-  tankEl.style.transform = `scale(${tankScale})`;
+  uiScale = Math.min(availW / TANK_W, availH / CANVAS_H);
+  canvasWrapperEl.style.width = `${TANK_W * uiScale}px`;
+  canvasWrapperEl.style.height = `${CANVAS_H * uiScale}px`;
+  canvasEl.style.transform = `scale(${uiScale})`;
 }
 
 /** 스크린 좌표 → 수조 논리 좌표 */
 export function toTankLocal(clientX, clientY) {
-  const rect = wrapperEl.getBoundingClientRect();
+  const rect = tankEl.getBoundingClientRect();
   return {
-    x: (clientX - rect.left) / tankScale,
-    y: (clientY - rect.top) / tankScale,
+    x: (clientX - rect.left) / uiScale,
+    y: (clientY - rect.top) / uiScale,
   };
 }
 

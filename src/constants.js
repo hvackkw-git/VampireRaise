@@ -12,6 +12,12 @@ export const FLOOR_Y = 624;
 export const CHAR_SIZE = 32;
 /** 걷기 스프라이트 시트 프레임 수 (shrimp-4frame: 32×32 × 8프레임) */
 export const CHAR_SHEET_FRAMES = 8;
+/**
+ * 스프라이트 상단 투명 여백(px, 32px 프레임 기준) — Shrimprium SHRIMP_SPRITE_TOP_PAD 이식.
+ * 새우 몸통은 프레임 아래쪽 ~14px에만 그려져 있으므로, 세로 충돌은 이 여백을 제외한
+ * "몸통"(높이 32-18=14px)으로 판정한다 → 1칸(20px) 통로를 위아래로 지나갈 수 있다.
+ */
+export const CHAR_SPRITE_TOP_PAD = 18;
 
 /** 진영별 임시 스프라이트 (Shrimprium 새우 재활용) */
 export const CHAR_SPRITE = {

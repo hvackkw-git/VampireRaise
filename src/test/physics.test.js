@@ -84,6 +84,27 @@ describe("걷기(CRAWL) 충돌", () => {
     run(c, makeCtx([plat]), 1);
     expect(c.dir).toBe(-1);
   });
+
+  it("1칸(20px) 세로 통로를 걸어서 통과한다 — 몸통(하단 14px)만 충돌", () => {
+    // 바닥 위 20px 높이 통로: 천장 블록이 FLOOR_Y-40에 있음 (블록 아래변 = FLOOR_Y-20)
+    const ceiling = { id: 3, x: 200, y: FLOOR_Y - 40, blockType: "platform_block" };
+    const c = makeChar({ x: 120, state: "CRAWL", dir: 1, timer: 30 });
+    const ctx = makeCtx([ceiling]);
+    let passed = false;
+    for (let t = 0; t < 3; t += 1 / 60) {
+      tickCharacter(c, ctx, 1 / 60);
+      if (c.x > 240) { passed = true; break; }
+    }
+    expect(passed).toBe(true);
+    expect(c.dir).toBe(1); // 반전 없이 통과
+  });
+
+  it("머리 높이(바닥 위 0~20px)를 막는 블록에는 여전히 막힌다", () => {
+    const wall = { id: 3, x: 200, y: FLOOR_Y - 20, blockType: "platform_block" };
+    const c = makeChar({ x: 150, state: "CRAWL", dir: 1, timer: 10 });
+    run(c, makeCtx([wall]), 1);
+    expect(c.dir).toBe(-1);
+  });
 });
 
 describe("기믹 블록", () => {
@@ -106,6 +127,20 @@ describe("기믹 블록", () => {
     run(c, makeCtx([black, white]), 1);
     // 워프 후 화이트홀 x 부근에서 낙하 중이거나 바닥 도달
     expect(Math.abs(c.x + c.w / 2 - (white.x + 10))).toBeLessThan(12);
+  });
+
+  it("머리 위 1칸 스턴 블록은 몸통에 닿지 않아 발동하지 않는다", () => {
+    const stun = { id: 13, x: 200, y: FLOOR_Y - 40, blockType: "stun_block" };
+    const c = makeChar({ x: 150, state: "CRAWL", dir: 1, timer: 30 });
+    const ctx = makeCtx([stun]);
+    let passed = false;
+    for (let t = 0; t < 3; t += 1 / 60) {
+      tickCharacter(c, ctx, 1 / 60);
+      if (c.state === "STUN") break;
+      if (c.x > 240) { passed = true; break; }
+    }
+    expect(passed).toBe(true);
+    expect(c.state).not.toBe("STUN");
   });
 
   it("스턴 블록에 스치면 STUN 상태로 낙하", () => {

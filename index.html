@@ -15,7 +15,10 @@
 <body>
   <div id="app">
     <div class="game-root">
-      <div class="tank-scale-wrapper" id="tankWrapper">
+      <!-- Shrimprium 방식: 수조(640) + 패널 영역(130)을 한 논리 캔버스(320×770)로 묶어 통째로 스케일 -->
+      <div class="canvas-scale-wrapper" id="canvasWrapper">
+        <div id="gameCanvas">
+        <div class="tank-area" id="tankWrapper">
         <div id="tank">
           <div class="tank-bg"></div>
           <div class="layer-blocks-logic" id="layerLogic"></div>
@@ -40,7 +43,12 @@
             <button id="btnReset" class="hotkey hotkey-danger" title="처음부터 재시작">🔄</button>
           </div>
 
-          <div id="decorate-bar" class="ui-overlay hidden">
+        </div>
+        </div>
+
+        <!-- 패널 영역: 수조와 분리된 하단 상시 영역 (수질 패널 자리 → 캐릭터 정보) -->
+        <div id="panel-region">
+          <div id="decorate-bar" class="hidden">
             <div class="decorate-controls" id="decorateControls">
               <button id="btnLogicLayer" class="deco-btn" title="논리 레이어">⚡</button>
               <span id="decoSelInfo" class="deco-sel-info"></span>
@@ -54,11 +62,11 @@
             </div>
             <div class="decorate-palette" id="decoratePalette"></div>
           </div>
-
-          <section id="info-panel" class="ui-overlay hidden">
-            <button id="btnInfoClose" class="info-close">✕</button>
-            <div id="infoChar" class="info-char"></div>
+          <section id="info-panel">
+            <div id="infoDefault" class="info-default">캐릭터를 탭하면 정보가 표시됩니다</div>
+            <div id="infoChar" class="info-char hidden"></div>
           </section>
+        </div>
         </div>
       </div>
     </div>

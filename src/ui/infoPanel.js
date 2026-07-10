@@ -1,38 +1,31 @@
 // src/ui/infoPanel.js
-// 캐릭터 정보 패널 (수조 하단 오버레이, Shrimprium 수질 패널 자리 대체):
-// 레벨·직업·경험치·HP·공격력 + 스킬트리 자리(직업 분류 후 개방).
-// 캐릭터 선택 시에만 표시된다.
+// 캐릭터 정보 패널 — 수조 아래 분리된 패널 영역에 상시 표시 (Shrimprium 수질 패널 자리).
+// 캐릭터 선택 시 레벨·직업·경험치·HP·공격력 + 스킬트리 자리, 미선택 시 안내 문구.
 
 import { expToNext } from "../constants.js";
 
 const SIDE_LABEL = { vampire: "🧛 뱀파이어", human: "🙍 인간", slave: "🧟 노예" };
 const SKILL_SLOTS = 5;
 
-let panelEl, charEl;
+let defaultEl, charEl;
 
-export function initInfoPanel({ onClose } = {}) {
-  panelEl = document.getElementById("info-panel");
+export function initInfoPanel() {
+  defaultEl = document.getElementById("infoDefault");
   charEl = document.getElementById("infoChar");
-  document.getElementById("btnInfoClose").addEventListener("click", () => {
-    hideInfoPanel();
-    onClose?.();
-  });
-}
-
-export function hideInfoPanel() {
-  panelEl.classList.add("hidden");
 }
 
 /**
- * 선택 캐릭터 정보 갱신. char가 null이면 패널 숨김.
+ * 선택 캐릭터 정보 갱신. char가 null이면 기본 안내 문구.
  * (매 프레임이 아니라 저빈도 호출 — index.js에서 4Hz + 선택 변경 시)
  */
 export function renderInfoPanel(char) {
   if (!char || char.dead) {
-    hideInfoPanel();
+    defaultEl.classList.remove("hidden");
+    charEl.classList.add("hidden");
     return;
   }
-  panelEl.classList.remove("hidden");
+  defaultEl.classList.add("hidden");
+  charEl.classList.remove("hidden");
   const need = expToNext(char.level);
   const hpPct = Math.max(0, Math.min(100, (char.hp / char.maxHp) * 100));
   const expPct = Math.max(0, Math.min(100, (char.exp / need) * 100));

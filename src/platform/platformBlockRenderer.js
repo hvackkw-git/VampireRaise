@@ -406,16 +406,17 @@ export function computeCharsOnPlatformIds(platforms, chars) {
 
 /**
  * 플랫폼 블록이 현재 배치 가능한 Y 범위를 반환합니다.
- * 위 7칸, 아래 7칸은 배치 불가 영역입니다 (20px 그리드 기준).
+ * 위 4칸, 아래 4칸은 배치 불가 영역입니다 (20px 그리드 기준).
+ * (Shrimprium 원본은 위/아래 7칸 — VampireRaise에서 위아래 3칸씩 확장)
  * @param {number} tankH - 수조 높이 (기본 640)
  * @returns {{ minY: number, maxY: number }}
  */
 export function getPlatformYRange(tankH = 640) {
   const totalRows = Math.round(tankH / PLATFORM_H);
-  const OFF_ROWS = 7; // 위/아래 각 7칸 금지
+  const OFF_ROWS = 4; // 위/아래 각 4칸 금지
   return {
-    minY: OFF_ROWS * PLATFORM_H,                        // 140px (tankH=640 기준)
-    maxY: (totalRows - OFF_ROWS - 1) * PLATFORM_H,     // 480px (tankH=640 기준)
+    minY: OFF_ROWS * PLATFORM_H,                        // 80px (tankH=640 기준)
+    maxY: (totalRows - OFF_ROWS - 1) * PLATFORM_H,     // 540px (tankH=640 기준)
   };
 }
 

@@ -28,7 +28,7 @@ const state = loadState() ?? createInitialState();
 const ui = { decorateMode: false, selectedBlockId: null, selectedCharId: null };
 
 initTankView();
-initInfoPanel({ onClose: () => { ui.selectedCharId = null; } });
+initInfoPanel();
 preloadStatefulBlockSprites();
 
 const decorate = createDecorateMode(state, ui, {});

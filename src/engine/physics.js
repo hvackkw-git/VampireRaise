@@ -9,10 +9,19 @@ import {
   getSlideDir, getSpikeDir, getConveyorDir, isLogicLayerBlock,
 } from "../platform/platformBlockRenderer.js";
 import {
-  TANK_W, FLOOR_Y, CRAWL_SPD,
+  TANK_W, FLOOR_Y, CRAWL_SPD, CHAR_SIZE, CHAR_SPRITE_TOP_PAD,
   PX_GRAVITY, PX_GRAVITY_JUMP, PX_GRAVITY_JUMP_LAND,
   STUN_DURATION_MS, CONVEYOR_PUSH_SPD, SLIDE_SPD, WARP_COOLDOWN_MS,
 } from "../constants.js";
+
+/**
+ * 세로 충돌용 몸통 윗변 Y. 스프라이트 상단 투명 여백(TOP_PAD)을 제외해
+ * 실제 그림이 있는 몸통(아래쪽 ~14px)만 벽·스턴 판정에 쓴다.
+ * 발(c.y + c.h)은 그대로 — 착지/지면 판정은 변하지 않는다.
+ */
+export function getCharBodyTop(c) {
+  return c.y + CHAR_SPRITE_TOP_PAD * (c.h / CHAR_SIZE);
+}
 
 /** 캐릭터가 밟을 수 없는(지형이 아닌) 블록 — 레드스톤 배선 + 스턴 */
 export const NON_PLATFORM_BLOCK_TYPES = new Set([
@@ -140,10 +149,11 @@ function checkStunTouch(c, ctx) {
   const { platforms, now } = ctx;
   if (now < c._stunImmuneUntil || c.state === "STUN" || c.state === "DASH") return;
   const hb = getCharHitbox(c);
+  const bodyTop = getCharBodyTop(c);
   for (const plat of platforms) {
     if (plat.blockType !== "stun_block") continue;
     const overlapX = hb.x + hb.w > plat.x && hb.x < plat.x + PLATFORM_W;
-    const overlapY = c.y + c.h > plat.y && c.y < plat.y + PLATFORM_H;
+    const overlapY = c.y + c.h > plat.y && bodyTop < plat.y + PLATFORM_H;
     if (overlapX && overlapY) { triggerStun(c, now); return; }
   }
 }
@@ -215,12 +225,14 @@ export function tickCharacter(c, ctx, simDt, onIdleDecide) {
       c.dir *= -1; c.vx = c.dir * CRAWL_SPD;
     }
     // 수평 블록 충돌: 진행 방향 앞 블록 → 반전 (가시 측면·블랙홀 측면 기믹 포함)
+    // 세로 겹침은 몸통(상단 투명 여백 제외) 기준 → 1칸 통로를 걸어서 통과 가능
     const hb = getCharHitbox(c);
     const hbLeft = hb.x, hbRight = hb.x + hb.w;
+    const bodyTop = getCharBodyTop(c);
     for (const plat of platforms) {
       if (plat.id === c._platformId) continue;
       if (!isTangible(plat, blockPowered)) continue;
-      if (c.y + c.h <= plat.y || c.y >= plat.y + PLATFORM_H) continue;
+      if (c.y + c.h <= plat.y || bodyTop >= plat.y + PLATFORM_H) continue;
       const MARGIN = 1;
       const step = Math.abs(c.vx) * simDt + MARGIN;
       const hitRight = c.dir > 0 && hbRight <= plat.x && hbRight + step > plat.x;
