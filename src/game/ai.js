@@ -9,6 +9,11 @@
 // 예산 이내인 적에게 그 최단 경로의 웨이포인트를 따라 날아간다.
 // 지형 기준은 물리와 동일: 전원 ON(투명) 게이트는 벽이 아니고, up-가시·스프링·
 // 블랙홀 윗면은 착지 목표로 삼지 않는다. 돌진 중단 시에는 제자리에서 낙하한다.
+//
+// 점프 중에도 돌진할 수 있다. 공중 좌표는 그리드에서 벗어나 있으므로, 현재 돌진
+// 규칙(그리드/착지 가능 지점 기준 BFS 경로)을 지키기 위해 먼저 공중 위치를 그리드에
+// 맞춘 "돌진 시작 위치"로 좌표보정한 뒤, 그 보정 위치에서 목표까지 최단 경로를
+// 계산한다. 실제 비행 경로는 [공중 현재 위치 → 좌표보정 시작 위치 → …BFS 경로… → 목표].
 
 import {
   DETECT_RANGE, PING_REFRESH_S,
@@ -57,6 +62,22 @@ function endDash(c, platforms = [], { arrived = false, blockPowered = null } = {
   c._dashRouteIndex = 0;
   c._dashGoal = null;
   c._dashCd = DASH_COOLDOWN_S;
+}
+
+/**
+ * 돌진 개시 — 상태·경로·목표를 세팅한다. (_ping은 호출부에서 목적에 맞게 지정)
+ * 지상(CRAWL)·원거리 반격·점프(공중) 모두 같은 방식으로 비행에 진입한다.
+ */
+function beginDash(c, found) {
+  c.state = "DASH";
+  c.mp = Math.max(0, (c.mp ?? 0) - DASH_MP_COST);
+  c._dashTargetId = found.char.id;
+  c._dashRoute = found.route.path;
+  c._dashGoal = found.goal;
+  c._dashRouteIndex = 1;
+  c._dashTimeLeft = DASH_MAX_S;
+  c._platformId = null;
+  c._jumpApexY = null; // 점프 중 돌진 진입 시 잔여 점프 상태 정리
 }
 
 /**
@@ -344,6 +365,48 @@ function findNearestDashRoute(c, chars, platforms, blockPowered = null) {
 }
 
 /**
+ * 공중(점프) 좌표를 그리드에 맞춘 "돌진 좌표보정 시작 위치"(중심 좌표).
+ * BFS는 이 보정 위치에서 목표까지의 경로를 계산하고, 실제 비행은 공중 현재 위치에서
+ * 이 위치로 먼저 이동(좌표보정)한 뒤 그 경로를 따른다.
+ */
+function jumpDashStartCenter(c) {
+  return cellCenter(pointToCell(centerOf(c)));
+}
+
+/**
+ * 점프 중 돌진 경로. 좌표보정 시작 위치에서 목표까지 BFS 최단 경로를 구하고,
+ * 그 앞에 공중 현재 위치 → 보정 위치 leg를 붙여 반환한다. 예산 판정은 규칙대로
+ * 보정 시작 위치→목표 경로 길이(route.dist)로 한다.
+ */
+function findJumpDashRouteToTarget(c, enemy, platforms, routeMult, blockPowered = null) {
+  const detectRange = DETECT_RANGE[c.side] ?? 0;
+  const budget = detectRange * routeMult;
+  const goal = dashGoalForEnemy(c, enemy, platforms, blockPowered);
+  if (!goal) return null;
+  const startCenter = jumpDashStartCenter(c);
+  const startChar = { x: startCenter.x - c.w / 2, y: startCenter.y - c.h / 2, w: c.w, h: c.h };
+  const route = findDashRoute(startChar, pointAsTarget(goal, c), platforms, goal, blockPowered);
+  if (!route || route.dist > budget || route.dist <= DASH_ARRIVE_DIST + 8) return null;
+  const path = [centerOf(c), ...route.path]; // 공중 현재 위치 → 좌표보정 시작 위치 leg 선두 추가
+  return { char: enemy, route: { dist: route.dist, path }, goal };
+}
+
+function findNearestJumpDashRoute(c, chars, platforms, blockPowered = null) {
+  let best = null;
+  for (const enemy of chars) {
+    if (enemy === c || enemy.dead || !isEnemySide(c.side, enemy.side)) continue;
+    if (!isInDetectRange(c, enemy)) continue;
+    const found = findJumpDashRouteToTarget(c, enemy, platforms, dashRouteMultiplier(c), blockPowered);
+    if (!found) continue;
+    if (!best || found.route.dist < best.route.dist
+      || (found.route.dist === best.route.dist && enemy.id < best.char.id)) {
+      best = found;
+    }
+  }
+  return best;
+}
+
+/**
  * 매 프레임 감지 틱.
  * @param {object} state
  * @param {number} simDt 초
@@ -387,6 +450,17 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null) 
       continue;
     }
 
+    // ── 점프(공중) 중 돌진: 적이 감지범위에 들어오면 좌표보정 후 최단 경로로 돌진 ──
+    // 공중 위치를 그리드 "돌진 시작 위치"로 좌표보정한 뒤, 보정 위치→목표 BFS 경로를 따른다.
+    if (c.state === "JUMP" && c.side === "vampire" && !(c._dashCd > 0)) {
+      const found = findNearestJumpDashRoute(c, chars, state.platforms.items, blockPowered);
+      if (found) {
+        beginDash(c, found);
+        c._ping = null;
+        continue;
+      }
+    }
+
     if (!AWARE_STATES.has(c.state)) {
       // 전투 진입/공중/스턴 동안 핑은 무효 (전투 후 재탐색)
       if (c.state === "FIGHT") c._ping = null;
@@ -426,16 +500,9 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null) 
         ? findDashRouteToTarget(c, t, state.platforms.items, routeMult, blockPowered)
         : null;
       if (found) {
-        c.state = "DASH";
-        c.mp = Math.max(0, (c.mp ?? 0) - DASH_MP_COST);
-        c._dashTargetId = found.char.id;
-        c._dashRoute = found.route.path;
-        c._dashGoal = found.goal;
-        c._dashRouteIndex = 1;
-        c._dashTimeLeft = DASH_MAX_S;
+        beginDash(c, found);
         c._ping = { targetId: found.char.id, ranged: true, x: found.goal.x, y: found.goal.y, platformId: found.goal.platformId };
         c._rangedRetaliation = null;
-        c._platformId = null;
         continue;
       }
       c._rangedRetaliation = null;
@@ -447,15 +514,8 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null) 
     if (c.side === "vampire" && !(c._dashCd > 0)) {
       const found = findNearestDashRoute(c, chars, state.platforms.items, blockPowered);
       if (found) {
-        c.state = "DASH";
-        c.mp = Math.max(0, (c.mp ?? 0) - DASH_MP_COST);
-        c._dashTargetId = found.char.id;
-        c._dashRoute = found.route.path;
-        c._dashGoal = found.goal;
-        c._dashRouteIndex = 1;
-        c._dashTimeLeft = DASH_MAX_S;
+        beginDash(c, found);
         c._ping = null;
-        c._platformId = null;
         continue;
       }
     }
