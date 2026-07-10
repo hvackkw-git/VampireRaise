@@ -2,10 +2,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { createInitialState, createCharacter } from "../state/gameState.js";
 import { tickCombat, grantExp, infectToSlave } from "../game/combat.js";
-import { startWave, tickWaves, vampireSideAlive, humansAlive, grantAccountExp } from "../game/waves.js";
+import {
+  startWave, tickWaves, vampireSideAlive, humansAlive, grantAccountExp, reviveVampires,
+} from "../game/waves.js";
 import {
   humanCountForWave, humanStatsForWave, expToNext, SLAVE_BASE,
-  accountExpForWave, accountExpToNext,
+  accountExpForWave, accountExpToNext, FLOOR_Y,
 } from "../constants.js";
 
 let state;
@@ -220,6 +222,19 @@ describe("웨이브", () => {
     expect(state.wave.current).toBe(1);
     expect(humansAlive(state)).toBe(0);
     expect(vampireSideAlive(state)).toBeGreaterThan(0);
+  });
+
+  it("부활한 뱀파이어는 상단 낙하가 아니라 맨 아래 바닥에서 재시작한다", () => {
+    for (const c of state.chars.items) {
+      if (c.side === "vampire") { c.dead = true; c.y = 100; }
+    }
+    reviveVampires(state, () => 0.5);
+    for (const c of state.chars.items) {
+      if (c.side !== "vampire") continue;
+      expect(c.dead).toBe(false);
+      expect(c.state).toBe("CRAWL");
+      expect(c.y).toBe(FLOOR_Y - c.h);
+    }
   });
 
   it("클리어 시 계정 경험치를 획득한다", () => {

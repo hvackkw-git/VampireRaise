@@ -55,7 +55,8 @@ export function initHud(state, { onDecorate, onReset, getBlockPowered, isDecorat
       return;
     }
     state.blood -= cost;
-    createCharacter(state, "vampire", { y: -32, state: "FALL" });
+    // 뱀파이어는 상단 낙하가 아니라 맨 아래(바닥)에서 스폰 — createCharacter 기본값이 바닥·CRAWL
+    createCharacter(state, "vampire");
     showToast("🧛 새 뱀파이어가 합류했습니다");
   });
 

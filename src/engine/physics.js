@@ -13,7 +13,16 @@ import {
   PX_GRAVITY, PX_GRAVITY_JUMP, PX_GRAVITY_JUMP_LAND,
   JUMP_SPEED_MIN, JUMP_SPEED_SPAN, JUMP_MIN_DEG, JUMP_SPAN_DEG,
   STUN_DURATION_MS, CONVEYOR_PUSH_SPD, SLIDE_SPD, WARP_COOLDOWN_MS,
+  HUMAN_RANGED_BRACE_SPEED_MULT,
 } from "../constants.js";
+
+/**
+ * 현재 걷기 속도. 인간은 원거리 사거리 안에 적이 들어오면(_rangedBraced) 자세를 잡느라
+ * 이속이 1/4로 줄어든다 — ai.tickAggro가 매 프레임 _rangedBraced를 갱신한다.
+ */
+function crawlSpeed(c) {
+  return c._rangedBraced ? CRAWL_SPD * HUMAN_RANGED_BRACE_SPEED_MULT : CRAWL_SPD;
+}
 
 /**
  * 세로 충돌용 몸통 윗변 Y. 진영별 스프라이트 상단 투명 여백(topPad)을 제외해
@@ -222,10 +231,11 @@ export function tickCharacter(c, ctx, simDt) {
 
   else if (c.state === "CRAWL") {
     c.y = effectiveGroundY; c.vy = 0;
-    c.vx = c.dir * CRAWL_SPD;
+    const spd = crawlSpeed(c);
+    c.vx = c.dir * spd;
     // 벽 반전
     if ((c.x <= 2 && c.dir < 0) || (c.x >= TANK_W - c.w - 2 && c.dir > 0)) {
-      c.dir *= -1; c.vx = c.dir * CRAWL_SPD;
+      c.dir *= -1; c.vx = c.dir * spd;
     }
     // 수평 블록 충돌: 진행 방향 앞 블록 → 반전 (가시 측면·블랙홀 측면 기믹 포함)
     // 세로 겹침은 몸통(상단 투명 여백 제외) 기준 → 1칸 통로를 걸어서 통과 가능
@@ -246,7 +256,7 @@ export function tickCharacter(c, ctx, simDt) {
       if ((hitRight && spikeDir === "left") || (hitLeft && spikeDir === "right")) {
         triggerSpike(c, now); break;
       }
-      c.dir *= -1; c.vx = c.dir * CRAWL_SPD;
+      c.dir *= -1; c.vx = c.dir * spd;
       c._blockBounces = (c._blockBounces || 0) + 1;
       c._blockBounceDecay = 0;
       break;
