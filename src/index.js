@@ -15,10 +15,11 @@ import { createInitialState, loadState, saveState } from "./state/gameState.js";
 import { tickCharacter } from "./engine/physics.js";
 import { tickAggro } from "./game/ai.js";
 import { tickCombat, aliveChars } from "./game/combat.js";
+import { tickHumanProjectiles } from "./game/projectiles.js";
 import { tickWaves } from "./game/waves.js";
 import {
   initTankView, renderBlocks, renderChars, renderPings,
-  renderCombatEvents, toTankLocal, showToast, spawnFloatText,
+  renderCombatEvents, renderProjectiles, toTankLocal, showToast, spawnFloatText,
 } from "./ui/tankView.js";
 import { createDecorateMode } from "./decorate/decorateMode.js";
 import { initInfoPanel, renderInfoPanel } from "./ui/infoPanel.js";
@@ -149,9 +150,10 @@ function frame(nowMs) {
     if (c.maxMp) c.mp = Math.min(c.maxMp, (c.mp ?? c.maxMp) + MP_REGEN_PER_S * simDt);
   }
 
-  // 3) 전투·전염 → 4) 웨이브
+  // 3) 투사체 → 전투·전염 → 4) 웨이브
+  const projectileEvents = tickHumanProjectiles(state, simDt);
   const combatEvents = tickCombat(state, simDt);
-  renderCombatEvents(combatEvents);
+  renderCombatEvents([...projectileEvents, ...combatEvents]);
   const waveEvents = tickWaves(state, simDt);
   for (const ev of waveEvents) {
     if (ev.type === "clear") showToast(`✅ 웨이브 클리어! +🩸 ${ev.reward}`);
@@ -166,10 +168,11 @@ function frame(nowMs) {
   if (animAccum >= 0.12) { animAccum = 0; animFrame++; }
   renderBlocks(state, signals, animFrame, ui);
   renderChars(state, nowMs, ui);
+  renderProjectiles(state);
   renderPings(state);
 
   uiAccum += simDt;
-  if (uiAccum >= 0.25 || combatEvents.length || waveEvents.length) {
+  if (uiAccum >= 0.25 || projectileEvents.length || combatEvents.length || waveEvents.length) {
     uiAccum = 0;
     hud.render();
     updatePanel();

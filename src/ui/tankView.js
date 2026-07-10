@@ -6,11 +6,12 @@ import {
   RGB_BLOCK_TINTS, CONVEYOR_ANIM_FRAMES, HOLE_ANIM_FRAMES,
 } from "../platform/platformBlockRenderer.js";
 import {
-  TANK_W, TANK_H, PANEL_H, CHAR_SPRITES, DETECT_RANGE,
+  TANK_W, TANK_H, PANEL_H, CHAR_SPRITES, DETECT_RANGE, HUMAN_PROJECTILE_RADIUS,
 } from "../constants.js";
 
 const blockEls = new Map(); // platId → { el, img, lastSrc, lastRot }
 const charEls = new Map();  // charId → { el, sprite, hpFill, lastSide }
+const projectileEls = new Map(); // projectileId → el
 
 /** 논리 캔버스 높이 = 수조(640) + 패널 영역(150) — Shrimprium 320×670 방식 */
 const CANVAS_H = TANK_H + PANEL_H;
@@ -253,6 +254,30 @@ export function renderPings(state) {
   }
 }
 
+
+export function renderProjectiles(state) {
+  const items = state.projectiles?.items ?? [];
+  const seen = new Set();
+  for (const p of items) {
+    seen.add(p.id);
+    let el = projectileEls.get(p.id);
+    if (!el) {
+      el = document.createElement("span");
+      el.className = `projectile projectile-${p.side}`;
+      layerFx.appendChild(el);
+      projectileEls.set(p.id, el);
+    }
+    const r = HUMAN_PROJECTILE_RADIUS;
+    el.style.width = `${r * 2}px`;
+    el.style.height = `${r * 2}px`;
+    el.style.left = `${p.x - r}px`;
+    el.style.top = `${p.y - r}px`;
+  }
+  for (const [id, el] of projectileEls) {
+    if (!seen.has(id)) { el.remove(); projectileEls.delete(id); }
+  }
+}
+
 /** 전투 이벤트 → 플로팅 텍스트 */
 export function spawnFloatText(x, y, text, cls = "") {
   const span = document.createElement("span");
@@ -266,7 +291,7 @@ export function spawnFloatText(x, y, text, cls = "") {
 
 export function renderCombatEvents(events) {
   for (const ev of events) {
-    if (ev.type === "hit") {
+    if (ev.type === "hit" || ev.type === "projectileHit") {
       spawnFloatText(ev.target.x + ev.target.w / 2 - 6, ev.target.y - 8, `-${ev.dmg}`);
     } else if (ev.type === "levelup") {
       spawnFloatText(ev.char.x, ev.char.y - 12, "LEVEL UP!", "fx-levelup");

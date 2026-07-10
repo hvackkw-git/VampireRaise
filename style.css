@@ -242,6 +242,20 @@ button { font-family: inherit; color: inherit; }
   to   { transform: translateY(-3px); }
 }
 
+
+/* 인간 투사체 */
+.projectile {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  background: #7ec8e3;
+  box-shadow: 0 0 6px rgba(126, 200, 227, 0.9);
+}
+.projectile-human {
+  background: #7ec8e3;
+  border: 1px solid rgba(220, 248, 255, 0.9);
+}
+
 /* 데미지/이벤트 플로팅 텍스트 */
 .fx-float {
   position: absolute;

@@ -161,6 +161,20 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
     expect(vamp._ping).toBeNull();
   });
 
+  it("돌진 경로가 너무 길면 다음 인식 전까지 경로 첫 지점으로 걸어간다", () => {
+    const vamp = put("vampire", 100);
+    vamp.dashRouteMult = 0.5; // 감지 원 안이지만 우회 경로는 돌진 예산을 넘도록 축소
+    const human = put("human", 100, { y: FLOOR_Y - CHAR_SIZE - 70 });
+    state.platforms.items.push({ id: 1, x: human.x, y: human.y + human.h, blockType: "platform_block" });
+
+    tickAggro(state, 0.016, () => 0.9);
+
+    expect(vamp.state).toBe("CRAWL");
+    expect(vamp._dashTargetId).toBeNull();
+    expect(vamp._ping).toMatchObject({ targetId: human.id, platformId: 1 });
+    expect(vamp._ping.x).not.toBeCloseTo(human.x + human.w / 2);
+  });
+
   it("인간 근처에 플랫폼 블록이 없으면 뱀파이어 핑과 돌진을 시작하지 않는다", () => {
     const vamp = put("vampire", 80);
     put("human", 140);

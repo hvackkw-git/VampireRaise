@@ -12,7 +12,7 @@
 
 import {
   DETECT_RANGE, PING_REFRESH_S,
-  DASH_ROUTE_MULT, TANK_W, TANK_H, FLOOR_Y,
+  DASH_ROUTE_MULT, DASH_RANGED_ROUTE_MULT, DASH_RANGED_SKILL_MULT, TANK_W, TANK_H, FLOOR_Y,
   DASH_SPD, DASH_COOLDOWN_S, DASH_ARRIVE_DIST, DASH_MAX_S, DASH_MP_COST,
   isEnemySide,
 } from "../constants.js";
@@ -238,6 +238,18 @@ function dashRouteMultiplier(c) {
   return Number.isFinite(c?.dashRouteMult) ? c.dashRouteMult : DASH_ROUTE_MULT;
 }
 
+function rangedDashRouteMultiplier(c) {
+  return Number.isFinite(c?.rangedDashRouteMult)
+    ? c.rangedDashRouteMult
+    : DASH_RANGED_ROUTE_MULT * DASH_RANGED_SKILL_MULT;
+}
+
+export function requestRangedDash(vampire, attackerId) {
+  if (!vampire || vampire.dead || vampire.side !== "vampire") return;
+  vampire._rangedRetaliation = { targetId: attackerId, routeMult: rangedDashRouteMultiplier(vampire) };
+  vampire._ping = { targetId: attackerId, ranged: true };
+}
+
 function isInDetectRange(c, enemy) {
   const range = DETECT_RANGE[c.side] ?? 0;
   const a = centerOf(c);
@@ -249,17 +261,39 @@ function dashGoalForEnemy(c, enemy, platforms, blockPowered = null) {
   return nearestPlatformStandPointTo(enemy, platforms, c.h, blockPowered);
 }
 
-function findNearestDashRoute(c, chars, platforms, blockPowered = null) {
+function findDashRouteToTarget(c, enemy, platforms, routeMult, blockPowered = null) {
+  const detectRange = DETECT_RANGE[c.side] ?? 0;
+  const budget = detectRange * routeMult;
+  const goal = dashGoalForEnemy(c, enemy, platforms, blockPowered);
+  if (!goal) return null;
+  const route = findDashRoute(c, pointAsTarget(goal, c), platforms, goal, blockPowered);
+  if (!route || route.dist > budget || route.dist <= DASH_ARRIVE_DIST + 8) return null;
+  return { char: enemy, route, goal };
+}
+
+function firstWalkableDashRoutePoint(c, enemy, platforms, blockPowered = null) {
   const detectRange = DETECT_RANGE[c.side] ?? 0;
   const budget = detectRange * dashRouteMultiplier(c);
+  const goal = dashGoalForEnemy(c, enemy, platforms, blockPowered);
+  if (!goal) return null;
+  const route = findDashRoute(c, pointAsTarget(goal, c), platforms, goal, blockPowered);
+  if (!route || route.dist <= budget) return null;
+
+  const cx = c.x + c.w / 2;
+  for (const pt of route.path.slice(1)) {
+    if (Math.abs(pt.x - cx) >= 4) return { ...pt, platformId: goal.platformId };
+  }
+  return { ...goal };
+}
+
+function findNearestDashRoute(c, chars, platforms, blockPowered = null) {
   let best = null;
   for (const enemy of chars) {
     if (enemy === c || enemy.dead || !isEnemySide(c.side, enemy.side)) continue;
     if (!isInDetectRange(c, enemy)) continue;
-    const goal = dashGoalForEnemy(c, enemy, platforms, blockPowered);
-    if (!goal) continue;
-    const route = findDashRoute(c, pointAsTarget(goal, c), platforms, goal, blockPowered);
-    if (!route || route.dist > budget || route.dist <= DASH_ARRIVE_DIST + 8) continue;
+    const found = findDashRouteToTarget(c, enemy, platforms, dashRouteMultiplier(c), blockPowered);
+    if (!found) continue;
+    const { route, goal } = found;
     if (!best || route.dist < best.route.dist || (route.dist === best.route.dist && enemy.id < best.char.id)) {
       best = { char: enemy, route, goal };
     }
@@ -315,6 +349,30 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null) 
       continue;
     }
 
+
+    // ── 원거리 피격 반격: 공격자에게 핑을 찍고 더 넓은 예산(감지×2.5×스킬배율)으로 돌진 ──
+    if (c.side === "vampire" && c._rangedRetaliation) {
+      const t = byId.get(c._rangedRetaliation.targetId);
+      const routeMult = c._rangedRetaliation.routeMult ?? rangedDashRouteMultiplier(c);
+      const found = t && !t.dead && isEnemySide(c.side, t.side)
+        ? findDashRouteToTarget(c, t, state.platforms.items, routeMult, blockPowered)
+        : null;
+      if (found) {
+        c.state = "DASH";
+        c.mp = Math.max(0, (c.mp ?? 0) - DASH_MP_COST);
+        c._dashTargetId = found.char.id;
+        c._dashRoute = found.route.path;
+        c._dashGoal = found.goal;
+        c._dashRouteIndex = 1;
+        c._dashTimeLeft = DASH_MAX_S;
+        c._ping = { targetId: found.char.id, ranged: true, x: found.goal.x, y: found.goal.y, platformId: found.goal.platformId };
+        c._rangedRetaliation = null;
+        c._platformId = null;
+        continue;
+      }
+      c._rangedRetaliation = null;
+    }
+
     // ── 뱀파이어 패시브(혈귀 돌진) ──
     // 중력을 무시한다. 감지 원 안의 적 중 플랫폼을 피해 돌아가는 BFS 최단 경로가
     // 감지범위×배율 이내인 가장 짧은 대상에게 그 최단 경로로 날아간다.
@@ -341,7 +399,8 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null) 
       const found = findNearestEnemy(c, chars);
       if (found && found.dist <= (DETECT_RANGE[c.side] ?? 0)) {
         const pingPoint = c.side === "vampire"
-          ? nearestPlatformStandPointTo(found.char, state.platforms.items, c.h, blockPowered)
+          ? (firstWalkableDashRoutePoint(c, found.char, state.platforms.items, blockPowered)
+            ?? nearestPlatformStandPointTo(found.char, state.platforms.items, c.h, blockPowered))
           : null;
         if (c.side === "vampire" && !pingPoint) {
           c._ping = null;

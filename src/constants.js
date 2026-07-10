@@ -53,6 +53,8 @@ export const PING_REFRESH_S = 1.0;
 // BFS 최단 경로의 실제 길이가 감지범위×배율 이내인 가장 짧은 대상에게 돌진한다.
 // 너무 돌아가야 하면(예산 초과) 발동하지 않고 기존 핑 추적/배회로 돌아간다.
 export const DASH_ROUTE_MULT = 2;       // 기본 발동 조건: BFS 경로 길이 ≤ 감지범위 × 2 (향후 스킬로 확장)
+export const DASH_RANGED_ROUTE_MULT = 2.5; // 원거리 피격 반격 기본 예산: 감지범위 × 2.5
+export const DASH_RANGED_SKILL_MULT = 1.1; // 원거리 피격 반격 스킬 배율 틀(향후 1.2, 1.3... 성장)
 export const DASH_SPD = 260;            // 돌진 속도 px/s
 export const DASH_COOLDOWN_S = 2.0;     // 돌진 재사용 대기(초)
 export const DASH_ARRIVE_DIST = 26;     // 이 거리까지 접근하면 돌진 종료(낙하 → 교전)
@@ -63,6 +65,15 @@ export const ENGAGE_RANGE = 34;       // 교전 시작 거리 (중심 간 px)
 export const FIGHT_BREAK_RANGE = 48;  // 이 거리보다 멀어지면 교전 해제
 export const ENGAGE_MAX_DY = 26;      // 교전 가능한 최대 높이 차 (중심 기준)
 export const ATTACK_COOLDOWN_S = 1.0; // 공격 주기(초)
+
+// ── 인간 투사체(파란새우 원거리 공격) ──
+export const HUMAN_PROJECTILE_RANGE = DETECT_RANGE.human; // 인식 범위 안에 들어온 적에게 투척
+export const HUMAN_PROJECTILE_SPEED = 170;
+export const HUMAN_PROJECTILE_COOLDOWN_S = 1.4;
+export const HUMAN_PROJECTILE_DAMAGE = 4;
+export const HUMAN_PROJECTILE_RADIUS = 4;
+export const HUMAN_PROJECTILE_HIT_RADIUS = 16;
+export const HUMAN_PROJECTILE_MAX_S = 2.0;
 
 /** 진영이 서로 적대적인지 */
 export function isEnemySide(a, b) {
