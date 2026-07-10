@@ -17,13 +17,19 @@ export const CHAR_SIZE = 32;
 // ── 스폰 존 (2×2 플랫폼블록 크기의 하얀 네모, 여기서만 캐릭터가 스폰된다) ──
 /** 스폰 존 한 변 길이(px) = 플랫폼블록 2칸(20×2) */
 export const SPAWN_ZONE_SIZE = 40;
-/** 인간 스폰 존: 오른쪽 위 모서리 */
+/** 존을 모서리에서 한 칸(20px) 안쪽으로 들여 UI/가장자리와 겹치지 않게 한다 */
+const SPAWN_ZONE_INSET = 20;
+/** 인간 스폰 존: 오른쪽 위에서 한 칸 안쪽(왼쪽·아래로 한 칸) */
 export const HUMAN_SPAWN_ZONE = {
-  x: TANK_W - SPAWN_ZONE_SIZE, y: 0, w: SPAWN_ZONE_SIZE, h: SPAWN_ZONE_SIZE,
+  x: TANK_W - SPAWN_ZONE_SIZE - SPAWN_ZONE_INSET, // 260
+  y: SPAWN_ZONE_INSET,                            // 20
+  w: SPAWN_ZONE_SIZE, h: SPAWN_ZONE_SIZE,
 };
-/** 뱀파이어 스폰 존: 왼쪽 아래 모서리 */
+/** 뱀파이어 스폰 존: 왼쪽 아래에서 한 칸 안쪽(오른쪽·위로 한 칸) */
 export const VAMPIRE_SPAWN_ZONE = {
-  x: 0, y: TANK_H - SPAWN_ZONE_SIZE, w: SPAWN_ZONE_SIZE, h: SPAWN_ZONE_SIZE,
+  x: SPAWN_ZONE_INSET,                             // 20
+  y: TANK_H - SPAWN_ZONE_SIZE - SPAWN_ZONE_INSET,  // 580
+  w: SPAWN_ZONE_SIZE, h: SPAWN_ZONE_SIZE,
 };
 
 /**
