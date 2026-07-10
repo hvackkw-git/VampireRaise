@@ -24,8 +24,23 @@ button { font-family: inherit; color: inherit; }
 /* ── 게임 영역 내 오버레이 UI (수조와 함께 스케일) ── */
 .ui-overlay { position: absolute; z-index: 20; }
 
+/* 게임 영역 최상단: 계정 레벨·경험치 바 */
+#levelBar {
+  top: 0; left: 0; right: 0;
+  height: 15px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 6px;
+  background: rgba(20, 10, 34, 0.55);
+  pointer-events: none;
+}
+#levelBar b { font-size: 9px; color: #ffd257; font-weight: 700; white-space: nowrap; }
+#levelBar span { font-size: 8px; color: #cbb8e8; white-space: nowrap; }
+#levelBar .bar { flex: 1; height: 7px; }
+
 #hud {
-  top: 6px; left: 6px;
+  top: 19px; left: 6px;
   display: flex;
   gap: 4px;
   pointer-events: none;
@@ -53,48 +68,12 @@ button { font-family: inherit; color: inherit; }
   pointer-events: none;
 }
 
-/* 핫키: 우상단 세로 열 (Shrimprium 퀵토글 스타일) */
-#hotkeys {
-  top: 6px; right: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.hotkey {
-  position: relative;
-  width: 28px; height: 28px;
-  border-radius: 50%;
-  background: rgba(42, 26, 58, 0.85);
-  border: 1px solid #5a3a7a;
-  font-size: 13px;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.hotkey:active { background: rgba(58, 42, 74, 0.9); }
-.hotkey.on { background: rgba(90, 32, 64, 0.9); border-color: #c04070; box-shadow: 0 0 6px rgba(192, 64, 112, 0.6); }
-.hotkey:disabled { opacity: 0.45; cursor: default; }
-.hotkey i {
-  position: absolute;
-  bottom: -2px; right: -4px;
-  font-style: normal;
-  font-size: 8px;
-  color: #ffd0da;
-  background: rgba(20, 10, 34, 0.85);
-  border-radius: 6px;
-  padding: 0 3px;
-}
-.hotkey i:empty { display: none; }
-.hotkey-danger { border-color: #8a3040; margin-top: 8px; }
-
-/* ── 논리 캔버스 (320×790 = 수조 640 + 패널 150) — Shrimprium처럼 통째로 스케일 ── */
+/* ── 논리 캔버스 (320×734 = 수조 640 + 패널 94) — Shrimprium처럼 통째로 스케일 ── */
 .canvas-scale-wrapper { position: relative; flex: 0 0 auto; }
 #gameCanvas {
   position: absolute;
   left: 0; top: 0;
-  width: 320px; height: 790px;
+  width: 320px; height: 734px;
   transform-origin: 0 0;
   display: flex;
   flex-direction: column;
@@ -110,8 +89,8 @@ button { font-family: inherit; color: inherit; }
 
 /* ── 패널 영역: 수조와 분리된 하단 상시 카드 ── */
 #panel-region {
-  flex: 0 0 150px;
-  height: 150px;
+  flex: 0 0 94px;
+  height: 94px;
   background: #180f22;
   border-top: 2px solid #43305f;
   overflow: hidden;
@@ -365,32 +344,14 @@ button { font-family: inherit; color: inherit; }
   margin: 0 3px;
 }
 
-/* ── 상시 정보 패널 (패널 영역 내부): 1행 계정 / 2행 캐릭터 4열 ── */
+/* ── 상시 정보 패널 (패널 영역 내부): 캐릭터 4열 ── */
 #info-panel {
   height: 100%;
   padding: 6px 7px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
 }
 
-/* 1행: 계정 레벨·경험치 + 유저 ID (전체 폭) */
-.acct-row {
-  flex: 0 0 24px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0 8px;
-  background: linear-gradient(180deg, #241536, #1e1130);
-  border: 1px solid #43305f;
-  border-radius: 7px;
-  font-size: 10px;
-}
-.acct-id { color: #9c88bc; white-space: nowrap; }
-.acct-id b { color: #ffd257; font-weight: 700; letter-spacing: 0.03em; }
-.acct-level { color: #b8a4d8; white-space: nowrap; }
-.acct-level b { color: #f0e6ff; }
-.acct-exp-num { font-size: 9px; color: #cbb8e8; white-space: nowrap; }
 .bar {
   flex: 1; height: 8px;
   background: rgba(0,0,0,0.5);
@@ -400,11 +361,11 @@ button { font-family: inherit; color: inherit; }
 .bar > i { display: block; height: 100%; border-radius: 4px; transition: width 0.3s; }
 .bar-acct > i { background: linear-gradient(90deg, #b08a20, #ffd257); }
 
-/* 2행: 4열 카드 그리드 */
+/* 4열 카드 그리드 */
 .panel-grid {
   flex: 1;
   display: grid;
-  grid-template-columns: 96px 52px 84px 1fr;
+  grid-template-columns: 84px 46px 66px 88px;
   gap: 5px;
   min-height: 0;
 }
@@ -428,6 +389,14 @@ button { font-family: inherit; color: inherit; }
 }
 .card-title-name { font-size: 10px; color: #f0e6ff; }
 #info-panel.no-char .panel-card { opacity: 0.55; }
+
+/* 캐릭터 미선택(squad-mode): 스탯/데미지/장착 스킬 대신 뱀파이어 얼굴 그리드, 핫키는 그대로 */
+#cardFaces { display: none; }
+#info-panel.squad-mode #cardStat,
+#info-panel.squad-mode #cardDmg,
+#info-panel.squad-mode #cardSkill { display: none; }
+#info-panel.squad-mode #cardFaces { display: flex; }
+#info-panel.squad-mode .panel-grid { grid-template-columns: 1fr 88px; }
 
 /* 1열: HP/MP/EXP 바 */
 .stat-row { display: flex; align-items: center; gap: 4px; margin-top: 3px; }
@@ -508,7 +477,40 @@ button { font-family: inherit; color: inherit; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
-#cardHotkey .slot-grid { grid-template-columns: repeat(2, 24px); gap: 3px; }
+#cardHotkey .slot-grid { grid-template-columns: repeat(3, 24px); gap: 3px; }
+.face-grid {
+  grid-template-columns: repeat(6, 26px);
+  gap: 3px;
+  justify-content: center;
+  align-content: center;
+}
+.face-slot {
+  position: relative;
+  width: 26px; height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  background: #241536;
+  border: 1px solid #55396b;
+  font-size: 14px;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+.face-slot.empty {
+  background: #1c1229;
+  border: 1px dashed #3c2a56;
+  opacity: 0.45;
+  cursor: default;
+}
+.face-slot small {
+  position: absolute;
+  right: 1px; bottom: 0;
+  font-size: 6px;
+  color: #cbb8e8;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.8);
+}
 .hotkey-slot {
   position: relative;
   width: 24px; height: 24px;
@@ -523,6 +525,8 @@ button { font-family: inherit; color: inherit; }
   border: 1px solid #8b6b2a;
   background: #292116;
   color: #f0d47a;
+  font-size: 13px;
+  line-height: 1;
   cursor: pointer;
   box-shadow: inset 0 0 5px rgba(215, 180, 89, 0.2);
 }
@@ -531,12 +535,18 @@ button { font-family: inherit; color: inherit; }
   background: #17332d;
   color: #8de2ce;
 }
-.hotkey-slot small {
+.hotkey-slot.assigned.hotkey-danger { border-color: #8a3040; }
+.hotkey-slot i {
   position: absolute;
-  right: 2px; bottom: 1px;
-  font-size: 6px;
-  color: #a78d48;
+  bottom: -3px; right: -3px;
+  font-style: normal;
+  font-size: 7px;
+  color: #ffd0da;
+  background: rgba(20, 10, 34, 0.9);
+  border-radius: 5px;
+  padding: 0 2px;
 }
+.hotkey-slot i:empty { display: none; }
 .hotkey-glyph { font-size: 13px; line-height: 1; }
 
 /* ── 스킬 트리: 320×790 논리 화면 전체를 사용하는 세로 패널 ── */

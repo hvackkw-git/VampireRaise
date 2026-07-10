@@ -15,7 +15,7 @@
 <body>
   <div id="app">
     <div class="game-root">
-      <!-- Shrimprium 방식: 수조(640) + 패널 영역(150)을 한 논리 캔버스(320×790)로 묶어 통째로 스케일 -->
+      <!-- Shrimprium 방식: 수조(640) + 패널 영역(94)을 한 논리 캔버스(320×734)로 묶어 통째로 스케일 -->
       <div class="canvas-scale-wrapper" id="canvasWrapper">
         <div id="gameCanvas">
         <div class="tank-area" id="tankWrapper">
@@ -29,25 +29,24 @@
           <div class="rgb-tint" id="rgbTint"></div>
           <div class="tank-floor"></div>
 
-          <!-- 게임 영역 내 오버레이 UI (Shrimprium 핫키 스타일) -->
+          <!-- 게임 영역 최상단: 계정 레벨·경험치 바 (Shrimprium처럼 수조 위에 항상 표시) -->
+          <div id="levelBar" class="ui-overlay">
+            <b id="acctLevel">Lv.1</b>
+            <div class="bar bar-acct"><i id="acctExpFill" style="width:0%"></i></div>
+            <span id="acctExpNum">0 / 80</span>
+          </div>
+          <!-- 게임 영역 내 오버레이 UI -->
           <header id="hud" class="ui-overlay">
             <span id="hudWave" class="hud-chip">🌊 1</span>
             <span id="hudHumans" class="hud-chip"></span>
             <span id="hudBlood" class="hud-chip">🩸 0</span>
           </header>
-          <div id="hotkeys" class="ui-overlay">
-            <button id="btnWave" class="hotkey" title="웨이브 시작">▶</button>
-            <button id="btnAuto" class="hotkey" title="자동 웨이브">♻</button>
-            <button id="btnSummon" class="hotkey" title="뱀파이어 소환">🧛<i id="summonCost"></i></button>
-            <button id="btnDecorate" class="hotkey" title="꾸미기">🛠</button>
-            <button id="btnReset" class="hotkey hotkey-danger" title="처음부터 재시작">🔄</button>
-          </div>
           <div id="versionBadge" class="ui-overlay">v0002</div>
 
         </div>
         </div>
 
-        <!-- 패널 영역: 수조와 분리된 하단 상시 패널 (2행 — 계정 / 캐릭터 4열) -->
+        <!-- 패널 영역: 수조와 분리된 하단 상시 패널 (캐릭터 4열) -->
         <div id="panel-region">
           <div id="decorate-bar" class="hidden">
             <div class="decorate-controls" id="decorateControls">
@@ -64,14 +63,8 @@
             <div class="decorate-palette" id="decoratePalette"></div>
           </div>
           <section id="info-panel">
-            <!-- 1행: 계정 레벨·경험치 + 유저 ID -->
-            <div class="acct-row">
-              <span class="acct-id">👤 <b id="acctUserId">—</b></span>
-              <span class="acct-level">계정 <b id="acctLevel">Lv.1</b></span>
-              <div class="bar bar-acct"><i id="acctExpFill" style="width:0%"></i></div>
-              <span class="acct-exp-num" id="acctExpNum">0 / 80</span>
-            </div>
-            <!-- 2행: [스탯 바] [데미지] [장착 스킬] [핫키] — 기본은 1번 뱀파이어, 탭으로 전환 -->
+            <!-- 캐릭터 선택 시: [스탯 바] [데미지] [장착 스킬] [핫키].
+                 미선택 시: 스탯/데미지/장착 스킬 자리에 뱀파이어 얼굴 2행6열([cardFaces])이 대신 나오고 핫키는 그대로. -->
             <div class="panel-grid">
               <div class="panel-card" id="cardStat">
                 <div class="card-title card-title-name" id="statName">—</div>
@@ -80,18 +73,26 @@
                 <div class="stat-row"><span class="stat-label">EXP</span><div class="stat-bar sb-exp"><i id="pExpFill"></i><em id="pExpNum"></em></div></div>
               </div>
               <div class="panel-card card-center" id="cardDmg">
-                <div class="card-title">데미지</div>
                 <div class="dmg-value" id="pAtk">—</div>
                 <div class="dmg-sub">⚔ 공격력</div>
               </div>
               <div class="panel-card" id="cardSkill">
-                <div class="card-title">장착 스킬</div>
                 <div class="slot-grid" id="skillGrid"></div>
                 <div class="skill-name" id="skillName"></div>
               </div>
+              <div class="panel-card" id="cardFaces">
+                <div class="slot-grid face-grid" id="faceGrid"></div>
+              </div>
               <div class="panel-card" id="cardHotkey">
-                <div class="card-title">핫키</div>
-                <div class="slot-grid" id="hotkeyGrid"></div>
+                <!-- 핫키: 기존 우상단 조작 버튼들을 이 그리드(2행3열)로 이전 -->
+                <div class="slot-grid" id="hotkeyGrid">
+                  <button id="btnSkillTree" class="hotkey-slot assigned" title="스킬 트리" aria-label="스킬 트리"><span class="hotkey-glyph">✦</span></button>
+                  <button id="btnWave" class="hotkey-slot assigned" title="웨이브 시작">▶</button>
+                  <button id="btnAuto" class="hotkey-slot assigned" title="자동 웨이브">♻</button>
+                  <button id="btnSummon" class="hotkey-slot assigned" title="뱀파이어 소환">🧛<i id="summonCost"></i></button>
+                  <button id="btnDecorate" class="hotkey-slot assigned" title="꾸미기">🛠</button>
+                  <button id="btnReset" class="hotkey-slot assigned hotkey-danger" title="처음부터 재시작">🔄</button>
+                </div>
               </div>
             </div>
           </section>

@@ -1,9 +1,9 @@
 // src/ui/infoPanel.js
-// 하단 상시 패널 (2행×4열).
-// 1행: 계정 레벨·경험치 바 + 유저 ID (전체 폭).
-// 2행: [HP/MP/EXP 바] [데미지] [장착 스킬 2×2] [핫키 슬롯].
-// 표시 대상 캐릭터는 index.js가 결정한다 — 기본은 생존 뱀파이어 중 순서(vampireOrder)가
-// 가장 빠른 캐릭터, 수조에서 캐릭터를 탭하면 그 캐릭터로 전환.
+// 하단 상시 패널 (1행×4열): [HP/MP/EXP 바] [데미지] [장착 스킬 2×2] [핫키 2×3].
+// 계정 레벨·경험치 바는 게임 영역 상단(levelBar)에 별도로 표시된다.
+// 표시 대상 캐릭터는 index.js가 결정한다 — 직접 탭한 캐릭터가 있으면 그 캐릭터를 보여주고,
+// 없으면(선택 해제 상태) renderSquadPanel로 스탯/데미지/장착 스킬 자리에 생존 뱀파이어
+// 얼굴 그리드(2행6열)를 대신 보여준다 (핫키는 그대로 유지). 얼굴을 탭하면 그 캐릭터가 선택된다.
 
 import { expToNext, accountExpToNext } from "../constants.js";
 
@@ -14,25 +14,13 @@ const SKILL_BOOK = {
   dash: { name: "혈귀 돌진", icon: "assets/skills/skill_dash.png" },
 };
 const SKILL_SLOT_COUNT = 4;  // 2×2
-const HOTKEY_SLOT_COUNT = 6; // 2×3 — 핫키 기능은 추후 배정
-
-const USER_ID_KEY = "vampireraise.userid.v1";
-
-/** 이 브라우저 고유의 유저 ID — 처음 접속 시 생성해 localStorage에 보관 */
-function loadUserId(storage = globalThis.localStorage) {
-  let id = null;
-  try { id = storage?.getItem(USER_ID_KEY); } catch { /* 무시 */ }
-  if (!id) {
-    id = "VAMP-" + Math.random().toString(36).slice(2, 6).toUpperCase();
-    try { storage?.setItem(USER_ID_KEY, id); } catch { /* 무시 */ }
-  }
-  return id;
-}
+const FACE_SLOT_COUNT = 12;  // 2×6
 
 let els = null;
 let lastSkillKey = null; // 장착 스킬 재구성 최소화용 캐시 키
+let onSelectVampireCb = null;
 
-export function initInfoPanel({ onSkillTree } = {}) {
+export function initInfoPanel({ onSkillTree, onSelectVampire } = {}) {
   const $ = (id) => document.getElementById(id);
   els = {
     panel: $("info-panel"),
@@ -46,9 +34,10 @@ export function initInfoPanel({ onSkillTree } = {}) {
     atk: $("pAtk"),
     skillGrid: $("skillGrid"),
     skillName: $("skillName"),
-    hotkeyGrid: $("hotkeyGrid"),
+    faceGrid: $("faceGrid"),
+    btnSkillTree: $("btnSkillTree"),
   };
-  $("acctUserId").textContent = loadUserId();
+  onSelectVampireCb = onSelectVampire;
 
   els.skillSlots = Array.from({ length: SKILL_SLOT_COUNT }, () => {
     const slot = document.createElement("div");
@@ -56,29 +45,20 @@ export function initInfoPanel({ onSkillTree } = {}) {
     els.skillGrid.appendChild(slot);
     return slot;
   });
-  els.hotkeySlots = Array.from({ length: HOTKEY_SLOT_COUNT }, (_, i) => {
+  els.faceSlots = Array.from({ length: FACE_SLOT_COUNT }, () => {
     const slot = document.createElement("button");
     slot.type = "button";
-    slot.className = "hotkey-slot";
-    if (i === 0) {
-      slot.classList.add("assigned");
-      slot.title = "스킬 트리";
-      slot.setAttribute("aria-label", "핫키 1: 스킬 트리");
-      slot.innerHTML = '<span class="hotkey-glyph">✦</span><small>1</small>';
-      slot.addEventListener("click", () => onSkillTree?.());
-    } else {
-      slot.textContent = String(i + 1);
-      slot.title = "빈 핫키";
-      slot.disabled = true;
-    }
-    els.hotkeyGrid.appendChild(slot);
+    slot.className = "face-slot empty";
+    slot.disabled = true;
+    els.faceGrid.appendChild(slot);
     return slot;
   });
+  els.btnSkillTree.addEventListener("click", () => onSkillTree?.());
   lastSkillKey = null;
   return {
     setSkillTreeOpen(open) {
-      els.hotkeySlots[0].classList.toggle("on", open);
-      els.hotkeySlots[0].setAttribute("aria-pressed", String(open));
+      els.btnSkillTree.classList.toggle("on", open);
+      els.btnSkillTree.setAttribute("aria-pressed", String(open));
     },
   };
 }
@@ -87,6 +67,15 @@ function setBar(fill, num, cur, max) {
   const pct = max > 0 ? Math.max(0, Math.min(100, (cur / max) * 100)) : 0;
   fill.style.width = `${pct}%`;
   num.textContent = `${Math.ceil(cur)}/${max}`;
+}
+
+function updateLevelBar(account) {
+  if (!account) return;
+  const need = accountExpToNext(account.level);
+  els.acctLevel.textContent = `Lv.${account.level}`;
+  els.acctExpFill.style.width =
+    `${Math.max(0, Math.min(100, (account.exp / need) * 100))}%`;
+  els.acctExpNum.textContent = `${account.exp} / ${need}`;
 }
 
 function renderSkills(char) {
@@ -109,20 +98,12 @@ function renderSkills(char) {
 
 /**
  * 패널 갱신 (저빈도 — index.js에서 4Hz + 선택 변경 시).
- * @param {object|null} char 2행에 비출 캐릭터 (null이면 대상 없음 표시)
- * @param {{level:number, exp:number}|null} account 계정 성장 상태
+ * @param {object|null} char 패널에 비출 캐릭터 (null이면 대상 없음 표시)
+ * @param {{level:number, exp:number}|null} account 계정 성장 상태 (상단 levelBar)
  */
 export function renderInfoPanel(char, account = null) {
-  // 1행: 계정
-  if (account) {
-    const need = accountExpToNext(account.level);
-    els.acctLevel.textContent = `Lv.${account.level}`;
-    els.acctExpFill.style.width =
-      `${Math.max(0, Math.min(100, (account.exp / need) * 100))}%`;
-    els.acctExpNum.textContent = `${account.exp} / ${need}`;
-  }
-
-  // 2행: 캐릭터
+  updateLevelBar(account);
+  els.panel.classList.remove("squad-mode");
   els.panel.classList.toggle("no-char", !char);
   if (!char) {
     els.statName.textContent = "— 뱀파이어 없음 —";
@@ -141,4 +122,40 @@ export function renderInfoPanel(char, account = null) {
   setBar(els.expFill, els.expNum, char.exp, expToNext(char.level));
   els.atk.textContent = String(char.atk);
   renderSkills(char);
+}
+
+/**
+ * 선택한 캐릭터가 없을 때(탭 해제 상태) 보여주는 화면 — 스탯/데미지/장착 스킬 자리에
+ * 생존 뱀파이어 얼굴 그리드(2행6열)를 대신 띄운다. 얼굴을 탭하면 그 캐릭터가 선택된다.
+ * @param {object[]} vampires 생존 뱀파이어 목록
+ * @param {{level:number, exp:number}|null} account 계정 성장 상태 (상단 levelBar)
+ */
+export function renderSquadPanel(vampires, account = null) {
+  updateLevelBar(account);
+
+  if (!vampires.length) {
+    renderInfoPanel(null);
+    return;
+  }
+
+  els.panel.classList.remove("no-char");
+  els.panel.classList.add("squad-mode");
+
+  const sorted = [...vampires].sort(
+    (a, b) => (a.vampireOrder ?? Infinity) - (b.vampireOrder ?? Infinity),
+  );
+  els.faceSlots.forEach((slot, i) => {
+    const v = sorted[i];
+    slot.classList.toggle("empty", !v);
+    slot.disabled = !v;
+    if (v) {
+      slot.innerHTML = `${SIDE_ICON.vampire}<small>${v.vampireOrder ?? i + 1}</small>`;
+      slot.title = `${v.vampireOrder ?? i + 1}번 뱀파이어 Lv.${v.level}`;
+      slot.onclick = () => onSelectVampireCb?.(v.id);
+    } else {
+      slot.innerHTML = "";
+      slot.title = "";
+      slot.onclick = null;
+    }
+  });
 }
