@@ -72,6 +72,10 @@ const infoPanel = initInfoPanel({
     if (decorate.active) decorate.exit();
     skillTreePanel?.toggle();
   },
+  onSelectVampire: (id) => {
+    ui.selectedCharId = id;
+    updatePanel();
+  },
 });
 skillTreePanel = initSkillTreePanel({
   getCharacter: panelChar,

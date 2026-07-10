@@ -390,6 +390,47 @@ button { font-family: inherit; color: inherit; }
 .card-title-name { font-size: 10px; color: #f0e6ff; }
 #info-panel.no-char .panel-card { opacity: 0.55; }
 
+/* 캐릭터 미선택(squad-mode): 스탯/데미지/장착 스킬 대신 뱀파이어 얼굴 그리드, 핫키는 그대로 */
+#cardFaces { display: none; }
+#info-panel.squad-mode #cardStat,
+#info-panel.squad-mode #cardDmg,
+#info-panel.squad-mode #cardSkill { display: none; }
+#info-panel.squad-mode #cardFaces { display: flex; }
+#info-panel.squad-mode .panel-grid { grid-template-columns: 1fr 88px; }
+.face-grid {
+  grid-template-columns: repeat(6, 26px);
+  gap: 3px;
+  justify-content: center;
+  align-content: center;
+}
+.face-slot {
+  position: relative;
+  width: 26px; height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  background: #241536;
+  border: 1px solid #55396b;
+  font-size: 14px;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+.face-slot.empty {
+  background: #1c1229;
+  border: 1px dashed #3c2a56;
+  opacity: 0.45;
+  cursor: default;
+}
+.face-slot small {
+  position: absolute;
+  right: 1px; bottom: 0;
+  font-size: 6px;
+  color: #cbb8e8;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.8);
+}
+
 /* 1열: HP/MP/EXP 바 */
 .stat-row { display: flex; align-items: center; gap: 4px; margin-top: 3px; }
 .stat-label {

@@ -63,21 +63,25 @@
             <div class="decorate-palette" id="decoratePalette"></div>
           </div>
           <section id="info-panel">
-            <!-- [스탯 바] [데미지] [장착 스킬] [핫키] — 선택한 캐릭터가 없으면 뱀파이어 전체 현황 -->
+            <!-- 캐릭터 선택 시: [스탯 바] [데미지] [장착 스킬] [핫키].
+                 미선택 시: 스탯/데미지/장착 스킬 자리에 뱀파이어 얼굴 2행6열([cardFaces])이 대신 나오고 핫키는 그대로. -->
             <div class="panel-grid">
               <div class="panel-card" id="cardStat">
                 <div class="card-title card-title-name" id="statName">—</div>
                 <div class="stat-row"><span class="stat-label">HP</span><div class="stat-bar sb-hp"><i id="pHpFill"></i><em id="pHpNum"></em></div></div>
                 <div class="stat-row"><span class="stat-label">MP</span><div class="stat-bar sb-mp"><i id="pMpFill"></i><em id="pMpNum"></em></div></div>
-                <div class="stat-row" id="statRowExp"><span class="stat-label">EXP</span><div class="stat-bar sb-exp"><i id="pExpFill"></i><em id="pExpNum"></em></div></div>
+                <div class="stat-row"><span class="stat-label">EXP</span><div class="stat-bar sb-exp"><i id="pExpFill"></i><em id="pExpNum"></em></div></div>
               </div>
               <div class="panel-card card-center" id="cardDmg">
                 <div class="dmg-value" id="pAtk">—</div>
-                <div class="dmg-sub" id="dmgSub">⚔ 공격력</div>
+                <div class="dmg-sub">⚔ 공격력</div>
               </div>
               <div class="panel-card" id="cardSkill">
                 <div class="slot-grid" id="skillGrid"></div>
                 <div class="skill-name" id="skillName"></div>
+              </div>
+              <div class="panel-card" id="cardFaces">
+                <div class="slot-grid face-grid" id="faceGrid"></div>
               </div>
               <div class="panel-card" id="cardHotkey">
                 <!-- 핫키: 기존 우상단 조작 버튼들을 이 그리드(2행3열)로 이전 -->
