@@ -19,9 +19,10 @@ import {
 import { startJump, NON_PLATFORM_BLOCK_TYPES } from "../engine/physics.js";
 import { isLogicLayerBlock, getSpikeDir, PLATFORM_W, PLATFORM_H } from "../platform/platformBlockRenderer.js";
 import { findNearestEnemy, aliveChars } from "./combat.js";
+import { createHumanDescentNavigator } from "./descentNavigation.js";
 
 /** 감지·추적이 동작하는 상태 (지상 행동 중일 때만 주변을 살핀다) */
-const AWARE_STATES = new Set(["IDLE", "STAY", "CRAWL"]);
+const AWARE_STATES = new Set(["CRAWL"]);
 
 /**
  * 돌진 종료.
@@ -38,7 +39,7 @@ function endDash(c, platforms = [], { arrived = false, blockPowered = null } = {
     c.x = goal.x - c.w / 2;
     c.y = goalPlatform.y - c.h;
     c._platformId = goalPlatform.id;
-    c.state = "IDLE";
+    c.state = "CRAWL";
     c.timer = 0.2;
   } else {
     // 중단(또는 착지면 소실): 현재 위치에서 정지 후 자연 낙하
@@ -311,6 +312,7 @@ function findNearestDashRoute(c, chars, platforms, blockPowered = null) {
 export function tickAggro(state, simDt, rng = Math.random, blockPowered = null) {
   const chars = aliveChars(state);
   const byId = new Map(chars.map((c) => [c.id, c]));
+  let descentNavigator = null;
   for (const c of chars) {
     if (c._dashCd > 0) c._dashCd -= simDt;
 
@@ -348,6 +350,21 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null) 
       if (c.state === "FIGHT") c._ping = null;
       continue;
     }
+
+    // 인간은 플랫폼 위에서 적을 쫓기보다 바닥으로 이어지는 최단 하강 가장자리를 우선한다.
+    if (c.side === "human" && c._platformId != null) {
+      descentNavigator ??= createHumanDescentNavigator(state.platforms.items, blockPowered);
+      const descent = descentNavigator.findStep(c);
+      if (descent) {
+        c._ping = null;
+        c._descentTargetX = descent.targetX;
+        c.dir = descent.dir;
+        c.state = "CRAWL";
+        c.timer = Math.max(c.timer, 0.4);
+        continue;
+      }
+    }
+    c._descentTargetX = null;
 
 
     // ── 원거리 피격 반격: 공격자에게 핑을 찍고 더 넓은 예산(감지×2.5×스킬배율)으로 돌진 ──
@@ -411,7 +428,7 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null) 
         const t = found.char;
         const pingX = Number.isFinite(c._ping.x) ? c._ping.x : t.x + t.w / 2;
         const dx = pingX - (c.x + c.w / 2);
-        if (t.y + t.h < c.y - 4 && Math.abs(dx) < 40 && rng() < 0.3) {
+        if (c.side !== "human" && t.y + t.h < c.y - 4 && Math.abs(dx) < 40 && rng() < 0.3) {
           c.dir = dx >= 0 ? 1 : -1;
           startJump(c, rng);
           continue;
@@ -428,11 +445,10 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null) 
     const pingX = Number.isFinite(c._ping.x) ? c._ping.x : t.x + t.w / 2;
     const dx = pingX - (c.x + c.w / 2);
     if (Math.abs(dx) < 4) {
-      // 수평으로 겹침 (바로 위/아래) — 더 걸어도 가까워지지 않는 국소 최소거리
-      c.state = "STAY";
+      // 수평으로 겹쳐도 멈추지 않는다. 교전 가능하면 combat 틱이 FIGHT로 전환한다.
+      c.state = "CRAWL";
       c.timer = Math.max(c.timer, 0.2);
-      c.dir = dx >= 0 ? 1 : -1;
-      c.vx = 0;
+      if (c.dir !== 1 && c.dir !== -1) c.dir = dx >= 0 ? 1 : -1;
     } else {
       c.dir = dx > 0 ? 1 : -1;
       c.state = "CRAWL";
@@ -441,4 +457,4 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null) 
   }
 }
 
-// 핑이 없을 때의 행동은 physics의 defaultIdleDecide(랜덤 배회)가 담당한다.
+// 핑이 없을 때도 physics의 defaultMoveDecide가 걷기/도약을 계속 유지한다.

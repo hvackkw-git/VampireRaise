@@ -289,11 +289,13 @@ export function createDecorateMode(state, ui, { onExit } = {}) {
   const infoPanelEl = document.getElementById("info-panel");
   const api = {
     enter() {
+      if (state.wave.active) return false;
       ui.decorateMode = true;
       bar.classList.remove("hidden");
       infoPanelEl.classList.add("hidden");
       selectedPaletteType = null;
       setSelectedBlock(null);
+      return true;
     },
     exit() {
       ui.decorateMode = false;

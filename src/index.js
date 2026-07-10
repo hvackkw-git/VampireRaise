@@ -23,6 +23,7 @@ import {
 } from "./ui/tankView.js";
 import { createDecorateMode } from "./decorate/decorateMode.js";
 import { initInfoPanel, renderInfoPanel } from "./ui/infoPanel.js";
+import { initSkillTreePanel } from "./ui/skillTreePanel.js";
 import { initHud } from "./ui/hud.js";
 
 const state = loadState() ?? createInitialState();
@@ -49,29 +50,63 @@ function updatePanel() {
   const focus = panelChar();
   ui.panelCharId = focus?.id ?? null;
   renderInfoPanel(focus, state.account);
+  skillTreePanel?.render();
 }
 
 initTankView();
-initInfoPanel();
 preloadStatefulBlockSprites();
 
-const decorate = createDecorateMode(state, ui, {});
-const hud = initHud(state, {
+let hud = null;
+const decorate = createDecorateMode(state, ui, { onExit: () => hud?.render() });
+let skillTreePanel = null;
+const infoPanel = initInfoPanel({
+  onSkillTree: () => {
+    if (decorate.active) decorate.exit();
+    skillTreePanel?.toggle();
+  },
+});
+skillTreePanel = initSkillTreePanel({
+  getCharacter: panelChar,
+  onChange: () => {
+    saveState(state);
+    updatePanel();
+  },
+  onOpenChange: (open) => {
+    ui.skillTreeOpen = open;
+    infoPanel.setSkillTreeOpen(open);
+  },
+});
+hud = initHud(state, {
   onDecorate: () => {
+    skillTreePanel.close();
     if (decorate.active) {
       decorate.exit();
     } else {
+      if (state.wave.active) {
+        showToast("꾸미기는 웨이브 종료 후에만 가능합니다");
+        return;
+      }
+      state.wave.auto = false;
+      state.wave.nextAutoAt = null;
       ui.selectedCharId = null;
       updatePanel();
       decorate.enter();
     }
+    hud?.render();
   },
   onReset: () => {
+    skillTreePanel.close();
     if (decorate.active) decorate.exit();
     ui.selectedCharId = null;
     ui.selectedBlockId = null;
     updatePanel();
   },
+  getBlockPowered: () => {
+    const chars = aliveChars(state);
+    const onPlatforms = computeCharsOnPlatformIds(state.platforms.items, chars);
+    return computeBlockSignals(state.platforms.items, onPlatforms).powered;
+  },
+  isDecorating: () => decorate.active,
 });
 
 updatePanel(); // 첫 페인트 — 이후는 4Hz 갱신
@@ -154,12 +189,13 @@ function frame(nowMs) {
   const projectileEvents = tickHumanProjectiles(state, simDt);
   const combatEvents = tickCombat(state, simDt);
   renderCombatEvents([...projectileEvents, ...combatEvents]);
-  const waveEvents = tickWaves(state, simDt);
+  const waveEvents = tickWaves(state, simDt, Math.random, signals.powered);
   for (const ev of waveEvents) {
     if (ev.type === "clear") showToast(`✅ 웨이브 클리어! +🩸 ${ev.reward}`);
     else if (ev.type === "defeat") showToast("💀 전멸… 웨이브 1부터 다시 시작합니다");
     else if (ev.type === "autostart") showToast(`🌊 웨이브 ${ev.wave} 시작!`);
     else if (ev.type === "acctlevel") showToast(`🌟 계정 레벨 ${ev.level} 달성!`);
+    else if (ev.type === "routeblocked") showToast("자동 웨이브 중지: 인간 이동 경로가 막혔습니다");
   }
   tickRecall(gameClock);
 

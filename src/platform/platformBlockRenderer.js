@@ -82,7 +82,7 @@ export const PLATFORM_BLOCK_TYPES = [
   "rgb_green_block",           // RGB 블록(초록): 신호 ON 동안 화면 전체 초록 틴트
   "rgb_blue_block",            // RGB 블록(파랑): 신호 ON 동안 화면 전체 파랑 틴트
   "rgb_white_block",           // RGB 블록(하양): 신호 ON 동안 화면 전체 하양 틴트
-  "stun_block",                // 스턴 블록 (밟히지 않음; 스치면 5초간 idle·검정 틴트·자유낙하)
+  "stun_block",                // 스턴 블록 (밟히지 않음; 스치면 5초간 이동 정지·검정 틴트·자유낙하)
 ];
 
 /** RGB 블록 종류 → 틴트 색상(rgb 트리플) */

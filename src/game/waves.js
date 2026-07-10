@@ -8,6 +8,7 @@ import {
   HUMAN_SPAWN_INTERVAL_S, AUTO_WAVE_DELAY_S,
 } from "../constants.js";
 import { createCharacter } from "../state/gameState.js";
+import { findHumanSpawnRoutes } from "./descentNavigation.js";
 
 /** 뱀파이어 진영(뱀파이어+노예) 생존 수 */
 export function vampireSideAlive(state) {
@@ -32,17 +33,30 @@ export function grantAccountExp(state, amount, events = []) {
   }
 }
 
-/** 웨이브 시작: 인간 스폰 스케줄 등록 */
-export function startWave(state) {
+/** 웨이브 시작: 바닥까지 내려오는 경로가 있는 스폰 지점에만 인간을 배정한다. */
+export function startWave(state, blockPowered = null) {
   const w = state.wave;
-  if (w.active) return false;
+  if (w.active) {
+    w.lastStartError = "active";
+    return false;
+  }
+  const routes = findHumanSpawnRoutes(state.platforms.items, blockPowered);
+  if (routes.length === 0) {
+    w.lastStartError = "noPath";
+    return false;
+  }
   w.active = true;
   w.clock = 0;
   w.nextAutoAt = null;
+  w.lastStartError = null;
   const n = w.current;
   const count = humanCountForWave(n);
   w.pendingSpawns = Array.from({ length: count }, (_, i) => ({
     spawnAt: i * HUMAN_SPAWN_INTERVAL_S,
+    x: routes[Math.min(
+      routes.length - 1,
+      Math.floor(((i + 1) * routes.length) / (count + 1)),
+    )].x,
   }));
   return true;
 }
@@ -65,7 +79,7 @@ export function reviveVampires(state, rng = Math.random) {
  * 웨이브 틱.
  * @returns {Array<object>} events — spawn/clear/defeat/autostart
  */
-export function tickWaves(state, simDt, rng = Math.random) {
+export function tickWaves(state, simDt, rng = Math.random, blockPowered = null) {
   const events = [];
   const w = state.wave;
   w.clock += simDt;
@@ -74,9 +88,9 @@ export function tickWaves(state, simDt, rng = Math.random) {
     // 순차 스폰: 상단에서 낙하
     const stats = humanStatsForWave(w.current);
     while (w.pendingSpawns.length > 0 && w.clock >= w.pendingSpawns[0].spawnAt) {
-      w.pendingSpawns.shift();
+      const spawn = w.pendingSpawns.shift();
       const c = createCharacter(state, "human", {
-        x: 10 + rng() * (TANK_W - CHAR_SIZE - 20),
+        x: spawn.x,
         y: -CHAR_SIZE,
         state: "FALL",
         level: stats.level,
@@ -111,7 +125,13 @@ export function tickWaves(state, simDt, rng = Math.random) {
     }
   } else if (w.auto && w.nextAutoAt != null && w.clock >= w.nextAutoAt) {
     // 자동 웨이브
-    if (startWave(state)) events.push({ type: "autostart", wave: w.current });
+    if (startWave(state, blockPowered)) {
+      events.push({ type: "autostart", wave: w.current });
+    } else if (w.lastStartError === "noPath") {
+      w.auto = false;
+      w.nextAutoAt = null;
+      events.push({ type: "routeblocked" });
+    }
   }
 
   return events;

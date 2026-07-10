@@ -17,7 +17,7 @@ const dist = (a, b) => {
 const dy = (a, b) => Math.abs((a.y + a.h / 2) - (b.y + b.h / 2));
 
 /** 교전을 시작할 수 있는(지상에 서 있는) 상태 */
-const GROUND_STATES = new Set(["IDLE", "CRAWL", "STAY", "FIGHT"]);
+const GROUND_STATES = new Set(["CRAWL", "FIGHT"]);
 
 /** 살아있는 캐릭터 목록 */
 export function aliveChars(state) {
@@ -41,6 +41,7 @@ export function grantExp(c, amount, events) {
   while (c.exp >= expToNext(c.level)) {
     c.exp -= expToNext(c.level);
     c.level += 1;
+    if (c.side === "vampire") c.skillPoints = Math.max(0, Number(c.skillPoints) || 0) + 1;
     c.maxHp += LEVELUP_HP_GAIN;
     c.atk += LEVELUP_ATK_GAIN;
     c.hp = c.maxHp;
@@ -61,7 +62,7 @@ export function infectToSlave(c, ownerVampire = null) {
   c.maxMp = SLAVE_BASE.maxMp;
   c.mp = c.maxMp;
   c.dead = false;
-  c.state = "IDLE";
+  c.state = "CRAWL";
   c.timer = 0.5;
   c.vx = 0; c.vy = 0;
   c._fightTargetId = null;
@@ -104,7 +105,7 @@ function engage(c, target) {
 
 /** 교전 해제 → 잠시 후 배회 복귀 */
 function disengage(c) {
-  if (c.state === "FIGHT") { c.state = "IDLE"; c.timer = 0.3; }
+  if (c.state === "FIGHT") { c.state = "CRAWL"; c.timer = 0.3; }
   c._fightTargetId = null;
 }
 

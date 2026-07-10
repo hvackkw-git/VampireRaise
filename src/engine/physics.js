@@ -1,6 +1,6 @@
 // src/engine/physics.js
 // 캐릭터 이동 물리 — Shrimprium mountAquarium의 새우 물리를 슬림 이식.
-// 상태: IDLE / CRAWL / STAY / JUMP / FALL / STUN / DEAD
+// 상태: CRAWL / FIGHT / JUMP / FALL / STUN / DASH / DEAD
 // 기믹: 스프링·가시·컨베이어·미끄럼·블랙홀 워프·스턴·투명 게이트·스위치 밟음
 
 import {
@@ -11,6 +11,7 @@ import {
 import {
   TANK_W, FLOOR_Y, CRAWL_SPD, CHAR_SPRITES,
   PX_GRAVITY, PX_GRAVITY_JUMP, PX_GRAVITY_JUMP_LAND,
+  JUMP_SPEED_MIN, JUMP_SPEED_SPAN, JUMP_MIN_DEG, JUMP_SPAN_DEG,
   STUN_DURATION_MS, CONVEYOR_PUSH_SPD, SLIDE_SPD, WARP_COOLDOWN_MS,
 } from "../constants.js";
 
@@ -45,9 +46,9 @@ export function getSlopeTopY(plat, cx) {
 }
 
 /** 블록이 현재 지형으로 유효한가 (화이트홀·ON 게이트·배선·스턴 제외) */
-function isTangible(plat, blockPowered) {
+export function isTangiblePlatform(plat, blockPowered) {
   if (plat.blockType === "white_hole_block") return false;
-  if (plat.blockType === "gate_block" && blockPowered.get(plat.id)) return false;
+  if (plat.blockType === "gate_block" && blockPowered?.get(plat.id)) return false;
   if (NON_PLATFORM_BLOCK_TYPES.has(plat.blockType)) return false;
   return true;
 }
@@ -84,10 +85,10 @@ function triggerStun(c, now) {
   c._stunImmuneUntil = now + STUN_DURATION_MS + 1000;
 }
 
-/** 위로 뛰는 점프 시작 (Shrimprium의 SWIM 대체 — 각도 -30~-60°) */
-export function startJump(c, rng = Math.random, minDeg = 30, spanDeg = 30) {
+/** 위로 뛰는 점프 시작 (최하단 플랫폼 도달을 보장하는 기본 각도 -52~-68°) */
+export function startJump(c, rng = Math.random, minDeg = JUMP_MIN_DEG, spanDeg = JUMP_SPAN_DEG) {
   const angle = -(minDeg + rng() * spanDeg);
-  const speed = 80 + rng() * 40;
+  const speed = JUMP_SPEED_MIN + rng() * JUMP_SPEED_SPAN;
   const rad = (angle * Math.PI) / 180;
   c.state = "JUMP";
   c.vx = c.dir * Math.cos(rad) * speed;
@@ -106,7 +107,7 @@ function tryLand(c, ctx, simDt) {
   const nextX = c.x + c.vx * simDt;
   for (const plat of platforms) {
     if (!charSweepsPlatformX(c, plat, nextX)) continue;
-    if (!isTangible(plat, blockPowered)) continue;
+    if (!isTangiblePlatform(plat, blockPowered)) continue;
     // 가시 트리거 후 바닥까지 통과 (블랙홀은 정상 워프)
     if (plat.blockType !== "black_hole_block" && now < (c._spikeIgnoreUntil ?? 0)) continue;
     const nextY = c.y + c.vy * simDt;
@@ -125,8 +126,8 @@ function tryLand(c, ctx, simDt) {
         startJump(c, ctx.rng, 60, 20);
         plat.lastBounceAt = now;
       } else {
-        c.state = "IDLE";
-        c.timer = 0.5 + (ctx.rng?.() ?? Math.random()) * 1.5;
+        c.state = "CRAWL";
+        c.timer = 0.8 + (ctx.rng?.() ?? Math.random()) * 1.4;
       }
       return true;
     }
@@ -139,8 +140,8 @@ function landOnFloor(c, ctx) {
   const groundY = FLOOR_Y - c.h;
   if (c.y >= groundY && c.vy > 0) {
     c.y = groundY; c.vy = 0; c.vx = 0; c._jumpApexY = null;
-    c.state = c.state === "STUN" ? "STUN" : "IDLE";
-    if (c.state === "IDLE") c.timer = 0.5 + (ctx.rng?.() ?? Math.random()) * 1.5;
+    c.state = c.state === "STUN" ? "STUN" : "CRAWL";
+    if (c.state === "CRAWL") c.timer = 0.8 + (ctx.rng?.() ?? Math.random()) * 1.4;
     return true;
   }
   return false;
@@ -165,13 +166,17 @@ function checkStunTouch(c, ctx) {
  * @param {object} c 캐릭터
  * @param {object} ctx { platforms, blockPowered, now(ms), rng }
  * @param {number} simDt 초
- * @param {(c:object)=>void} [onIdleDecide] IDLE 타이머 만료 시 다음 행동 결정 콜백(AI 주입)
  */
-export function tickCharacter(c, ctx, simDt, onIdleDecide) {
+export function tickCharacter(c, ctx, simDt) {
   if (c.dead || c.state === "DEAD") return;
   const { platforms, blockPowered, now } = ctx;
   const rng = ctx.rng ?? Math.random;
   const GROUND_Y = FLOOR_Y - c.h;
+  // 구버전 런타임 상태가 남아 있어도 멈추지 않고 즉시 걷기로 흡수한다.
+  if (c.state === "IDLE" || c.state === "STAY") {
+    c.state = "CRAWL";
+    c.timer = 0;
+  }
   c.timer -= simDt;
 
   // ── 플랫폼 인식 지반고 (플랫폼 삭제·이탈·게이트 투명화 → 자유낙하) ──
@@ -179,14 +184,14 @@ export function tickCharacter(c, ctx, simDt, onIdleDecide) {
   let onPlat = null;
   if (c._platformId != null) {
     const plat = platforms.find((p) => p.id === c._platformId);
-    if (plat && isTangible(plat, blockPowered) && charOverlapsPlatformX(c, plat)) {
+    if (plat && isTangiblePlatform(plat, blockPowered) && charOverlapsPlatformX(c, plat)) {
       onPlat = plat;
       effectiveGroundY = plat.blockType === "slide_block"
         ? getSlopeTopY(plat, c.x + c.w / 2) - c.h
         : plat.y - c.h;
     } else {
       c._platformId = null;
-      if (c.state === "IDLE" || c.state === "CRAWL" || c.state === "STAY" || c.state === "FIGHT") {
+      if (c.state === "CRAWL" || c.state === "FIGHT") {
         c.vx = 0; c.vy = 0;
         c.state = "FALL";
       }
@@ -195,27 +200,23 @@ export function tickCharacter(c, ctx, simDt, onIdleDecide) {
 
   // ── 스턴 만료 ──
   if (c.state === "STUN" && now >= c._stunUntil) {
-    c.state = "IDLE"; c.timer = 0.3;
+    c.state = "CRAWL"; c.timer = 0.3;
+  }
+
+  if (c.state === "CRAWL" && c.y < effectiveGroundY - 0.5) {
+    c.state = "FALL";
+    c.vx = 0; c.vy = 0;
   }
 
   // ── 상태 머신 ──
-  if (c.state === "IDLE" || c.state === "STAY" || c.state === "FIGHT") {
+  if (c.state === "FIGHT") {
     c.vx = 0;
     if (c.y < effectiveGroundY - 0.5) {
       // 발밑이 비었으면 낙하로 전환
       c.state = "FALL";
     } else {
       c.y = effectiveGroundY; c.vy = 0;
-      // FIGHT는 전투 틱이 해제할 때까지 그 자리에서 마주보고 유지
-      if (c.state !== "FIGHT" && c.timer <= 0) {
-        if (c.state === "STAY") {
-          c.state = "IDLE"; c.timer = 0.3 + rng();
-        } else if (onIdleDecide) {
-          onIdleDecide(c);
-        } else {
-          defaultIdleDecide(c, rng);
-        }
-      }
+      // FIGHT는 전투 틱이 해제할 때까지 그 자리에서 마주보고 유지한다.
     }
   }
 
@@ -233,7 +234,7 @@ export function tickCharacter(c, ctx, simDt, onIdleDecide) {
     const bodyTop = getCharBodyTop(c);
     for (const plat of platforms) {
       if (plat.id === c._platformId) continue;
-      if (!isTangible(plat, blockPowered)) continue;
+      if (!isTangiblePlatform(plat, blockPowered)) continue;
       if (c.y + c.h <= plat.y || bodyTop >= plat.y + PLATFORM_H) continue;
       const MARGIN = 1;
       const step = Math.abs(c.vx) * simDt + MARGIN;
@@ -258,9 +259,8 @@ export function tickCharacter(c, ctx, simDt, onIdleDecide) {
     if ((c._blockBounces || 0) >= 4) {
       c._blockBounces = 0; c._blockBounceDecay = 0;
       startJump(c, rng, 40, 20);
-    } else {
-      if (rng() < 0.012) { c.state = "STAY"; c.timer = 0.5 + rng() * 2; c.vx = 0; }
-      if (c.timer <= 0) { c.state = "IDLE"; c.timer = 0.5 + rng() * 2; c.vx = 0; }
+    } else if (c.timer <= 0) {
+      defaultMoveDecide(c, ctx, rng);
     }
   }
 
@@ -310,19 +310,52 @@ export function tickCharacter(c, ctx, simDt, onIdleDecide) {
   checkStunTouch(c, ctx);
 }
 
-/** 기본 IDLE 행동 선택: 18% 점프 / 64% 걷기 / 18% 대기 (Shrimprium 비율) */
-export function defaultIdleDecide(c, rng = Math.random) {
-  const r = rng();
-  if (r < 0.18) {
-    startJump(c, rng);
-  } else if (r < 0.82) {
-    c.state = "CRAWL";
-    c.timer = 2 + rng() * 3;
-    if (c.x < 40) c.dir = 1;
-    else if (c.x > TANK_W - 72) c.dir = -1;
-    else if (c.dir !== 1 && c.dir !== -1) c.dir = rng() > 0.5 ? 1 : -1;
-  } else {
-    c.state = "STAY";
-    c.timer = 1 + rng() * 3;
+const MIN_JUMP_RISE = ((JUMP_SPEED_MIN * Math.sin(JUMP_MIN_DEG * Math.PI / 180)) ** 2)
+  / (2 * PX_GRAVITY_JUMP);
+
+function lowestJumpTarget(c, platforms, blockPowered) {
+  const feetY = c.y + c.h;
+  const centerX = c.x + c.w / 2;
+  let best = null;
+  for (const p of platforms) {
+    if (!isTangiblePlatform(p, blockPowered)) continue;
+    if (p.blockType === "spring_block" || p.blockType === "black_hole_block") continue;
+    if (p.blockType === "spike_block" && getSpikeDir(p.rotation ?? 0) === "up") continue;
+    const rise = feetY - p.y;
+    if (rise <= 2 || rise > MIN_JUMP_RISE - 3) continue;
+    const dx = p.x + PLATFORM_W / 2 - centerX;
+    if (!best || p.y > best.platform.y || (p.y === best.platform.y && Math.abs(dx) < Math.abs(best.dx))) {
+      best = { platform: p, dx };
+    }
   }
+  return best;
+}
+
+/** 멈춤 없는 기본 이동: 인간은 걷고, 새우 진영은 주기적으로 위 플랫폼을 향해 도약한다. */
+export function defaultMoveDecide(c, ctx, rng = Math.random) {
+  c.state = "CRAWL";
+  if (c.side === "human") {
+    c.timer = 1.5;
+    return;
+  }
+
+  const target = lowestJumpTarget(c, ctx.platforms, ctx.blockPowered);
+  if (target) {
+    c.dir = target.dx >= 0 ? 1 : -1;
+    if (Math.abs(target.dx) <= 175) {
+      startJump(c, rng);
+      return;
+    }
+    c.timer = 0.45;
+    return;
+  }
+
+  if (rng() < 0.32) {
+    startJump(c, rng);
+    return;
+  }
+  c.timer = 1.1 + rng() * 1.8;
+  if (c.x < 40) c.dir = 1;
+  else if (c.x > TANK_W - 72) c.dir = -1;
+  else if (c.dir !== 1 && c.dir !== -1) c.dir = rng() > 0.5 ? 1 : -1;
 }
