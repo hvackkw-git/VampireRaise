@@ -2,10 +2,11 @@
 // 웨이브 진행: 인간 스폰 스케줄, 클리어/패배 판정, 자동 웨이브.
 
 import {
-  TANK_W, CHAR_SIZE, FLOOR_Y,
+  CHAR_SIZE, FLOOR_Y,
   humanCountForWave, humanStatsForWave, waveReward,
   accountExpForWave, accountExpToNext,
   HUMAN_SPAWN_INTERVAL_S, AUTO_WAVE_DELAY_S,
+  HUMAN_SPAWN_ZONE, VAMPIRE_SPAWN_ZONE, spawnXInZone,
 } from "../constants.js";
 import { createCharacter } from "../state/gameState.js";
 import { findHumanSpawnRoutes } from "./descentNavigation.js";
@@ -33,14 +34,23 @@ export function grantAccountExp(state, amount, events = []) {
   }
 }
 
-/** 웨이브 시작: 바닥까지 내려오는 경로가 있는 스폰 지점에만 인간을 배정한다. */
+/** 인간 스폰 존(오른쪽 위) 안에 좌상단 x가 들어오는 하강 경로만 남긴다. */
+function routesInHumanZone(routes) {
+  const minX = HUMAN_SPAWN_ZONE.x;
+  const maxX = HUMAN_SPAWN_ZONE.x + HUMAN_SPAWN_ZONE.w - CHAR_SIZE;
+  return routes.filter((r) => r.x >= minX - 0.5 && r.x <= maxX + 0.5);
+}
+
+/** 웨이브 시작: 인간 스폰 존에서 바닥까지 내려오는 경로가 있을 때만 인간을 배정한다. */
 export function startWave(state, blockPowered = null) {
   const w = state.wave;
   if (w.active) {
     w.lastStartError = "active";
     return false;
   }
-  const routes = findHumanSpawnRoutes(state.platforms.items, blockPowered);
+  const routes = routesInHumanZone(
+    findHumanSpawnRoutes(state.platforms.items, blockPowered),
+  );
   if (routes.length === 0) {
     w.lastStartError = "noPath";
     return false;
@@ -61,15 +71,15 @@ export function startWave(state, blockPowered = null) {
   return true;
 }
 
-/** 죽은 뱀파이어 전원 부활 (풀피, 맨 아래 바닥에서 재시작) */
+/** 죽은 뱀파이어 전원 부활 (풀피, 왼쪽 아래 스폰 존 바닥에서 재시작) */
 export function reviveVampires(state, rng = Math.random) {
   for (const c of state.chars.items) {
     if (c.side !== "vampire" || !c.dead) continue;
     c.dead = false;
     c.hp = c.maxHp;
-    // 상단 낙하가 아니라 맨 아래(바닥)에서 바로 걷기 시작
+    // 상단 낙하가 아니라 왼쪽 아래 스폰 존(바닥)에서 바로 걷기 시작
     c.state = "CRAWL";
-    c.x = rng() * (TANK_W - CHAR_SIZE);
+    c.x = spawnXInZone(VAMPIRE_SPAWN_ZONE, c.w, rng);
     c.y = FLOOR_Y - c.h;
     c.vx = 0; c.vy = 0;
     c._platformId = null;

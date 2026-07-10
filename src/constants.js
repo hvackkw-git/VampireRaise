@@ -14,6 +14,31 @@ export const FLOOR_Y = 624;
 /** 기본 캐릭터 크기(px) — 스폰 좌표 계산 등에 사용 */
 export const CHAR_SIZE = 32;
 
+// ── 스폰 존 (2×2 플랫폼블록 크기의 하얀 네모, 여기서만 캐릭터가 스폰된다) ──
+/** 스폰 존 한 변 길이(px) = 플랫폼블록 2칸(20×2) */
+export const SPAWN_ZONE_SIZE = 40;
+/** 인간 스폰 존: 오른쪽 위 모서리 */
+export const HUMAN_SPAWN_ZONE = {
+  x: TANK_W - SPAWN_ZONE_SIZE, y: 0, w: SPAWN_ZONE_SIZE, h: SPAWN_ZONE_SIZE,
+};
+/** 뱀파이어 스폰 존: 왼쪽 아래 모서리 */
+export const VAMPIRE_SPAWN_ZONE = {
+  x: 0, y: TANK_H - SPAWN_ZONE_SIZE, w: SPAWN_ZONE_SIZE, h: SPAWN_ZONE_SIZE,
+};
+
+/**
+ * 스폰 존 안에서 캐릭터(size)의 좌상단 x를 무작위로 뽑는다.
+ * 캐릭터가 존보다 넓으면 존 왼쪽에 붙여 클램프한다.
+ * @param {{x:number, w:number}} zone
+ * @param {number} size - 캐릭터 한 변(px)
+ * @param {() => number} [rng]
+ * @returns {number}
+ */
+export function spawnXInZone(zone, size, rng = Math.random) {
+  const span = Math.max(0, zone.w - size);
+  return zone.x + rng() * span;
+}
+
 /**
  * 진영별 스프라이트 설정. 어셋 교체 시 여기만 바꾸면 된다.
  * - size: 프레임 한 변(px). 캐릭터 논리 박스(w/h)도 이 값.

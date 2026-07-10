@@ -3,7 +3,7 @@
 
 import {
   TANK_W, FLOOR_Y, CHAR_SIZE, CHAR_SPRITES, VAMPIRE_BASE, SLAVE_BASE, HUMAN_BASE_MP,
-  INITIAL_VAMPIRE_COUNT,
+  INITIAL_VAMPIRE_COUNT, VAMPIRE_SPAWN_ZONE, spawnXInZone,
 } from "../constants.js";
 
 export const SAVE_KEY = "vampireraise.save.v1";
@@ -20,10 +20,14 @@ export function createCharacter(state, side, opts = {}) {
   const id = state.chars.nextId++;
   const size = CHAR_SPRITES[side]?.size ?? CHAR_SIZE;
   const baseStats = side === "slave" ? SLAVE_BASE : VAMPIRE_BASE;
+  // 뱀파이어는 왼쪽 아래 스폰 존(바닥)에서만 스폰. 그 외(노예 등)는 기존 무작위 위치.
+  const defaultX = side === "vampire"
+    ? spawnXInZone(VAMPIRE_SPAWN_ZONE, size)
+    : Math.random() * (TANK_W - size);
   const c = {
     id,
     side,                       // 'vampire' | 'human' | 'slave'
-    x: opts.x ?? Math.random() * (TANK_W - size),
+    x: opts.x ?? defaultX,
     y: opts.y ?? FLOOR_Y - size,
     w: size, h: size,
     vx: 0, vy: 0,

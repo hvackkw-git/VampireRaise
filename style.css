@@ -130,6 +130,17 @@ button { font-family: inherit; color: inherit; }
   border-top: 2px solid #55396b;
   pointer-events: none;
 }
+/* 스폰 존: 2×2 크기의 하얀 네모 (배경 위·블록/캐릭터 아래) */
+.spawn-zone-layer { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.spawn-zone {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.16);
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.35);
+  box-sizing: border-box;
+  image-rendering: pixelated;
+}
+
 .layer-blocks-logic, .layer-blocks-platform, .layer-chars, .layer-fx {
   position: absolute; inset: 0; pointer-events: none;
 }
