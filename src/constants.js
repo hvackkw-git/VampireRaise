@@ -36,6 +36,14 @@ export const DETECT_RANGE = { vampire: 90, human: 120, slave: 55 };
 /** 핑(추적 대상) 갱신 주기(초) — 비전투 유닛은 1초마다 가장 가까운 적을 다시 찍는다 */
 export const PING_REFRESH_S = 1.0;
 
+// ── 뱀파이어 패시브: 혈귀 돌진 ──
+// 감지범위×2 안에 적이 있으면 중력을 무시하고 최단거리(직선)로 돌진한다.
+export const DASH_RANGE_MULT = 2;    // 돌진 발동 거리 = DETECT_RANGE.vampire × 2
+export const DASH_SPD = 260;         // 돌진 속도 px/s
+export const DASH_COOLDOWN_S = 2.0;  // 돌진 재사용 대기(초)
+export const DASH_ARRIVE_DIST = 26;  // 이 거리까지 접근하면 돌진 종료(낙하 → 교전)
+export const DASH_MAX_S = 1.5;       // 돌진 최대 지속(초) — 안전 타임아웃
+
 // ── 전투 (교전형: 만나면 마주보고 멈춰서 싸운다) ──
 export const ENGAGE_RANGE = 34;       // 교전 시작 거리 (중심 간 px)
 export const FIGHT_BREAK_RANGE = 48;  // 이 거리보다 멀어지면 교전 해제

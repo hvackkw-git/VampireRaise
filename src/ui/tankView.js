@@ -169,9 +169,11 @@ export function renderChars(state, nowMs, ui) {
       entry.detect.style.left = `${c.w / 2 - r}px`;
       entry.detect.style.top = `${c.h / 2 - r}px`;
     }
-    // FIGHT는 제자리지만 몸싸움 느낌이 나도록 빠르게 프레임을 돌린다
-    const moving = Math.abs(c.vx) > 1 || c.state === "CRAWL" || c.state === "JUMP" || c.state === "FIGHT";
-    const frame = moving ? Math.floor(nowMs / (c.state === "FIGHT" ? 60 : 90)) % CHAR_SHEET_FRAMES : 0;
+    // FIGHT/DASH는 빠르게 프레임을 돌려 몸싸움·질주 느낌을 낸다
+    const moving = Math.abs(c.vx) > 1 || c.state === "CRAWL" || c.state === "JUMP"
+      || c.state === "FIGHT" || c.state === "DASH";
+    const fast = c.state === "FIGHT" || c.state === "DASH";
+    const frame = moving ? Math.floor(nowMs / (fast ? 60 : 90)) % CHAR_SHEET_FRAMES : 0;
     if (entry.lastFrame !== frame) {
       entry.sprite.style.backgroundPosition = `${-frame * CHAR_SIZE}px 0`;
       entry.lastFrame = frame;
@@ -183,10 +185,29 @@ export function renderChars(state, nowMs, ui) {
     entry.el.classList.toggle("stunned", c.state === "STUN");
     entry.el.classList.toggle("selected", ui.selectedCharId === c.id);
     entry.hpFill.style.width = `${Math.max(0, Math.min(100, (c.hp / c.maxHp) * 100))}%`;
+    // 돌진 잔상: 45ms 간격으로 현재 모습의 고스트를 남긴다
+    if (c.state === "DASH" && nowMs - (entry.lastGhostAt ?? 0) > 45) {
+      entry.lastGhostAt = nowMs;
+      spawnDashGhost(c, entry);
+    }
   }
   for (const [id, entry] of charEls) {
     if (!seen.has(id)) { entry.el.remove(); charEls.delete(id); }
   }
+}
+
+/** 돌진 잔상: 현재 스프라이트 모습 그대로 두고 페이드아웃 */
+function spawnDashGhost(c, entry) {
+  const g = document.createElement("div");
+  g.className = "char-ghost";
+  g.style.backgroundImage = entry.sprite.style.backgroundImage;
+  g.style.backgroundSize = entry.sprite.style.backgroundSize;
+  g.style.backgroundPosition = entry.sprite.style.backgroundPosition;
+  g.style.transform = entry.sprite.style.transform;
+  g.style.left = `${c.x}px`;
+  g.style.top = `${c.y}px`;
+  layerFx.appendChild(g);
+  g.addEventListener("animationend", () => g.remove());
 }
 
 // ── 핑 마커 (테스트용): 추적당하는 대상 머리 위 ▼, 추적자 진영 색 ──

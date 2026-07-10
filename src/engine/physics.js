@@ -135,10 +135,10 @@ function landOnFloor(c, ctx) {
   return false;
 }
 
-/** 스턴 블록 접촉 검사 (밟는 게 아니라 스치면 발동) */
+/** 스턴 블록 접촉 검사 (밟는 게 아니라 스치면 발동). 돌진 중에는 지형 무시 */
 function checkStunTouch(c, ctx) {
   const { platforms, now } = ctx;
-  if (now < c._stunImmuneUntil || c.state === "STUN") return;
+  if (now < c._stunImmuneUntil || c.state === "STUN" || c.state === "DASH") return;
   const hb = getCharHitbox(c);
   for (const plat of platforms) {
     if (plat.blockType !== "stun_block") continue;
@@ -255,6 +255,11 @@ export function tickCharacter(c, ctx, simDt, onIdleDecide) {
     const inLastFifth = c._jumpApexY != null && c.y >= GROUND_Y + 0.2 * (c._jumpApexY - GROUND_Y);
     c.vy += (inLastFifth ? PX_GRAVITY_JUMP_LAND : PX_GRAVITY_JUMP) * simDt;
     if (!tryLand(c, ctx, simDt)) landOnFloor(c, ctx);
+  }
+
+  else if (c.state === "DASH") {
+    // 뱀파이어 패시브 돌진: 중력·지형 전부 무시하고 직선 비행.
+    // 조향(vx/vy)은 ai.tickAggro가 매 프레임 대상 방향으로 갱신한다 — 여기선 적분만.
   }
 
   else if (c.state === "FALL" || c.state === "STUN") {

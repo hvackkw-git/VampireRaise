@@ -5,7 +5,9 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { createInitialState, createCharacter } from "../state/gameState.js";
 import { tickAggro } from "../game/ai.js";
 import { tickCharacter } from "../engine/physics.js";
-import { DETECT_RANGE, PING_REFRESH_S, FLOOR_Y, CHAR_SIZE } from "../constants.js";
+import {
+  DETECT_RANGE, PING_REFRESH_S, FLOOR_Y, CHAR_SIZE, DASH_RANGE_MULT,
+} from "../constants.js";
 
 let state;
 beforeEach(() => {
@@ -24,6 +26,7 @@ const put = (side, x, over = {}) => {
 describe("핑 추적", () => {
   it("감지 원 안의 최근접 적에게 핑을 찍고 그쪽으로 걷는다", () => {
     const vamp = put("vampire", 100);
+    vamp._dashCd = 999; // 돌진 배제 — 걷기 추적 검증
     put("human", 100 + DETECT_RANGE.vampire + 40);      // 원 밖 (무시)
     const near = put("human", 100 + DETECT_RANGE.vampire - 20); // 원 안
     tickAggro(state, 0.016, () => 0.9);
@@ -34,6 +37,7 @@ describe("핑 추적", () => {
 
   it("감지 원 밖이면 핑이 없다", () => {
     const vamp = put("vampire", 0);
+    vamp._dashCd = 999;
     put("human", DETECT_RANGE.vampire + 80);
     tickAggro(state, 0.016, () => 0.9);
     expect(vamp._ping).toBeNull();
@@ -42,6 +46,7 @@ describe("핑 추적", () => {
 
   it("핑은 1초 주기로 갱신된다: 대상이 범위를 벗어나도 다음 갱신까지 유지", () => {
     const vamp = put("vampire", 100);
+    vamp._dashCd = 999;
     const human = put("human", 160);
     tickAggro(state, 0.016, () => 0.9);
     expect(vamp._ping?.targetId).toBe(human.id);
@@ -56,6 +61,7 @@ describe("핑 추적", () => {
 
   it("서로의 원에 들어오면 양쪽 다 핑을 찍는다", () => {
     const vamp = put("vampire", 100);
+    vamp._dashCd = 999;
     const human = put("human", 160);
     tickAggro(state, 0.016, () => 0.9);
     expect(vamp._ping?.targetId).toBe(human.id);
@@ -68,6 +74,7 @@ describe("핑 추적", () => {
     expect(DETECT_RANGE.slave).toBeLessThan(DETECT_RANGE.vampire);
     const d = DETECT_RANGE.slave + 15;
     const vamp = put("vampire", 100);
+    vamp._dashCd = 999;
     const slave = put("slave", 100);
     put("human", 100 + d);
     tickAggro(state, 0.016, () => 0.9);
@@ -85,11 +92,63 @@ describe("핑 추적", () => {
   });
 });
 
+describe("뱀파이어 패시브: 혈귀 돌진", () => {
+  it("감지범위×2 안의 적에게 돌진(DASH)한다 — 일반 감지 밖이어도", () => {
+    const vamp = put("vampire", 100);
+    const far = 100 + DETECT_RANGE.vampire + 30; // 감지 밖, ×2 안
+    put("human", far);
+    tickAggro(state, 0.016, () => 0.9);
+    expect(vamp.state).toBe("DASH");
+  });
+
+  it("감지범위×2 밖이면 돌진하지 않는다", () => {
+    const vamp = put("vampire", 0);
+    put("human", DETECT_RANGE.vampire * DASH_RANGE_MULT + 60);
+    tickAggro(state, 0.016, () => 0.9);
+    expect(vamp.state).toBe("IDLE");
+  });
+
+  it("중력을 무시하고 위쪽 대상에게도 직선으로 날아간다", () => {
+    const vamp = put("vampire", 100);
+    put("human", 130, { y: FLOOR_Y - CHAR_SIZE - 120 }); // 위쪽 공중/플랫폼 위치
+    const ctx = { platforms: [], blockPowered: new Map(), now: 10000, rng: () => 0.9 };
+    const y0 = vamp.y;
+    let flewUp = false;
+    for (let t = 0; t < 1; t += 1 / 60) {
+      tickAggro(state, 1 / 60, () => 0.9);
+      tickCharacter(vamp, ctx, 1 / 60);
+      if (vamp.state === "DASH" && vamp.vy < 0 && vamp.y < y0 - 20) { flewUp = true; break; }
+    }
+    expect(flewUp).toBe(true);
+  });
+
+  it("대상에 도달하면 돌진이 끝나고(낙하) 쿨다운이 걸린다", () => {
+    const vamp = put("vampire", 100);
+    put("human", 100 + DETECT_RANGE.vampire + 30);
+    const ctx = { platforms: [], blockPowered: new Map(), now: 10000, rng: () => 0.9 };
+    let ended = false;
+    for (let t = 0; t < 3; t += 1 / 60) {
+      tickAggro(state, 1 / 60, () => 0.9);
+      tickCharacter(vamp, ctx, 1 / 60);
+      if (vamp._dashTargetId == null && vamp._dashCd > 0) { ended = true; break; }
+    }
+    expect(ended).toBe(true);
+  });
+
+  it("노예는 돌진하지 않는다 (뱀파이어 전용 패시브)", () => {
+    const slave = put("slave", 100);
+    put("human", 100 + DETECT_RANGE.slave + 20); // 노예 감지 밖·×2 개념 없음
+    tickAggro(state, 0.016, () => 0.9);
+    expect(slave.state).toBe("IDLE");
+  });
+});
+
 describe("플랫폼 위 최단거리 추적 (경로 탐색 없음)", () => {
   it("플랫폼 위에서 아래 적을 인식하면 수평으로 걷다가 가장자리에서 떨어진다", () => {
     // 감지는 유클리드 거리 — 원 안에 들도록 플랫폼(y=560)과 인간(x=100)을 가깝게 배치
     const plat = { id: 1, x: 140, y: 560, blockType: "platform_block" };
     const vamp = put("vampire", 140, { y: 560 - CHAR_SIZE });
+    vamp._dashCd = 999;
     vamp._platformId = 1;
     const human = put("human", 100); // 왼쪽 아래 바닥 (dist ≈ 75 < 90)
     human.timer = 99;
@@ -107,6 +166,7 @@ describe("플랫폼 위 최단거리 추적 (경로 탐색 없음)", () => {
   it("대상이 바로 아래면 제자리에 멈춘다 (국소 최소거리)", () => {
     const plat = { id: 1, x: 100, y: 560, blockType: "platform_block" };
     const vamp = put("vampire", 94, { y: 560 - CHAR_SIZE }); // 중심 110 = 인간 중심과 동일
+    vamp._dashCd = 999;
     vamp._platformId = 1;
     put("human", 94);
     const ctx = { platforms: [plat], blockPowered: new Map(), now: 10000, rng: () => 0.9 };
