@@ -285,10 +285,13 @@ export function createDecorateMode(state, ui, { onExit } = {}) {
   buildGrid();
   buildPalette();
 
+  // 패널 영역은 정보 패널과 꾸미기 바가 배타적으로 사용
+  const infoPanelEl = document.getElementById("info-panel");
   const api = {
     enter() {
       ui.decorateMode = true;
       bar.classList.remove("hidden");
+      infoPanelEl.classList.add("hidden");
       selectedPaletteType = null;
       setSelectedBlock(null);
     },
@@ -299,6 +302,7 @@ export function createDecorateMode(state, ui, { onExit } = {}) {
       drag = null;
       setSelectedBlock(null);
       bar.classList.add("hidden");
+      infoPanelEl.classList.remove("hidden");
       overlay.classList.add("hidden");
       onExit?.();
     },

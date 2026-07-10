@@ -77,15 +77,32 @@ button { font-family: inherit; color: inherit; }
 .hotkey i:empty { display: none; }
 .hotkey-danger { border-color: #8a3040; margin-top: 8px; }
 
-/* ── 수조(전장) ── */
-.tank-scale-wrapper { position: relative; flex: 0 0 auto; }
+/* ── 논리 캔버스 (320×770 = 수조 640 + 패널 130) — Shrimprium처럼 통째로 스케일 ── */
+.canvas-scale-wrapper { position: relative; flex: 0 0 auto; }
+#gameCanvas {
+  position: absolute;
+  left: 0; top: 0;
+  width: 320px; height: 770px;
+  transform-origin: 0 0;
+  display: flex;
+  flex-direction: column;
+}
+.tank-area { position: relative; flex: 0 0 640px; }
 #tank {
   position: absolute;
   left: 0; top: 0;
   width: 320px; height: 640px;
-  transform-origin: 0 0;
   overflow: hidden;
   background: linear-gradient(180deg, #1a0f26 0%, #241536 55%, #2d1a42 100%);
+}
+
+/* ── 패널 영역: 수조와 분리된 하단 상시 카드 ── */
+#panel-region {
+  flex: 0 0 130px;
+  height: 130px;
+  background: #180f22;
+  border-top: 2px solid #43305f;
+  overflow: hidden;
 }
 .tank-bg {
   position: absolute; inset: 0;
@@ -248,11 +265,9 @@ button { font-family: inherit; color: inherit; }
   border-color: rgba(255, 90, 90, 0.9) !important;
 }
 
-/* ── 꾸미기 바 (수조 하단 오버레이) ── */
+/* ── 꾸미기 바 (패널 영역 내부) ── */
 #decorate-bar {
-  left: 0; right: 0; bottom: 0;
-  background: rgba(24, 15, 34, 0.92);
-  border-top: 1px solid #43305f;
+  height: 100%;
   padding: 5px 6px;
 }
 .decorate-controls {
@@ -296,24 +311,17 @@ button { font-family: inherit; color: inherit; }
   margin: 0 3px;
 }
 
-/* ── 캐릭터 정보 패널 (수조 하단 오버레이, 수질 패널 대체) ── */
+/* ── 캐릭터 정보 패널 (패널 영역 내부, 수질 패널 대체) ── */
 #info-panel {
-  left: 0; right: 0; bottom: 0;
-  background: rgba(24, 15, 34, 0.92);
-  border-top: 1px solid #43305f;
+  height: 100%;
   padding: 7px 10px;
-  max-height: 150px;
   overflow-y: auto;
 }
-.info-close {
-  position: absolute;
-  top: 4px; right: 6px;
-  width: 20px; height: 20px;
-  background: transparent;
-  border: none;
-  color: #9c88bc;
-  font-size: 12px;
-  cursor: pointer;
+.info-default {
+  color: #8a76a8;
+  font-size: 11px;
+  text-align: center;
+  padding-top: 44px;
 }
 .info-char { font-size: 11px; }
 .info-head {
@@ -322,7 +330,7 @@ button { font-family: inherit; color: inherit; }
 }
 .info-name { font-size: 14px; font-weight: 700; }
 .info-job { color: #b8a4d8; font-size: 11px; }
-.info-row { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+.info-row { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
 .info-label { width: 46px; color: #9c88bc; font-size: 11px; }
 .bar {
   flex: 1; height: 8px;
@@ -334,15 +342,15 @@ button { font-family: inherit; color: inherit; }
 .bar-hp > i { background: linear-gradient(90deg, #c03048, #e04858); }
 .bar-exp > i { background: linear-gradient(90deg, #7a50c0, #a880e8); }
 .bar-num { font-size: 10px; color: #cbb8e8; min-width: 64px; text-align: right; }
-.info-skill-title { margin-top: 8px; font-size: 11px; color: #9c88bc; }
-.skill-tree { display: flex; gap: 6px; margin-top: 4px; }
+.info-skill-title { margin-top: 4px; font-size: 10px; color: #9c88bc; }
+.skill-tree { display: flex; gap: 5px; margin-top: 3px; }
 .skill-node {
-  width: 30px; height: 30px;
+  width: 22px; height: 22px;
   display: flex; align-items: center; justify-content: center;
   background: #241536;
   border: 1px dashed #55396b;
-  border-radius: 6px;
-  font-size: 13px;
+  border-radius: 5px;
+  font-size: 11px;
   opacity: 0.65;
 }
 .skill-hint { margin-top: 4px; font-size: 10px; color: #6a5888; }
