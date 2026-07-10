@@ -40,6 +40,7 @@ describe("교전 (마주보고 싸우기)", () => {
 
   it("공중(점프)으로 스쳐 지나갈 때는 교전·데미지가 없다", () => {
     const vamp = state.chars.items[0];
+    state.chars.items = [vamp]; // 랜덤 위치의 다른 초기 뱀파이어 배제
     vamp.x = 100; vamp.state = "JUMP"; vamp._atkCd = 0;
     const human = createCharacter(state, "human", { x: 110, y: vamp.y, maxHp: 100, atk: 5 });
     human._atkCd = 0;
