@@ -12,6 +12,7 @@ import {
   DETECT_RANGE, PING_REFRESH_S,
   DASH_ROUTE_MULT, TANK_W, TANK_H, FLOOR_Y,
   DASH_SPD, DASH_COOLDOWN_S, DASH_ARRIVE_DIST, DASH_MAX_S,
+  isEnemySide,
 } from "../constants.js";
 import { startJump, NON_PLATFORM_BLOCK_TYPES } from "../engine/physics.js";
 import { isLogicLayerBlock, PLATFORM_W, PLATFORM_H } from "../platform/platformBlockRenderer.js";
@@ -67,11 +68,24 @@ function platformStandPoint(p, charH) {
   return { x: p.x + PLATFORM_W / 2, y: p.y - charH / 2, platformId: p.id };
 }
 
+function isInPlatformUpperArea(target, p) {
+  if (target._platformId === p.id) return true;
+  const cx = target.x + target.w / 2;
+  const feetY = target.y + target.h;
+  const horizontalMargin = target.w / 2;
+  const minX = p.x - horizontalMargin;
+  const maxX = p.x + PLATFORM_W + horizontalMargin;
+  return cx >= minX
+    && cx <= maxX
+    && feetY <= p.y + 1
+    && feetY >= p.y - Math.max(target.h, PLATFORM_H);
+}
+
 function nearestPlatformStandPointTo(target, platforms, charH) {
   const goal = centerOf(target);
   let best = null;
   for (const p of platforms) {
-    if (!isSolidForRoute(p)) continue;
+    if (!isSolidForRoute(p) || !isInPlatformUpperArea(target, p)) continue;
     const pt = platformStandPoint(p, charH);
     const dist = Math.hypot(pt.x - goal.x, pt.y - goal.y);
     if (!best || dist < best.dist || (dist === best.dist && p.id < best.platformId)) {
@@ -185,7 +199,7 @@ function findNearestDashRoute(c, chars, platforms) {
   const budget = (DETECT_RANGE.vampire ?? 0) * DASH_ROUTE_MULT;
   let best = null;
   for (const enemy of chars) {
-    if (enemy === c || enemy.dead || enemy.side === c.side) continue;
+    if (enemy === c || enemy.dead || !isEnemySide(c.side, enemy.side)) continue;
     const goal = nearestPlatformStandPointTo(enemy, platforms, c.h);
     if (!goal) continue;
     const route = findDashRoute(c, pointAsTarget(goal, c), platforms, goal);

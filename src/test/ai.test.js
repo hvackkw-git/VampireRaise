@@ -41,12 +41,12 @@ describe("핑 추적", () => {
     const human = put("human", 160);
     state.platforms.items.push(
       { id: 1, x: 20, y: 500, blockType: "platform_block" },
-      { id: 2, x: 160, y: FLOOR_Y - CHAR_SIZE + 16, blockType: "platform_block" },
+      { id: 2, x: 160, y: human.y + human.h, blockType: "platform_block" },
     );
 
     tickAggro(state, 0.016, () => 0.9);
 
-    expect(vamp._ping).toMatchObject({ targetId: human.id, platformId: 2, x: 170, y: FLOOR_Y - CHAR_SIZE });
+    expect(vamp._ping).toMatchObject({ targetId: human.id, platformId: 2, x: 170, y: FLOOR_Y - CHAR_SIZE / 2 });
   });
 
   it("감지 원 밖이면 핑이 없다", () => {
@@ -110,7 +110,7 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
   it("감지 원 안의 적 + 우회 거리가 예산(×2) 이내면 돌진(DASH)한다", () => {
     const vamp = put("vampire", 100);
     const human = put("human", 100 + DETECT_RANGE.vampire - 20); // 감지 원 안, 평지 (우회 = 직선)
-    state.platforms.items.push({ id: 1, x: human.x, y: FLOOR_Y - CHAR_SIZE + 16, blockType: "platform_block" });
+    state.platforms.items.push({ id: 1, x: human.x, y: human.y + human.h, blockType: "platform_block" });
     tickAggro(state, 0.016, () => 0.9);
     expect(vamp.state).toBe("DASH");
   });
@@ -118,10 +118,32 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
   it("직선 감지 원 밖이어도 우회 거리가 예산(×2) 이내면 돌진한다", () => {
     const vamp = put("vampire", 0);
     const human = put("human", DETECT_RANGE.vampire + 30); // 감지 원 밖, 하지만 우회 거리 120 ≤ 180
-    state.platforms.items.push({ id: 1, x: human.x, y: FLOOR_Y - CHAR_SIZE + 16, blockType: "platform_block" });
+    state.platforms.items.push({ id: 1, x: human.x, y: human.y + human.h, blockType: "platform_block" });
     tickAggro(state, 0.016, () => 0.9);
     expect(vamp.state).toBe("DASH");
     expect(vamp._ping).toBeNull();
+  });
+
+  it("노예는 뱀파이어 돌진 대상이 아니다", () => {
+    const vamp = put("vampire", 100);
+    const slave = put("slave", 140);
+    state.platforms.items.push({ id: 1, x: slave.x, y: slave.y + slave.h, blockType: "platform_block" });
+
+    tickAggro(state, 0.016, () => 0.9);
+
+    expect(vamp.state).not.toBe("DASH");
+    expect(vamp._dashTargetId).toBeNull();
+  });
+
+  it("플랫폼 근처라도 대상이 플랫폼 위쪽 영역에 없으면 돌진하지 않는다", () => {
+    const vamp = put("vampire", 100);
+    const human = put("human", 140);
+    state.platforms.items.push({ id: 1, x: human.x, y: human.y + 16, blockType: "platform_block" });
+
+    tickAggro(state, 0.016, () => 0.9);
+
+    expect(vamp.state).not.toBe("DASH");
+    expect(vamp._dashTargetId).toBeNull();
   });
 
   it("우회 거리가 예산(×2)을 넘으면 돌진하지 않는다", () => {
@@ -190,7 +212,7 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
   it("대상에 도달하면 돌진이 끝나고(낙하) 쿨다운이 걸린다", () => {
     const vamp = put("vampire", 100);
     const human = put("human", 100 + DETECT_RANGE.vampire - 20);
-    state.platforms.items.push({ id: 1, x: human.x, y: FLOOR_Y - CHAR_SIZE + 16, blockType: "platform_block" });
+    state.platforms.items.push({ id: 1, x: human.x, y: human.y + human.h, blockType: "platform_block" });
     const ctx = { platforms: state.platforms.items, blockPowered: new Map(), now: 10000, rng: () => 0.9 };
     let ended = false;
     for (let t = 0; t < 3; t += 1 / 60) {
