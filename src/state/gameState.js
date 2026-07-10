@@ -28,6 +28,8 @@ export function createCharacter(state, side, opts = {}) {
     _blockBounces: 0,
     _blockBounceDecay: 0,
     _fightTargetId: null,       // 교전 대상 (FIGHT 상태)
+    _ping: null,                // 추적 핑 { targetId } — 1초마다 갱신
+    _pingCd: Math.random(),     // 핑 갱신 시차 분산
     _atkCd: Math.random(),      // 첫 공격 타이밍 분산
     // ── 성장 ──
     level: opts.level ?? 1,
@@ -87,6 +89,17 @@ export function serialize(state) {
         })),
     },
   });
+}
+
+/** 처음부터 재시작: 저장 삭제 + 상태를 초기값으로 제자리 교체 (참조 유지) */
+export function resetState(state, storage = globalThis.localStorage) {
+  try { storage?.removeItem(SAVE_KEY); } catch { /* 무시 */ }
+  const fresh = createInitialState();
+  state.blood = fresh.blood;
+  state.wave = fresh.wave;
+  state.prestige = fresh.prestige;
+  state.platforms = fresh.platforms;
+  state.chars = fresh.chars;
 }
 
 export function saveState(state, storage = globalThis.localStorage) {

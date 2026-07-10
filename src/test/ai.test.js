@@ -1,8 +1,11 @@
-// 감지(인식 원) AI 테스트: 원 안에 들어오면 인식하고 접근, 노예는 감지 반경이 작다
+// 감지·핑 추적 AI 테스트:
+// 원 안에 들어오면 최근접 적에게 핑을 찍고 접근, 1초마다 갱신,
+// 범위 이탈 시 배회 복귀, 노예는 감지 반경이 작다, 플랫폼 위에서는 그냥 걷다 떨어진다.
 import { describe, it, expect, beforeEach } from "vitest";
 import { createInitialState, createCharacter } from "../state/gameState.js";
 import { tickAggro } from "../game/ai.js";
-import { DETECT_RANGE } from "../constants.js";
+import { tickCharacter } from "../engine/physics.js";
+import { DETECT_RANGE, PING_REFRESH_S, FLOOR_Y, CHAR_SIZE } from "../constants.js";
 
 let state;
 beforeEach(() => {
@@ -11,54 +14,107 @@ beforeEach(() => {
 });
 
 const put = (side, x, over = {}) => {
-  const c = createCharacter(state, side, { x, y: 592, maxHp: 100, atk: 5, ...over });
+  const c = createCharacter(state, side, { x, y: FLOOR_Y - CHAR_SIZE, maxHp: 100, atk: 5, ...over });
   c.state = "IDLE";
-  c.timer = 99; // 자율 행동 억제 — 감지 반응만 관찰
+  c.timer = 99;   // 자율 행동 억제 — 감지 반응만 관찰
+  c._pingCd = 0;  // 첫 틱에 즉시 핑 갱신
   return c;
 };
 
-describe("감지 원", () => {
-  it("감지 원 안의 적을 인식하고 그쪽으로 걷는다", () => {
+describe("핑 추적", () => {
+  it("감지 원 안의 최근접 적에게 핑을 찍고 그쪽으로 걷는다", () => {
     const vamp = put("vampire", 100);
-    put("human", 100 + DETECT_RANGE.vampire - 10); // 원 안
-    tickAggro(state, () => 0.5);
+    put("human", 100 + DETECT_RANGE.vampire + 40);      // 원 밖 (무시)
+    const near = put("human", 100 + DETECT_RANGE.vampire - 20); // 원 안
+    tickAggro(state, 0.016, () => 0.9);
+    expect(vamp._ping?.targetId).toBe(near.id);
     expect(vamp.state).toBe("CRAWL");
     expect(vamp.dir).toBe(1);
   });
 
-  it("감지 원 밖의 적은 인식하지 못한다", () => {
+  it("감지 원 밖이면 핑이 없다", () => {
     const vamp = put("vampire", 0);
-    put("human", DETECT_RANGE.vampire + 60); // 원 밖
-    tickAggro(state, () => 0.5);
+    put("human", DETECT_RANGE.vampire + 80);
+    tickAggro(state, 0.016, () => 0.9);
+    expect(vamp._ping).toBeNull();
     expect(vamp.state).toBe("IDLE");
   });
 
-  it("서로의 원에 들어오면 양쪽 다 인식한다", () => {
+  it("핑은 1초 주기로 갱신된다: 대상이 범위를 벗어나도 다음 갱신까지 유지", () => {
     const vamp = put("vampire", 100);
-    const human = put("human", 160); // 60px — 둘 다 감지 반경 안
-    tickAggro(state, () => 0.5);
-    expect(vamp.state).toBe("CRAWL");
+    const human = put("human", 160);
+    tickAggro(state, 0.016, () => 0.9);
+    expect(vamp._ping?.targetId).toBe(human.id);
+    // 대상이 멀리 도망 — 갱신 전까지는 핑 유지
+    human.x = 100 + DETECT_RANGE.vampire + 100;
+    tickAggro(state, 0.016, () => 0.9);
+    expect(vamp._ping?.targetId).toBe(human.id);
+    // 1초 경과 후 갱신 → 범위 밖이므로 핑 해제 → 배회 복귀
+    tickAggro(state, PING_REFRESH_S + 0.1, () => 0.9);
+    expect(vamp._ping).toBeNull();
+  });
+
+  it("서로의 원에 들어오면 양쪽 다 핑을 찍는다", () => {
+    const vamp = put("vampire", 100);
+    const human = put("human", 160);
+    tickAggro(state, 0.016, () => 0.9);
+    expect(vamp._ping?.targetId).toBe(human.id);
+    expect(human._ping?.targetId).toBe(vamp.id);
     expect(vamp.dir).toBe(1);
-    expect(human.state).toBe("CRAWL");
     expect(human.dir).toBe(-1);
   });
 
   it("노예는 감지 반경이 작다: 같은 거리에서 뱀파이어는 보지만 노예는 못 본다", () => {
     expect(DETECT_RANGE.slave).toBeLessThan(DETECT_RANGE.vampire);
-    const d = DETECT_RANGE.slave + 15; // 노예 반경 밖, 뱀파이어 반경 안
+    const d = DETECT_RANGE.slave + 15;
     const vamp = put("vampire", 100);
     const slave = put("slave", 100);
     put("human", 100 + d);
-    tickAggro(state, () => 0.5);
-    expect(vamp.state).toBe("CRAWL");
-    expect(slave.state).toBe("IDLE");
+    tickAggro(state, 0.016, () => 0.9);
+    expect(vamp._ping).not.toBeNull();
+    expect(slave._ping).toBeNull();
   });
 
-  it("교전 중(FIGHT)에는 감지가 행동을 덮어쓰지 않는다", () => {
+  it("교전 중(FIGHT)에는 핑 추적이 개입하지 않는다", () => {
     const vamp = put("vampire", 100);
     vamp.state = "FIGHT";
     put("human", 130);
-    tickAggro(state, () => 0.5);
+    tickAggro(state, 0.016, () => 0.9);
     expect(vamp.state).toBe("FIGHT");
+    expect(vamp._ping).toBeNull();
+  });
+});
+
+describe("플랫폼 위 최단거리 추적 (경로 탐색 없음)", () => {
+  it("플랫폼 위에서 아래 적을 인식하면 수평으로 걷다가 가장자리에서 떨어진다", () => {
+    // 감지는 유클리드 거리 — 원 안에 들도록 플랫폼(y=560)과 인간(x=100)을 가깝게 배치
+    const plat = { id: 1, x: 140, y: 560, blockType: "platform_block" };
+    const vamp = put("vampire", 140, { y: 560 - CHAR_SIZE });
+    vamp._platformId = 1;
+    const human = put("human", 100); // 왼쪽 아래 바닥 (dist ≈ 75 < 90)
+    human.timer = 99;
+    const ctx = { platforms: [plat], blockPowered: new Map(), now: 10000, rng: () => 0.9 };
+    for (let t = 0; t < 4; t += 1 / 60) {
+      tickAggro(state, 1 / 60, () => 0.9);
+      tickCharacter(vamp, ctx, 1 / 60);
+    }
+    // 가장자리를 넘어 떨어져 바닥에 도달했어야 한다
+    expect(vamp._platformId).toBeNull();
+    expect(vamp.y).toBe(FLOOR_Y - CHAR_SIZE);
+    expect(vamp.x).toBeLessThan(140); // 대상 방향(왼쪽)으로 이동함
+  });
+
+  it("대상이 바로 아래면 제자리에 멈춘다 (국소 최소거리)", () => {
+    const plat = { id: 1, x: 100, y: 560, blockType: "platform_block" };
+    const vamp = put("vampire", 94, { y: 560 - CHAR_SIZE }); // 중심 110 = 인간 중심과 동일
+    vamp._platformId = 1;
+    put("human", 94);
+    const ctx = { platforms: [plat], blockPowered: new Map(), now: 10000, rng: () => 0.9 };
+    for (let t = 0; t < 1; t += 1 / 60) {
+      tickAggro(state, 1 / 60, () => 0.9);
+      tickCharacter(vamp, ctx, 1 / 60);
+    }
+    expect(vamp._platformId).toBe(1);
+    expect(vamp.state).toBe("STAY");
   });
 });

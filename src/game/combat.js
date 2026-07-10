@@ -56,12 +56,14 @@ export function infectToSlave(c) {
   c.timer = 0.5;
   c.vx = 0; c.vy = 0;
   c._fightTargetId = null;
+  c._ping = null;
 }
 
-/** 교전 진입: 멈춰서 대상을 마주본다 */
+/** 교전 진입: 멈춰서 대상을 마주본다 (핑 추적 종료) */
 function engage(c, target) {
   c.state = "FIGHT";
   c._fightTargetId = target.id;
+  c._ping = null;
   c.vx = 0;
   c.dir = target.x + target.w / 2 >= c.x + c.w / 2 ? 1 : -1;
 }

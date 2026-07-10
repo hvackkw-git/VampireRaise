@@ -31,8 +31,10 @@ export const SLIDE_SPD = 70;          // 미끄럼 블록 슬라이드 속도 px
 export const WARP_COOLDOWN_MS = 1000; // 블랙홀 워프 재사용 대기
 
 // ── 감지 (인식 범위: 원 안에 적이 들어오면 인식하고 다가간다) ──
-/** 진영별 감지 반경(px). 노예는 감지가 둔하다 */
+/** 진영별 감지 반경(px). 노예는 감지가 둔하다. (향후 성장 요소로 사용 예정) */
 export const DETECT_RANGE = { vampire: 90, human: 120, slave: 55 };
+/** 핑(추적 대상) 갱신 주기(초) — 비전투 유닛은 1초마다 가장 가까운 적을 다시 찍는다 */
+export const PING_REFRESH_S = 1.0;
 
 // ── 전투 (교전형: 만나면 마주보고 멈춰서 싸운다) ──
 export const ENGAGE_RANGE = 34;       // 교전 시작 거리 (중심 간 px)

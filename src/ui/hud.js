@@ -3,10 +3,10 @@
 
 import { summonCost } from "../constants.js";
 import { startWave, humansAlive } from "../game/waves.js";
-import { createCharacter } from "../state/gameState.js";
+import { createCharacter, resetState } from "../state/gameState.js";
 import { showToast } from "./tankView.js";
 
-export function initHud(state, { onDecorate }) {
+export function initHud(state, { onDecorate, onReset }) {
   const elWave = document.getElementById("hudWave");
   const elHumans = document.getElementById("hudHumans");
   const elBlood = document.getElementById("hudBlood");
@@ -43,6 +43,23 @@ export function initHud(state, { onDecorate }) {
   });
 
   btnDecorate.addEventListener("click", () => onDecorate?.());
+
+  // 처음부터 재시작 (테스트용): 두 번 눌러 확정 — 오조작 방지
+  const btnReset = document.getElementById("btnReset");
+  let resetArmedUntil = 0;
+  btnReset.addEventListener("click", () => {
+    const now = performance.now();
+    if (now > resetArmedUntil) {
+      resetArmedUntil = now + 2500;
+      showToast("한 번 더 누르면 처음부터 재시작합니다");
+      return;
+    }
+    resetArmedUntil = 0;
+    resetState(state);
+    onReset?.();
+    render();
+    showToast("🔄 처음부터 재시작!");
+  });
 
   /** 저빈도(4Hz) 갱신 */
   function render() {

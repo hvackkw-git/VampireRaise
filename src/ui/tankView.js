@@ -189,6 +189,37 @@ export function renderChars(state, nowMs, ui) {
   }
 }
 
+// ── 핑 마커 (테스트용): 추적당하는 대상 머리 위 ▼, 추적자 진영 색 ──
+const pingEls = new Map(); // `${targetId}:${side}` → el
+
+export function renderPings(state) {
+  const seen = new Set();
+  const byId = new Map(state.chars.items.map((c) => [c.id, c]));
+  for (const c of state.chars.items) {
+    if (c.dead || !c._ping) continue;
+    const t = byId.get(c._ping.targetId);
+    if (!t || t.dead) continue;
+    const key = `${t.id}:${c.side}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    let el = pingEls.get(key);
+    if (!el) {
+      el = document.createElement("span");
+      el.className = `ping-mark ping-${c.side}`;
+      el.textContent = "▼";
+      layerFx.appendChild(el);
+      pingEls.set(key, el);
+    }
+    // 같은 대상에 여러 진영 핑이 찍히면 좌우로 살짝 벌린다
+    const offset = c.side === "human" ? 5 : c.side === "slave" ? -5 : 0;
+    el.style.left = `${t.x + t.w / 2 - 4 + offset}px`;
+    el.style.top = `${t.y - 2}px`;
+  }
+  for (const [key, el] of pingEls) {
+    if (!seen.has(key)) { el.remove(); pingEls.delete(key); }
+  }
+}
+
 /** 전투 이벤트 → 플로팅 텍스트 */
 export function spawnFloatText(x, y, text, cls = "") {
   const span = document.createElement("span");

@@ -75,6 +75,7 @@ button { font-family: inherit; color: inherit; }
   padding: 0 3px;
 }
 .hotkey i:empty { display: none; }
+.hotkey-danger { border-color: #8a3040; margin-top: 8px; }
 
 /* ── 수조(전장) ── */
 .tank-scale-wrapper { position: relative; flex: 0 0 auto; }
@@ -170,6 +171,23 @@ button { font-family: inherit; color: inherit; }
 }
 .char.side-human .char-hpbar > i { background: #4d9fdc; }
 .char.side-slave .char-hpbar > i { background: #9a68d8; }
+
+/* 핑 마커 (테스트용): 추적 대상 머리 위 표시 */
+.ping-mark {
+  position: absolute;
+  font-size: 8px;
+  line-height: 1;
+  pointer-events: none;
+  animation: ping-bob 0.6s ease-in-out infinite alternate;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+.ping-vampire { color: #ff5a6e; }
+.ping-human { color: #4d9fdc; }
+.ping-slave { color: #9a68d8; }
+@keyframes ping-bob {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-3px); }
+}
 
 /* 데미지/이벤트 플로팅 텍스트 */
 .fx-float {

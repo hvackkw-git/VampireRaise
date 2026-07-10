@@ -13,11 +13,11 @@ import {
 import { TANK_W, TANK_H } from "./constants.js";
 import { createInitialState, loadState, saveState } from "./state/gameState.js";
 import { tickCharacter } from "./engine/physics.js";
-import { makeIdleDecider, tickAggro } from "./game/ai.js";
+import { tickAggro } from "./game/ai.js";
 import { tickCombat, aliveChars } from "./game/combat.js";
 import { tickWaves } from "./game/waves.js";
 import {
-  initTankView, renderBlocks, renderChars,
+  initTankView, renderBlocks, renderChars, renderPings,
   renderCombatEvents, toTankLocal, showToast, spawnFloatText,
 } from "./ui/tankView.js";
 import { createDecorateMode } from "./decorate/decorateMode.js";
@@ -41,6 +41,12 @@ const hud = initHud(state, {
       renderInfoPanel(null);
       decorate.enter();
     }
+  },
+  onReset: () => {
+    if (decorate.active) decorate.exit();
+    ui.selectedCharId = null;
+    ui.selectedBlockId = null;
+    renderInfoPanel(null);
   },
 });
 
@@ -81,7 +87,6 @@ function tickRecall(gameClock, rng = Math.random) {
 }
 
 // ── 메인 루프 ──
-const idleDecider = makeIdleDecider(state);
 const yBounds = { ...getPlatformYRange(TANK_H), tankW: TANK_W };
 let lastFrameMs = performance.now();
 let gameClock = 0;
@@ -109,10 +114,10 @@ function frame(nowMs) {
   });
   tickPistons(platforms, signals.powered, yBounds);
 
-  // 2) 감지(인식 원 안의 적에게 접근) → 캐릭터 물리
-  tickAggro(state);
+  // 2) 감지·핑 추적(1초 갱신) → 캐릭터 물리
+  tickAggro(state, simDt);
   const ctx = { platforms, blockPowered: signals.powered, now: nowMs, rng: Math.random };
-  for (const c of chars) tickCharacter(c, ctx, simDt, idleDecider);
+  for (const c of chars) tickCharacter(c, ctx, simDt);
 
   // 3) 전투·전염 → 4) 웨이브
   const combatEvents = tickCombat(state, simDt);
@@ -130,6 +135,7 @@ function frame(nowMs) {
   if (animAccum >= 0.12) { animAccum = 0; animFrame++; }
   renderBlocks(state, signals, animFrame, ui);
   renderChars(state, nowMs, ui);
+  renderPings(state);
 
   uiAccum += simDt;
   if (uiAccum >= 0.25 || combatEvents.length || waveEvents.length) {
