@@ -98,7 +98,7 @@ export const DASH_RANGED_SKILL_MULT = 1.1; // 원거리 피격 반격 스킬 배
 export const DASH_SPD = 260;            // 돌진 속도 px/s
 export const DASH_COOLDOWN_S = 2.0;     // 돌진 재사용 대기(초)
 export const DASH_ARRIVE_DIST = 26;     // 이 거리까지 접근하면 돌진 종료(낙하 → 교전)
-export const DASH_MAX_S = 1.5;          // 돌진 최대 지속(초) — 안전 타임아웃
+export const DASH_MAX_S = 1.5;          // 돌진 타임아웃 하한(초) — 실제 타임아웃은 경로 길이에 비례(ai.beginDash)
 
 // ── 전투 (교전형: 만나면 마주보고 멈춰서 싸운다) ──
 export const ENGAGE_RANGE = 34;       // 교전 시작 거리 (중심 간 px)

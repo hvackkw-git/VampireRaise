@@ -17,11 +17,6 @@ function memoryStorage() {
   };
 }
 
-/** 사이클을 n개까지 타일링 */
-function tiled(cycle, n) {
-  return Array.from({ length: n }, (_, i) => cycle[i % cycle.length]);
-}
-
 describe("Dash 잔상 색 로직", () => {
   it("기본은 복수(빨강) 1포인트", () => {
     expect(defaultDashColors()).toEqual({ red: 1 });
@@ -60,20 +55,24 @@ describe("Dash 잔상 색 로직", () => {
     expect(new Set(dashGhostTrail({ red: 1 }, 10))).toEqual(new Set(["red"]));
   });
 
-  it("트레일: 잔상은 스폰 순서대로 사이클을 그대로 반복한다(길이 무관)", () => {
-    // 빨6 주2 → 사이클 [빨빨빨주], 스폰 순서대로 반복
-    expect(dashGhostTrail({ red: 6, orange: 2 }, 10)).toEqual(
-      tiled(["red", "red", "red", "orange"], 10),
-    );
-    // 짧은 돌진(적은 개수)이어도 앞에서부터 순서대로 나온다 — 색이 건너뛰지 않는다
+  it("트레일: 사이클을 돌진 전체에 한 번 순서대로 펼친다(비율 유지)", () => {
+    // 빨6 주2 → 사이클 [빨빨빨주] → 10개에 3:1 비율로 펼침
+    expect(dashGhostTrail({ red: 6, orange: 2 }, 10)).toEqual([
+      "red", "red", "red", "red", "red", "red", "red", "red", "orange", "orange",
+    ]);
+    // 짧은 돌진(적은 개수)이어도 마지막 색(주황)까지 순서대로 반드시 나온다
     expect(dashGhostTrail({ red: 6, orange: 2 }, 5)).toEqual(
-      ["red", "red", "red", "orange", "red"],
+      ["red", "red", "red", "red", "orange"],
     );
   });
 
-  it("빨주노초 반복: 스폰 순서대로 빨주노초빨주노초…", () => {
-    expect(dashGhostTrail({ red: 1, orange: 1, yellow: 1, green: 1 }, 9)).toEqual(
-      tiled(["red", "orange", "yellow", "green"], 9),
+  it("빨주노초 균등 투자: 돌진 전체에 빨→주→노→초 순서로 고르게 나온다", () => {
+    expect(dashGhostTrail({ red: 1, orange: 1, yellow: 1, green: 1 }, 9)).toEqual([
+      "red", "red", "red", "orange", "orange", "yellow", "yellow", "green", "green",
+    ]);
+    // 노랑·초록이 "적을 만나야만" 나오는 게 아니라 어떤 길이의 돌진에서든 항상 나온다
+    expect(dashGhostTrail({ red: 1, orange: 1, yellow: 1, green: 1 }, 4)).toEqual(
+      ["red", "orange", "yellow", "green"],
     );
   });
 

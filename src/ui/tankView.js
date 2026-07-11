@@ -253,16 +253,16 @@ export function renderChars(state, nowMs, ui) {
       ui.panelCharId === c.id && ui.selectedCharId !== c.id);
     entry.el.classList.toggle("selected", ui.selectedCharId === c.id);
     entry.hpFill.style.width = `${Math.max(0, Math.min(100, (c.hp / c.maxHp) * 100))}%`;
-    // 돌진 잔상: 45ms 간격으로 고스트를 남긴다. 색은 이번 돌진의 사이클(빨빨빨주…)을
-    // 스폰 순서대로 따라간다 — 경로 곡률/돌진 길이와 무관하게 항상 순서대로 나온다.
+    // 돌진 잔상: 45ms 간격으로 고스트를 남긴다. 색은 이번 돌진의 진행률(경과/예상 비행시간)로
+    // 사이클(빨빨빨주…노)을 돌진 전체에 한 번 펼쳐 칠한다 — 짧은 돌진이든 긴 돌진이든
+    // 투자한 모든 색이 항상 빨→…→하 순서로 나온다. (예전엔 스폰 순번 × 45ms라
+    // 가까운 적 돌진은 사이클 뒷색(노랑 등)에 도달하기 전에 끝나 색이 잘렸다)
     const dashing = c.state === "DASH";
-    if (dashing && !entry.wasDashing) entry.ghostIdx = 0; // 새 돌진 시작 → 사이클 처음부터
-    entry.wasDashing = dashing;
     if (dashing && nowMs - (entry.lastGhostAt ?? 0) > 45) {
       entry.lastGhostAt = nowMs;
       const cyc = c._dashCycle?.length ? c._dashCycle : ["red"];
-      const colorKey = cyc[(entry.ghostIdx ?? 0) % cyc.length];
-      entry.ghostIdx = (entry.ghostIdx ?? 0) + 1;
+      const prog = c._dashDurS > 0 ? Math.min(1, (c._dashElapsedS ?? 0) / c._dashDurS) : 0;
+      const colorKey = cyc[Math.min(cyc.length - 1, Math.floor(prog * cyc.length))];
       spawnDashGhost(c, entry, DASH_COLOR_HEX[colorKey] ?? DASH_COLOR_HEX.red);
     }
   }
