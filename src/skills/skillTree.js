@@ -9,33 +9,35 @@ const ROW_Y = [10, 21.43, 32.86, 44.29, 55.71, 67.14, 78.57, 90];
 const NUM_COLS = COLUMN_X.length;
 const NUM_ROWS = ROW_Y.length;
 
+const TREE_ICON_DIR = "assets/skills/tree";
+
 /** 왼쪽 열(col0)에 위→아래로 채울 Dash 스킬 정의. kind: color=잔상 색, passive=쿨타임/마나 숙련 */
 export const DASH_SKILL_DEFS = Object.freeze([
-  { key: "red", kind: "color", nameKey: "skills.redName", effectKey: "skills.redEffect" },
-  { key: "orange", kind: "color", nameKey: "skills.orangeName", effectKey: "skills.orangeEffect" },
-  { key: "yellow", kind: "color", nameKey: "skills.yellowName", effectKey: "skills.yellowEffect" },
-  { key: "green", kind: "color", nameKey: "skills.greenName", effectKey: "skills.greenEffect" },
-  { key: "blue", kind: "color", nameKey: "skills.blueName", effectKey: "skills.blueEffect" },
-  { key: "purple", kind: "color", nameKey: "skills.purpleName", effectKey: "skills.purpleEffect" },
-  { key: "white", kind: "color", nameKey: "skills.whiteName", effectKey: "skills.whiteEffect" },
-  { key: "cdmana", kind: "passive", nameKey: "skills.cdmanaName", effectKey: "skills.cdmanaEffect" },
+  { key: "red", kind: "color", nameKey: "skills.redName", effectKey: "skills.redEffect", icon: `${TREE_ICON_DIR}/dash_red.png` },
+  { key: "orange", kind: "color", nameKey: "skills.orangeName", effectKey: "skills.orangeEffect", icon: `${TREE_ICON_DIR}/dash_orange.png` },
+  { key: "yellow", kind: "color", nameKey: "skills.yellowName", effectKey: "skills.yellowEffect", icon: `${TREE_ICON_DIR}/dash_yellow.png` },
+  { key: "green", kind: "color", nameKey: "skills.greenName", effectKey: "skills.greenEffect", icon: `${TREE_ICON_DIR}/dash_green.png` },
+  { key: "blue", kind: "color", nameKey: "skills.blueName", effectKey: "skills.blueEffect", icon: `${TREE_ICON_DIR}/dash_blue.png` },
+  { key: "purple", kind: "color", nameKey: "skills.purpleName", effectKey: "skills.purpleEffect", icon: `${TREE_ICON_DIR}/dash_purple.png` },
+  { key: "white", kind: "color", nameKey: "skills.whiteName", effectKey: "skills.whiteEffect", icon: `${TREE_ICON_DIR}/dash_white.png` },
+  { key: "cdmana", kind: "passive", nameKey: "skills.cdmanaName", effectKey: "skills.cdmanaEffect", icon: `${TREE_ICON_DIR}/cdmana.png` },
 ]);
 
 /** 우상단에 별도 배치하는 인식범위 패시브 */
 export const DETECT_SKILL_DEF = Object.freeze({
-  key: "detect", kind: "detect", nameKey: "skills.detectName", effectKey: "skills.detectEffect",
+  key: "detect", kind: "detect", nameKey: "skills.detectName", effectKey: "skills.detectEffect", icon: `${TREE_ICON_DIR}/detect.png`,
 });
 
 /** 두 번째 열(col1)에 위→아래로 채울 Jombie Shrimp 스킬 정의. */
 export const ZOMBIE_SKILL_DEFS = Object.freeze([
-  { key: "zombie-hp", nameKey: "skills.zombieHpName", effectKey: "skills.zombieHpEffect" },
-  { key: "zombie-yellow-revive", nameKey: "skills.zombieReviveName", effectKey: "skills.zombieReviveEffect", trait: true, cost: 5, implemented: true },
-  { key: "zombie-red-poison", nameKey: "skills.zombiePoisonName", effectKey: "skills.zombiePoisonEffect", trait: true, cost: 5, implemented: true },
-  { key: "zombie-black", nameKey: "skills.zombieBlackName", effectKey: "skills.zombieBlackEffect", trait: true, cost: 5, implemented: false },
-  { key: "zombie-move", nameKey: "skills.zombieMoveName", effectKey: "skills.zombieMoveEffect" },
-  { key: "zombie-swarm", nameKey: "skills.zombieSwarmName", effectKey: "skills.zombieSwarmEffect" },
-  { key: "zombie-infect", nameKey: "skills.zombieInfectName", effectKey: "skills.zombieInfectEffect" },
-  { key: "zombie-mastery", nameKey: "skills.zombieMasteryName", effectKey: "skills.zombieMasteryEffect" },
+  { key: "zombie-hp", nameKey: "skills.zombieHpName", effectKey: "skills.zombieHpEffect", icon: `${TREE_ICON_DIR}/zombie_hp.png` },
+  { key: "zombie-yellow-revive", nameKey: "skills.zombieReviveName", effectKey: "skills.zombieReviveEffect", trait: true, cost: 5, implemented: true, icon: `${TREE_ICON_DIR}/zombie_yellow_revive.png` },
+  { key: "zombie-red-poison", nameKey: "skills.zombiePoisonName", effectKey: "skills.zombiePoisonEffect", trait: true, cost: 5, implemented: true, icon: `${TREE_ICON_DIR}/zombie_red_poison.png` },
+  { key: "zombie-black", nameKey: "skills.zombieBlackName", effectKey: "skills.zombieBlackEffect", trait: true, cost: 5, implemented: false, icon: `${TREE_ICON_DIR}/zombie_black.png` },
+  { key: "zombie-move", nameKey: "skills.zombieMoveName", effectKey: "skills.zombieMoveEffect", icon: `${TREE_ICON_DIR}/zombie_move.png` },
+  { key: "zombie-swarm", nameKey: "skills.zombieSwarmName", effectKey: "skills.zombieSwarmEffect", icon: `${TREE_ICON_DIR}/zombie_swarm.png` },
+  { key: "zombie-infect", nameKey: "skills.zombieInfectName", effectKey: "skills.zombieInfectEffect", icon: `${TREE_ICON_DIR}/zombie_infect.png` },
+  { key: "zombie-mastery", nameKey: "skills.zombieMasteryName", effectKey: "skills.zombieMasteryEffect", icon: `${TREE_ICON_DIR}/zombie_mastery.png` },
 ]);
 
 const dashByIndex = new Map();

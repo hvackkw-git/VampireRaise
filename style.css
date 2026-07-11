@@ -900,13 +900,23 @@ button { font-family: inherit; color: inherit; }
 .skill-tree-node.empty-node { opacity: 0.3; cursor: default; }
 .skill-tree-node.empty-node::before { border-style: dotted; }
 .skill-tree-node.dash-node::before { display: none; }
+.skill-node-icon {
+  width: 26px;
+  height: 26px;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
 .skill-node-count {
-  position: relative;
-  z-index: 1;
-  font-size: 13px;
+  position: absolute;
+  right: 1px;
+  bottom: -1px;
+  z-index: 2;
+  font-size: 10px;
+  line-height: 1;
   font-weight: 700;
   color: #fff;
   text-shadow: 0 0 2px #000, 0 0 2px #000, 0 1px 1px #000;
+  pointer-events: none;
 }
 .skill-tree-node.dash-node-color {
   border-color: var(--dash-color);
