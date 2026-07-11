@@ -1,65 +1,46 @@
 import { describe, it, expect } from "vitest";
-import { createInitialState, loadState, saveState } from "../state/gameState.js";
 import { grantExp } from "../game/combat.js";
 import { expToNext } from "../constants.js";
-import { SKILL_TREE, learnSkill, skillStatus } from "../skills/skillTree.js";
-
-function memoryStorage() {
-  const values = new Map();
-  return {
-    getItem: (key) => values.get(key) ?? null,
-    setItem: (key, value) => values.set(key, value),
-    removeItem: (key) => values.delete(key),
-  };
-}
+import { createInitialState } from "../state/gameState.js";
+import { SKILL_TREE, DASH_SKILL_DEFS, normalizeSkillProgress } from "../skills/skillTree.js";
 
 describe("스킬트리 데이터", () => {
-  it("세로 화면용 6행 30개 슬롯과 독립 가지를 가진다", () => {
+  it("세로 화면용 6행 30개 슬롯, 레벨 제한·선행 없음", () => {
     expect(SKILL_TREE).toHaveLength(30);
     expect(new Set(SKILL_TREE.map((s) => s.y))).toHaveLength(6);
-    expect(SKILL_TREE.filter((s) => s.parents.length === 0).length).toBeGreaterThan(5);
-  });
-});
-
-describe("스킬 습득", () => {
-  it("레벨, 선행 스킬, 포인트를 모두 검사한다", () => {
-    const char = createInitialState().chars.items[0];
-    expect(skillStatus(char, "skill-01").state).toBe("level");
-    char.level = 4;
-    char.skillPoints = 2;
-    expect(skillStatus(char, "skill-06").state).toBe("prerequisite");
-    expect(learnSkill(char, "skill-01").state).toBe("learned");
-    expect(skillStatus(char, "skill-06").state).toBe("available");
+    expect(SKILL_TREE.every((s) => s.requiredLevel === 1)).toBe(true); // 레벨 제한 없음
+    expect(SKILL_TREE.every((s) => s.parents.length === 0)).toBe(true); // 선행 없음
   });
 
-  it("습득 시 1포인트를 쓰고 중복 습득하지 않는다", () => {
-    const char = createInitialState().chars.items[0];
-    char.level = 2;
-    char.skillPoints = 1;
-    expect(learnSkill(char, "skill-01").learnedNow).toBe(true);
-    expect(char.skillPoints).toBe(0);
-    expect(char.learnedSkills).toEqual(["skill-01"]);
-    expect(learnSkill(char, "skill-01").learnedNow).toBeUndefined();
-    expect(char.learnedSkills).toEqual(["skill-01"]);
+  it("Dash 스킬 8개(7색+인식범위)를 왼쪽 열부터 차례대로 배치한다", () => {
+    const dashNodes = SKILL_TREE.filter((s) => s.dash);
+    expect(dashNodes).toHaveLength(DASH_SKILL_DEFS.length);
+    expect(DASH_SKILL_DEFS).toHaveLength(8);
+
+    const leftX = Math.min(...SKILL_TREE.map((s) => s.x));
+    // 왼쪽 열 6칸(빨·주·노·초·파·보)이 위→아래 순서
+    const leftCol = SKILL_TREE.filter((s) => s.x === leftX).sort((a, b) => a.y - b.y);
+    expect(leftCol.map((s) => s.dash?.key)).toEqual(["red", "orange", "yellow", "green", "blue", "purple"]);
+
+    // 넘친 2개(하양·인식범위)는 다음 열 위쪽에 배치
+    const overflow = dashNodes.filter((s) => s.x !== leftX).sort((a, b) => a.y - b.y);
+    expect(overflow.map((s) => s.dash?.key)).toEqual(["white", "detect"]);
+
+    // 인식범위 포함
+    expect(dashNodes.some((s) => s.dash.kind === "detect")).toBe(true);
   });
 
-  it("뱀파이어가 레벨업할 때마다 1포인트를 얻는다", () => {
+  it("레벨업 시 스킬포인트(별개 트랙)는 그대로 1씩 증가한다", () => {
     const char = createInitialState().chars.items[0];
     grantExp(char, expToNext(char.level), []);
     expect(char.level).toBe(2);
     expect(char.skillPoints).toBe(1);
   });
 
-  it("스킬 진행 상태를 저장하고 복원한다", () => {
-    const storage = memoryStorage();
-    const state = createInitialState();
-    const char = state.chars.items[0];
-    char.level = 2;
-    char.skillPoints = 1;
-    learnSkill(char, "skill-01");
-    saveState(state, storage);
-    const restored = loadState(storage);
-    expect(restored.chars.items[0].skillPoints).toBe(0);
-    expect(restored.chars.items[0].learnedSkills).toEqual(["skill-01"]);
+  it("normalizeSkillProgress: 잘못된 learnedSkills 정리", () => {
+    const char = { level: 3, skillPoints: -2, learnedSkills: ["skill-01", "nope", "skill-01"] };
+    normalizeSkillProgress(char);
+    expect(char.skillPoints).toBe(0);
+    expect(char.learnedSkills).toEqual(["skill-01"]);
   });
 });

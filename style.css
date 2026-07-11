@@ -689,6 +689,36 @@ button { font-family: inherit; color: inherit; }
 .skill-tree-node.learned::before { border-style: solid; border-color: #397d6d; }
 .skill-tree-node.learned .skill-node-check { display: block; }
 .skill-tree-node.selected { outline: 1px solid #f1e9d2; outline-offset: 2px; }
+
+/* ── Dash 스킬 노드(MVP: 색/개수만) ── */
+.skill-tree-node.empty-node { opacity: 0.3; cursor: default; }
+.skill-tree-node.empty-node::before { border-style: dotted; }
+.skill-tree-node.dash-node::before { display: none; }
+.skill-node-count {
+  position: relative;
+  z-index: 1;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 0 2px #000, 0 0 2px #000, 0 1px 1px #000;
+}
+.skill-tree-node.dash-node-color {
+  border-color: var(--dash-color);
+  background: color-mix(in srgb, var(--dash-color) 26%, #10161a);
+}
+.skill-tree-node.dash-node-color.invested {
+  background: color-mix(in srgb, var(--dash-color) 62%, #10161a);
+  box-shadow: 0 0 7px color-mix(in srgb, var(--dash-color) 55%, transparent);
+}
+.skill-tree-node.dash-node-detect {
+  border-color: #6fb7cc;
+  background: #1a2c33;
+}
+.skill-tree-node.dash-node-detect.invested {
+  background: #244653;
+  box-shadow: 0 0 7px rgba(111, 183, 204, 0.5);
+}
+.skill-tree-node.dash-node:disabled { cursor: default; opacity: 0.6; }
 .skill-tree-detail {
   flex: 0 0 32px;
   display: flex;
