@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-  <title>뱀파이어 키우기 — VampireRaise</title>
-  <meta name="description" content="플랫폼 위 뱀파이어를 키우고, 몰려오는 인간 웨이브를 막고, 물어서 노예로 만드는 방치형 게임" />
+  <title>Vampire Shrimp Frenzy</title>
+  <meta name="description" content="Vamp Shrimp를 키우고, 몰려오는 Holy Shrimp를 막아 Jombie Shrimp로 만드는 방치형 게임" />
   <meta name="theme-color" content="#0b0710" />
   <meta name="color-scheme" content="dark" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧛</text></svg>" />
@@ -41,6 +41,10 @@
             <span id="hudHumans" class="hud-chip"></span>
             <span id="hudBlood" class="hud-chip">🩸 0</span>
           </header>
+          <div id="testControls" class="test-controls ui-overlay" aria-label="테스트 도구">
+            <button id="btnDetectRanges" class="test-control on" type="button" aria-pressed="true" aria-label="인지범위 숨기기" title="인지범위 숨기기">◎</button>
+            <button id="btnAllVampireLevelUp" class="test-control test-level-up" type="button" aria-label="빨간 새우 전체 레벨 1 증가" title="빨간 새우 전체 LV +1">LV+</button>
+          </div>
           <div id="versionBadge" class="ui-overlay">v0002</div>
 
         </div>
@@ -64,7 +68,7 @@
           </div>
           <section id="info-panel">
             <!-- 캐릭터 선택 시: [스탯 바] [데미지] [장착 스킬] [핫키].
-                 미선택 시: 스탯/데미지/장착 스킬 자리에 뱀파이어 얼굴 2행6열([cardFaces])이 대신 나오고 핫키는 그대로. -->
+                 미선택 시: 스탯/데미지/장착 스킬 자리에 Vamp Shrimp 얼굴 2행6열([cardFaces])이 대신 나오고 핫키는 그대로. -->
             <div class="panel-grid">
               <div class="panel-card" id="cardStat">
                 <div class="card-title card-title-name" id="statName">—</div>
@@ -89,7 +93,7 @@
                   <button id="btnSkillTree" class="hotkey-slot assigned" title="스킬 트리" aria-label="스킬 트리"><span class="hotkey-glyph">✦</span></button>
                   <button id="btnWave" class="hotkey-slot assigned" title="웨이브 시작">▶</button>
                   <button id="btnAuto" class="hotkey-slot assigned" title="자동 웨이브">♻</button>
-                  <button id="btnSummon" class="hotkey-slot assigned" title="뱀파이어 소환">🧛<i id="summonCost"></i></button>
+                  <button id="btnSummon" class="hotkey-slot assigned" title="Vamp Shrimp 소환">🦐<i id="summonCost"></i></button>
                   <button id="btnDecorate" class="hotkey-slot assigned" title="꾸미기">🛠</button>
                   <button id="btnReset" class="hotkey-slot assigned hotkey-danger" title="처음부터 재시작">🔄</button>
                 </div>
@@ -121,7 +125,10 @@
               <button id="btnDashReset" class="dash-alloc-reset" type="button">초기화</button>
             </header>
           </section>
-          <footer id="skillTreeDetail" class="skill-tree-detail">슬롯을 눌러 투자</footer>
+          <footer class="skill-tree-footer">
+            <span id="skillTreeDetail" class="skill-tree-detail">슬롯을 눌러 투자</span>
+            <button id="btnSkillTreeLevelUp" class="skill-tree-level-up" type="button" title="테스트 레벨 +1">LV +1</button>
+          </footer>
         </section>
         </div>
       </div>

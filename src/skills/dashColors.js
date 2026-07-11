@@ -5,7 +5,7 @@
 
 import { DETECT_RANGE, DASH_ROUTE_MULT } from "../constants.js";
 
-/** 잔상 개수 스케일 기준이 되는 뱀파이어 기본 인식 범위 */
+/** 잔상 개수 스케일 기준이 되는 Vamp Shrimp 기본 인식 범위 */
 export const BASE_DETECT_RANGE = DETECT_RANGE.vampire;
 
 /**
@@ -17,7 +17,7 @@ export function detectRangeMult(detectPoints = 0) {
 }
 
 /**
- * 캐릭터의 실효 인식 범위(px). 뱀파이어는 인식범위 스킬(detectPoints)로 실제로 커진다.
+ * 캐릭터의 실효 인식 범위(px). Vamp Shrimp는 인식범위 스킬(detectPoints)로 실제로 커진다.
  * c.detectRange를 직접 지정하면 그 값을 우선한다(테스트·특수 케이스용).
  */
 export function effectiveDetectRange(char) {
@@ -38,7 +38,7 @@ export function effectiveDetectRange(char) {
 //   │ O │ 초록 │ 연타 확률           │ 0% → 10% → 20%       │ combat 공격 롤 │
 //   │ O │ 파랑 │ 도착 후 폭발        │ dmg×0.1 → 0.2        │ dashEffects/도착│
 //   │ O │ 보라 │ 도착 후 실드(5초)   │ Hp×0.1 → 0.2         │ dashEffects/도착│
-//   │ O │ 하양 │ 도착 후 스턴(인간)  │ 1초 → 2초            │ dashEffects/도착│
+//   │ O │ 하양 │ 도착 후 스턴(Holy Shrimp) │ 1초 → 2초       │ dashEffects/도착│
 //   └───┴──────┴─────────────────────┴──────────────────────┴───────────────┘
 //   헬퍼: revenge/dashDistance/pathDamage/multiHit/explosionDamage/shieldHp/stunSeconds Mult.
 //   포인트 출처: 현재는 char.dashColors 맵(독립). 향후 스킬트리 노드 습득 → dashColors 반영 배선 필요.
@@ -62,7 +62,7 @@ export const DASH_COLOR_HEX = Object.freeze({
   white: "#f2f2f2",
 });
 
-/** 뱀파이어 기본 색상 포인트 — 복수(빨강) 1포인트가 기본 적용 → 처음엔 전부 빨강 */
+/** Vamp Shrimp 기본 색상 포인트 — 복수(빨강) 1포인트가 기본 적용 → 처음엔 전부 빨강 */
 export function defaultDashColors() {
   return { red: 1 };
 }
@@ -75,7 +75,7 @@ export function isDashColor(color) {
   return DASH_COLORS.includes(color);
 }
 
-/** 뱀파이어의 색상 포인트 상태를 안전한 값으로 정규화 */
+/** Vamp Shrimp의 색상 포인트 상태를 안전한 값으로 정규화 */
 export function normalizeDashPoints(char) {
   if (!char) return char;
   if (!char.dashColors || typeof char.dashColors !== "object") char.dashColors = defaultDashColors();
@@ -167,7 +167,7 @@ const GHOST_MAX = 18;
  * 잔상 개수 = (빨강+주황 포인트 하드코딩) × (인식 범위 비율).
  * 인식 범위가 커질수록(향후 성장) 돌진 사거리가 늘어 잔상도 더 길게 남는다.
  * @param {{[color:string]: number}} points 색상별 투자 포인트
- * @param {number} [detectRange] 실효 인식 범위(기본 = 뱀파이어 기본값)
+ * @param {number} [detectRange] 실효 인식 범위(기본 = Vamp Shrimp 기본값)
  * @returns {number}
  */
 export function dashGhostCount(points = {}, detectRange = BASE_DETECT_RANGE) {
@@ -209,7 +209,7 @@ export function explosionDamageMult(points = {}) {
 export function shieldHpMult(points = {}) {
   return 0.1 * Math.max(0, Number(points.purple) || 0);
 }
-/** 하양 · 스턴: 도착 시 대상(인간) 스턴 지속(초) — 포인트당 1초 */
+/** 하양 · 스턴: 도착 시 대상(Holy Shrimp) 스턴 지속(초) — 포인트당 1초 */
 export function stunSeconds(points = {}) {
   return 1.0 * Math.max(0, Number(points.white) || 0);
 }

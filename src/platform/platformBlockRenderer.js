@@ -407,7 +407,7 @@ export function computeCharsOnPlatformIds(platforms, chars) {
 /**
  * 플랫폼 블록이 현재 배치 가능한 Y 범위를 반환합니다.
  * 위 3칸, 아래 3칸은 배치 불가 영역입니다 (20px 그리드 기준).
- * (Shrimprium 원본은 위/아래 7칸 — VampireRaise에서 위아래로 한 줄씩 넓혀 각 3칸)
+ * (Shrimprium 원본은 위/아래 7칸 — Vampire Shrimp Frenzy에서 위아래로 한 줄씩 넓혀 각 3칸)
  * @param {number} tankH - 수조 높이 (기본 640)
  * @returns {{ minY: number, maxY: number }}
  */

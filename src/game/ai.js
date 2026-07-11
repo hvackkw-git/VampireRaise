@@ -4,7 +4,7 @@
 // 적에게 핑을 찍고, 다음 갱신까지 그 대상을 향해 걷는다. 갱신 시점에 감지 원 안에
 // 적이 없으면 핑을 지우고 랜덤 배회로 돌아간다 (감지 범위는 향후 성장 요소).
 //
-// 기본 핑 추적은 경로 탐색 없이 수평으로 걷는다. 단, 뱀파이어 돌진은 중력을
+// 기본 핑 추적은 경로 탐색 없이 수평으로 걷는다. 단, Vamp Shrimp 돌진은 중력을
 // 무시하며, 플랫폼 블록을 장애물로 둔 20px 그리드 BFS 최단 경로가 감지범위×2
 // 예산 이내인 적에게 그 최단 경로의 웨이포인트를 따라 날아간다.
 // 지형 기준은 물리와 동일: 전원 ON(투명) 게이트는 벽이 아니고, up-가시·스프링·
@@ -24,7 +24,7 @@ import {
 } from "../constants.js";
 import { dashCdManaMult } from "../skills/dashColors.js";
 
-/** 인간이 행군하는 베이스(뱀파이어 스폰 존) 중심 x */
+/** Holy Shrimp가 행군하는 베이스(Vamp Shrimp 스폰 존) 중심 x */
 const BASE_GOAL_X = VAMPIRE_SPAWN_ZONE.x + VAMPIRE_SPAWN_ZONE.w / 2;
 import { startJump, NON_PLATFORM_BLOCK_TYPES } from "../engine/physics.js";
 import { isLogicLayerBlock, getSpikeDir, PLATFORM_W, PLATFORM_H } from "../platform/platformBlockRenderer.js";
@@ -54,7 +54,7 @@ function endDash(c, platforms = [], { arrived = false, blockPowered = null, fx =
     ? platforms.find((p) => p.id === goal.platformId && isSolidForRoute(p, blockPowered))
     : null;
   // TODO(dash색상 효과·미구현): arrived 시 도착 지점 효과 발동 훅.
-  //   파랑=폭발(주변 적 dmg×0.1~0.2) / 보라=실드(Hp×0.1~0.2, 5초) / 하양=스턴(대상 인간 1~2초).
+  //   파랑=폭발(주변 적 dmg×0.1~0.2) / 보라=실드(Hp×0.1~0.2, 5초) / 하양=스턴(대상 Holy Shrimp 1~2초).
   //   각 색 투자 포인트(c.dashColors)에 비례. dashColorEffect(color, points) 헬퍼 추가 예정.
   if (goalPlatform) {
     c.x = goal.x - c.w / 2;
@@ -363,7 +363,7 @@ export function requestRangedDash(vampire, attackerId) {
 }
 
 /**
- * 인간 원거리 자세 잡기 갱신.
+ * Holy Shrimp 원거리 자세 잡기 갱신.
  * 원거리 사거리(인식 범위) 안에 적이 들어오면 _rangedBraced를 세워 물리에서 이속을 1/4로 줄인다.
  */
 function updateRangedBrace(c, chars) {
@@ -485,7 +485,7 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null, 
   let descentNavigator = null;
   for (const c of chars) {
     if (c._dashCd > 0) c._dashCd -= simDt;
-    updateRangedBrace(c, chars); // 인간: 원거리 사거리 안 적 감지 → 이속 감속 플래그
+    updateRangedBrace(c, chars); // Holy Shrimp: 원거리 사거리 안 적 감지 → 이속 감속 플래그
 
     // ── 돌진 조향: BFS 경로 웨이포인트를 따라 비행 ──
     if (c.state === "DASH") {
@@ -551,9 +551,9 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null, 
       continue;
     }
 
-    // 인간은 적을 쫓지 않고 뱀파이어 스폰 존(베이스)까지 최소 경로로 행군한다.
+    // Holy Shrimp는 적을 쫓지 않고 Vamp Shrimp 스폰 존(베이스)까지 최소 경로로 행군한다.
     // 플랫폼 위에선 베이스에 가까운 쪽으로 내려가는 최단 하강 가장자리를 따라가고,
-    // 바닥에선 베이스 x를 향해 곧장 걷는다. (앞을 막는 뱀파이어와는 combat 틱이 교전 처리)
+    // 바닥에선 베이스 x를 향해 곧장 걷는다. (앞을 막는 Vamp Shrimp와는 combat 틱이 교전 처리)
     if (c.side === "human") {
       c._ping = null;
       if (c._platformId != null) {
@@ -592,7 +592,7 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null, 
       c._rangedRetaliation = null;
     }
 
-    // ── 뱀파이어 패시브(혈귀 돌진) ──
+    // ── Vamp Shrimp 패시브(혈귀 돌진) ──
     // 중력을 무시한다. 감지 원 안의 적 중 플랫폼을 피해 돌아가는 BFS 최단 경로가
     // 감지범위×배율 이내인 가장 짧은 대상에게 그 최단 경로로 날아간다.
     if (c.side === "vampire" && !(c._dashCd > 0)) {

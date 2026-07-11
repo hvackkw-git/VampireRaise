@@ -6,6 +6,9 @@ import {
   normalizeDashPoints, resetDashColors, effectiveDetectRange,
   revengeAttackMult, dashDistanceMult, detectRangeMult, dashCdManaMult,
 } from "../skills/dashColors.js";
+import {
+  investZombieHp, investZombieTrait, zombieHpPoints, ZOMBIE_TRAIT_COST,
+} from "../skills/zombieSkills.js";
 
 /** dash 스킬의 현재 투자 포인트 */
 function dashInvested(char, dash) {
@@ -29,7 +32,7 @@ function dashEffectValue(char, dash) {
   return "";
 }
 
-export function initSkillTreePanel({ getCharacter, onChange, onOpenChange } = {}) {
+export function initSkillTreePanel({ getCharacter, getCharacters, onChange, onOpenChange } = {}) {
   const panel = document.getElementById("skillTreePanel");
   const owner = document.getElementById("skillTreeOwner");
   const level = document.getElementById("skillTreeLevel");
@@ -37,6 +40,7 @@ export function initSkillTreePanel({ getCharacter, onChange, onOpenChange } = {}
   const nodes = document.getElementById("skillTreeNodes");
   const detail = document.getElementById("skillTreeDetail");
   const closeButton = document.getElementById("btnSkillTreeClose");
+  const levelUpButton = document.getElementById("btnSkillTreeLevelUp");
   const dashGhostN = document.getElementById("dashGhostN");
   const dashPointsLeft = document.getElementById("dashPointsLeft");
   const dashResetBtn = document.getElementById("btnDashReset");
@@ -48,7 +52,15 @@ export function initSkillTreePanel({ getCharacter, onChange, onOpenChange } = {}
     if (char) { resetDashColors(char); onChange?.(char); render(); }
   });
 
-  // 노드 생성: dash 슬롯은 색/개수 표시 + 클릭 투자, 빈 슬롯은 비활성.
+  levelUpButton?.addEventListener("click", () => {
+    const char = getCharacter?.();
+    if (!char || char.level >= 50) return;
+    char.level = Math.min(50, Math.max(1, Number(char.level) || 1) + 1);
+    onChange?.(char);
+    render();
+  });
+
+  // 노드 생성: dash 슬롯은 색/개수 표시 + 클릭 투자, Jombie Shrimp 슬롯은 표시용, 빈 슬롯은 비활성.
   for (const skill of SKILL_TREE) {
     const button = document.createElement("button");
     button.type = "button";
@@ -62,6 +74,9 @@ export function initSkillTreePanel({ getCharacter, onChange, onOpenChange } = {}
         button.style.setProperty("--dash-color", DASH_COLOR_HEX[skill.dash.key]);
       }
       button.innerHTML = '<span class="skill-node-count">0</span>';
+    } else if (skill.zombie) {
+      button.classList.add("zombie-node");
+      button.innerHTML = '<span class="skill-node-count">Z</span>';
     } else {
       button.classList.add("empty-node");
     }
@@ -72,6 +87,12 @@ export function initSkillTreePanel({ getCharacter, onChange, onOpenChange } = {}
         const ok = skill.dash.kind === "detect" ? investDetect(char)
           : skill.dash.kind === "passive" ? investDashCdMana(char)
           : investDashColor(char, skill.dash.key);
+        if (ok) onChange?.(char);
+      } else if (char && skill.zombie?.key === "zombie-hp") {
+        const ok = investZombieHp(char, getCharacters?.() ?? []);
+        if (ok) onChange?.(char);
+      } else if (char && skill.zombie?.trait && skill.zombie.implemented) {
+        const ok = investZombieTrait(char, skill.zombie.key);
         if (ok) onChange?.(char);
       }
       render();
@@ -91,6 +112,7 @@ export function initSkillTreePanel({ getCharacter, onChange, onOpenChange } = {}
       if (dashGhostN) dashGhostN.textContent = "0";
       if (dashPointsLeft) dashPointsLeft.textContent = "0";
       if (dashResetBtn) dashResetBtn.disabled = true;
+      if (levelUpButton) levelUpButton.disabled = true;
       for (const button of nodeEls.values()) button.disabled = true;
       return;
     }
@@ -105,6 +127,7 @@ export function initSkillTreePanel({ getCharacter, onChange, onOpenChange } = {}
     if (dashGhostN) dashGhostN.textContent = String(dashGhostCount(char.dashColors, effectiveDetectRange(char)));
     if (dashPointsLeft) dashPointsLeft.textContent = String(char.dashPoints);
     if (dashResetBtn) dashResetBtn.disabled = false;
+    if (levelUpButton) levelUpButton.disabled = char.level >= 50;
 
     for (const skill of SKILL_TREE) {
       const button = nodeEls.get(skill.id);
@@ -117,6 +140,23 @@ export function initSkillTreePanel({ getCharacter, onChange, onOpenChange } = {}
         button.disabled = noPoints; // 레벨 제한 없음 — 남은 포인트가 없을 때만 비활성
         button.title = `${skill.name} · ${cur}p · ${skill.dash.effect}`;
         button.setAttribute("aria-label", button.title);
+      } else if (skill.zombie) {
+        const hpSkill = skill.zombie.key === "zombie-hp";
+        const trait = !!skill.zombie.trait;
+        const learnedTrait = trait && char.zombieTrait === skill.zombie.key;
+        const cur = hpSkill ? zombieHpPoints(char) : learnedTrait ? 1 : 0;
+        const countEl = button.querySelector(".skill-node-count");
+        if (countEl) countEl.textContent = hpSkill ? String(cur) : trait ? (learnedTrait ? "✓" : "5") : "Z";
+        if (hpSkill) button.disabled = char.skillPoints <= 0;
+        else if (trait) {
+          button.disabled = !skill.zombie.implemented || !!char.zombieTrait
+            || char.skillPoints < ZOMBIE_TRAIT_COST;
+        } else button.disabled = false;
+        button.classList.toggle("invested", cur > 0);
+        button.classList.toggle("locked", trait && !!char.zombieTrait && !learnedTrait);
+        const cost = trait ? ` · 비용 ${ZOMBIE_TRAIT_COST}SP · 2~4 중 택1` : "";
+        button.title = `${skill.name} · ${cur}p${cost} · ${skill.zombie.effect}`;
+        button.setAttribute("aria-label", button.title);
       } else {
         button.disabled = true;
         button.title = "빈 슬롯";
@@ -127,6 +167,12 @@ export function initSkillTreePanel({ getCharacter, onChange, onOpenChange } = {}
     if (selected.dash) {
       const cur = dashInvested(char, selected.dash);
       detail.textContent = `${selected.name} · ${cur}p${dashEffectValue(char, selected.dash)} — ${selected.dash.effect}`;
+    } else if (selected.zombie) {
+      const hpSkill = selected.zombie.key === "zombie-hp";
+      const learned = selected.zombie.trait && char.zombieTrait === selected.zombie.key;
+      const cur = hpSkill ? zombieHpPoints(char) : learned ? 1 : 0;
+      const cost = selected.zombie.trait ? ` · ${ZOMBIE_TRAIT_COST}SP · 택1` : "";
+      detail.textContent = `${selected.name} · ${cur}p${cost} — ${selected.zombie.effect}`;
     } else {
       detail.textContent = "빈 슬롯";
     }

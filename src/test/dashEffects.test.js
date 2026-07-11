@@ -78,12 +78,31 @@ describe("도착 효과(폭발/실드/스턴)", () => {
 
   it("하양 스턴: 대상 인간을 스턴 상태로", () => {
     const c = vamp(100, 100, { dashColors: { white: 2 } });
-    const t = human(2, 120, 100);
+    const t = human(2, 120, 100, { _platformId: 17, vy: -50 });
     const evs = [];
     applyDashArrivalEffects(c, [c, t], t, {}, 1000, evs);
     expect(t.state).toBe("STUN");
     expect(t._stunUntil).toBe(1000 + 2000);
+    expect(t._dropThroughId).toBe(17);
+    expect(t._platformId).toBeNull();
+    expect(t.vy).toBe(0);
     expect(evs.some((e) => e.type === "dashStun")).toBe(true);
+  });
+
+  it("스턴 면역 중 연속 도착해도 다시 스턴시키거나 발판에서 떨어뜨리지 않는다", () => {
+    const c = vamp(100, 100, { dashColors: { white: 2 } });
+    const t = human(2, 120, 100, {
+      state: "STUN", _platformId: 23, _dropThroughId: null,
+      _stunUntil: 3000, _stunImmuneUntil: 4000, vy: 0,
+    });
+    const evs = [];
+
+    applyDashArrivalEffects(c, [c, t], t, {}, 2000, evs);
+
+    expect(t._platformId).toBe(23);
+    expect(t._dropThroughId).toBeNull();
+    expect(t._stunUntil).toBe(3000);
+    expect(evs.some((e) => e.type === "dashStun")).toBe(false);
   });
 
   it("스턴은 대상이 인간일 때만", () => {

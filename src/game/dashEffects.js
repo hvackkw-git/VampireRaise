@@ -44,13 +44,13 @@ export function applyDashPathDamage(c, chars, state, dashEvents) {
     c._dashHitIds.add(e.id);
     const dmg = Math.max(1, Math.round(c.atk * mult));
     queueDashHit(state, c, e, dmg);
-    dashEvents.push({ type: "dashZap", x: b.x, y: b.y });
+    dashEvents.push({ type: "dashZap", x: b.x, y: b.y, target: e });
   }
 }
 
 /**
  * 도착 후 효과 — 파랑 폭발 / 보라 실드 / 하양 스턴. (arrived로 endDash될 때 호출)
- * @param {object} c 돌진 뱀파이어
+ * @param {object} c 돌진 Vamp Shrimp
  * @param {object[]} chars 전체 캐릭터
  * @param {object|null} target 돌진 대상(스턴 판정용)
  * @param {object} state
@@ -72,7 +72,10 @@ export function applyDashArrivalEffects(c, chars, target, state, nowMs, dashEven
       queueDashHit(state, c, e, Math.max(1, Math.round(c.atk * exMult)));
       hitCount++;
     }
-    dashEvents.push({ type: "dashExplosion", x: center.x, y: center.y, radius: EXPLOSION_RADIUS, hits: hitCount });
+    dashEvents.push({
+      type: "dashExplosion", x: center.x, y: center.y,
+      radius: EXPLOSION_RADIUS, hits: hitCount, char: c,
+    });
   }
 
   // 보라 · 실드
@@ -85,11 +88,15 @@ export function applyDashArrivalEffects(c, chars, target, state, nowMs, dashEven
     dashEvents.push({ type: "dashShield", char: c, amount });
   }
 
-  // 하양 · 스턴(대상 인간)
+  // 하양 · 스턴(대상 Holy Shrimp)
   const stunS = stunSeconds(points);
-  if (stunS > 0 && target && !target.dead && target.side === "human") {
+  const canStun = target && nowMs >= (Number(target._stunImmuneUntil) || 0)
+    && target.state !== "STUN";
+  if (stunS > 0 && canStun && !target.dead && target.side === "human") {
+    target._dropThroughId = target._platformId;
     target.state = "STUN";
     target.vx = 0;
+    target.vy = Math.max(0, Number(target.vy) || 0);
     target._platformId = null;
     target._stunUntil = nowMs + stunS * 1000;
     target._stunImmuneUntil = nowMs + stunS * 1000 + 1000;

@@ -20,7 +20,7 @@ import { tickWaves } from "./game/waves.js";
 import {
   initTankView, renderBlocks, renderChars, renderPings,
   renderCombatEvents, renderProjectiles, toTankLocal, showToast, spawnFloatText,
-  setCoreCounter,
+  setCoreCounter, setDetectRangesVisible,
 } from "./ui/tankView.js";
 import { createDecorateMode } from "./decorate/decorateMode.js";
 import { initInfoPanel, renderInfoPanel, renderSquadPanel } from "./ui/infoPanel.js";
@@ -28,11 +28,17 @@ import { initSkillTreePanel } from "./ui/skillTreePanel.js";
 import { initHud } from "./ui/hud.js";
 
 const state = loadState() ?? createInitialState();
-const ui = { decorateMode: false, selectedBlockId: null, selectedCharId: null, panelCharId: null };
+const ui = {
+  decorateMode: false,
+  selectedBlockId: null,
+  selectedCharId: null,
+  panelCharId: null,
+  showDetectRanges: true,
+};
 
 /**
  * 패널 2행이 비출 캐릭터.
- * 직접 탭한 캐릭터가 살아있으면 그 캐릭터, 아니면 생존 뱀파이어 중
+ * 직접 탭한 캐릭터가 살아있으면 그 캐릭터, 아니면 생존 Vamp Shrimp 중
  * 순서(vampireOrder)가 가장 빠른 캐릭터 (1번 사망 시 2번, 3번… 자동 전환).
  */
 function panelChar() {
@@ -64,6 +70,35 @@ function updatePanel() {
 initTankView();
 preloadStatefulBlockSprites();
 
+const btnDetectRanges = document.getElementById("btnDetectRanges");
+const btnAllVampireLevelUp = document.getElementById("btnAllVampireLevelUp");
+
+btnDetectRanges.addEventListener("click", () => {
+  ui.showDetectRanges = !ui.showDetectRanges;
+  setDetectRangesVisible(ui.showDetectRanges);
+  btnDetectRanges.classList.toggle("on", ui.showDetectRanges);
+  btnDetectRanges.setAttribute("aria-pressed", String(ui.showDetectRanges));
+  const label = ui.showDetectRanges ? "인지범위 숨기기" : "인지범위 보이기";
+  btnDetectRanges.setAttribute("aria-label", label);
+  btnDetectRanges.title = label;
+});
+
+btnAllVampireLevelUp.addEventListener("click", () => {
+  let changed = 0;
+  for (const char of state.chars.items) {
+    if (char.side !== "vampire" || char.level >= 50) continue;
+    char.level = Math.min(50, Math.max(1, Number(char.level) || 1) + 1);
+    changed++;
+  }
+  if (changed === 0) {
+    showToast("모든 빨간 새우가 최고 레벨입니다");
+    return;
+  }
+  saveState(state);
+  updatePanel();
+  showToast(`빨간 새우 ${changed}마리 LV +1`);
+});
+
 let hud = null;
 const decorate = createDecorateMode(state, ui, { onExit: () => hud?.render() });
 let skillTreePanel = null;
@@ -79,6 +114,7 @@ const infoPanel = initInfoPanel({
 });
 skillTreePanel = initSkillTreePanel({
   getCharacter: panelChar,
+  getCharacters: () => state.chars.items,
   onChange: () => {
     saveState(state);
     updatePanel();
@@ -137,12 +173,12 @@ document.getElementById("tank").addEventListener("pointerdown", (ev) => {
       if (d < hitD) { hit = c; hitD = d; }
     }
   }
-  // 탭한 캐릭터로 패널 전환, 빈 곳 탭이면 기본(1번 뱀파이어)으로 복귀
+  // 탭한 캐릭터로 패널 전환, 빈 곳 탭이면 기본(1번 Vamp Shrimp)으로 복귀
   ui.selectedCharId = hit ? hit.id : null;
   updatePanel();
 });
 
-// ── 리콜 블록: 60초마다 뱀파이어 진영 1명을 블록 위로 소환 ──
+// ── 리콜 블록: 60초마다 Vamp Shrimp 진영 1명을 블록 위로 소환 ──
 let recallNextAt = 60;
 function tickRecall(gameClock, rng = Math.random) {
   if (gameClock < recallNextAt) return;
@@ -207,7 +243,7 @@ function frame(nowMs) {
     else if (ev.type === "defeat") showToast("💀 전멸… 웨이브 1부터 다시 시작합니다");
     else if (ev.type === "autostart") showToast(`🌊 웨이브 ${ev.wave} 시작!`);
     else if (ev.type === "acctlevel") showToast(`🌟 계정 레벨 ${ev.level} 달성!`);
-    else if (ev.type === "routeblocked") showToast("자동 웨이브 중지: 인간 이동 경로가 막혔습니다");
+    else if (ev.type === "routeblocked") showToast("자동 웨이브 중지: Holy Shrimp 이동 경로가 막혔습니다");
     else if (ev.type === "invade") {
       spawnFloatText(VAMPIRE_SPAWN_ZONE.x + VAMPIRE_SPAWN_ZONE.w / 2 - 6,
         VAMPIRE_SPAWN_ZONE.y - 8, `-1`, "fx-infect");

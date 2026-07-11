@@ -1,8 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { grantExp } from "../game/combat.js";
 import { expToNext } from "../constants.js";
-import { createInitialState } from "../state/gameState.js";
-import { SKILL_TREE, DASH_SKILL_DEFS, normalizeSkillProgress } from "../skills/skillTree.js";
+import { createCharacter, createInitialState, serialize } from "../state/gameState.js";
+import { infectToSlave } from "../game/combat.js";
+import {
+  investZombieHp, investZombieTrait, zombieHpBonus, ZOMBIE_TRAIT_COST,
+} from "../skills/zombieSkills.js";
+import {
+  SKILL_TREE, DASH_SKILL_DEFS, ZOMBIE_SKILL_DEFS, normalizeSkillProgress,
+} from "../skills/skillTree.js";
 
 describe("스킬트리 데이터", () => {
   it("세로 화면용 8행 40개 슬롯, 레벨 제한·선행 없음", () => {
@@ -33,6 +39,18 @@ describe("스킬트리 데이터", () => {
     expect(dashNodes.some((s) => s.dash.kind === "detect")).toBe(true);
   });
 
+  it("좀비 스킬 8개를 두 번째 열에 위→아래로 배치한다", () => {
+    const zombieNodes = SKILL_TREE.filter((s) => s.zombie);
+    expect(ZOMBIE_SKILL_DEFS).toHaveLength(8);
+    expect(zombieNodes).toHaveLength(ZOMBIE_SKILL_DEFS.length);
+
+    const xs = [...new Set(SKILL_TREE.map((s) => s.x))].sort((a, b) => a - b);
+    const secondX = xs[1];
+    const secondCol = SKILL_TREE.filter((s) => s.x === secondX).sort((a, b) => a.y - b.y);
+    expect(secondCol.map((s) => s.zombie?.key)).toEqual(ZOMBIE_SKILL_DEFS.map((def) => def.key));
+    expect(secondCol.every((s) => !s.dash)).toBe(true);
+  });
+
   it("레벨업 시 스킬포인트(별개 트랙)는 그대로 1씩 증가한다", () => {
     const char = createInitialState().chars.items[0];
     grantExp(char, expToNext(char.level), []);
@@ -45,5 +63,67 @@ describe("스킬트리 데이터", () => {
     normalizeSkillProgress(char);
     expect(char.skillPoints).toBe(0);
     expect(char.learnedSkills).toEqual(["skill-01"]);
+  });
+
+  it("2열 1행 투자 시 SP 1을 쓰고 소유 좀비 체력만 1 올린다", () => {
+    const state = createInitialState();
+    const owner = state.chars.items[0];
+    const otherOwner = state.chars.items[1];
+    owner.skillPoints = 2;
+    const ownZombie = createCharacter(state, "slave", {
+      ownerVampireId: owner.id, maxHp: 5, hp: 3,
+    });
+    const otherZombie = createCharacter(state, "slave", {
+      ownerVampireId: otherOwner.id, maxHp: 5, hp: 3,
+    });
+
+    expect(investZombieHp(owner, state.chars.items)).toBe(true);
+    expect(owner.skillPoints).toBe(1);
+    expect(owner.zombieHpPoints).toBe(1);
+    expect(ownZombie.maxHp).toBe(6);
+    expect(ownZombie.hp).toBe(4);
+    expect(otherZombie.maxHp).toBe(5);
+    expect(otherZombie.hp).toBe(3);
+  });
+
+  it("투자 포인트는 이후 감염되는 좀비와 저장 데이터에도 적용된다", () => {
+    const state = createInitialState();
+    const owner = state.chars.items[0];
+    owner.skillPoints = 3;
+    expect(investZombieHp(owner, state.chars.items)).toBe(true);
+    expect(investZombieHp(owner, state.chars.items)).toBe(true);
+    expect(zombieHpBonus(owner)).toBe(2);
+
+    const human = createCharacter(state, "human", { maxHp: 20, hp: 20 });
+    infectToSlave(human, owner);
+    expect(human.maxHp).toBe(7);
+    expect(human.hp).toBe(7);
+
+    const savedOwner = JSON.parse(serialize(state)).chars.items.find((c) => c.id === owner.id);
+    expect(savedOwner.zombieHpPoints).toBe(2);
+  });
+
+  it("SP가 없으면 좀비 체력에 투자하지 않는다", () => {
+    const owner = createInitialState().chars.items[0];
+    owner.skillPoints = 0;
+    expect(investZombieHp(owner, [])).toBe(false);
+    expect(owner.zombieHpPoints).toBe(0);
+  });
+
+  it("좀비 스킬 2~4는 5SP 선택형이며 하나를 배우면 나머지를 못 배운다", () => {
+    const owner = createInitialState().chars.items[0];
+    owner.skillPoints = 10;
+    expect(investZombieTrait(owner, "zombie-yellow-revive")).toBe(true);
+    expect(owner.skillPoints).toBe(10 - ZOMBIE_TRAIT_COST);
+    expect(owner.zombieTrait).toBe("zombie-yellow-revive");
+    expect(investZombieTrait(owner, "zombie-red-poison")).toBe(false);
+    expect(owner.skillPoints).toBe(5);
+  });
+
+  it("좀비 선택형 스킬은 5SP 미만이면 배울 수 없다", () => {
+    const owner = createInitialState().chars.items[0];
+    owner.skillPoints = 4;
+    expect(investZombieTrait(owner, "zombie-yellow-revive")).toBe(false);
+    expect(owner.zombieTrait).toBeNull();
   });
 });

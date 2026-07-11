@@ -1,5 +1,5 @@
 // src/game/projectiles.js
-// 인간(파란새우) 원거리 투사체 공격.
+// Holy Shrimp(파란새우) 원거리 투사체 공격.
 // 현재는 비유도 단발 투척만 구현하고, 동시 발사 수/유도/피해/연사력은 캐릭터별
 // projectileSkill 필드로 확장할 수 있게 훅을 둔다.
 
@@ -58,7 +58,7 @@ export function tickHumanProjectiles(state, simDt) {
   const chars = aliveChars(state);
   const byId = new Map(chars.map((c) => [c.id, c]));
 
-  // 발사: 인간은 인식 범위 안 최근접 적에게 쿨다운마다 투사체를 던진다.
+  // 발사: Holy Shrimp는 인식 범위 안 최근접 적에게 쿨다운마다 투사체를 던진다.
   for (const c of chars) {
     if (c.side !== "human" || c.dead || c.state === "FIGHT") continue;
     c._projectileCd = Math.max(0, (c._projectileCd ?? 0) - simDt);

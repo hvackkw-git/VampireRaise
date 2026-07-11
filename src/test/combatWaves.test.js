@@ -1,7 +1,10 @@
 // 전투·전염·경험치·웨이브 테스트
 import { describe, it, expect, beforeEach } from "vitest";
 import { createInitialState, createCharacter } from "../state/gameState.js";
-import { tickCombat, grantExp, infectToSlave } from "../game/combat.js";
+import {
+  tickCombat, grantExp, infectToSlave, explodeZombiePoison,
+  ZOMBIE_POISON_MAX_STACKS,
+} from "../game/combat.js";
 import {
   startWave, tickWaves, vampireSideAlive, humansAlive, grantAccountExp, reviveVampires,
 } from "../game/waves.js";
@@ -53,6 +56,26 @@ describe("교전 (마주보고 싸우기)", () => {
     expect(events.some((e) => e.type === "engage")).toBe(false);
     expect(events.some((e) => e.type === "hit")).toBe(false);
     expect(human.hp).toBe(100);
+  });
+
+  it("스턴된 적은 상태를 유지한 채 뱀파이어의 일반 공격 대상이 된다", () => {
+    const vamp = state.chars.items[0];
+    state.chars.items = [vamp];
+    vamp.x = 100; vamp._atkCd = 0; vamp.atk = 7;
+    const human = createCharacter(state, "human", { x: 118, y: vamp.y, maxHp: 100, atk: 99 });
+    human.state = "STUN";
+    human._stunUntil = 10000;
+    human._atkCd = 0;
+
+    const events = tickCombat(state, 0.016);
+
+    expect(vamp.state).toBe("FIGHT");
+    expect(vamp._fightTargetId).toBe(human.id);
+    expect(human.state).toBe("STUN");
+    expect(human._fightTargetId).toBeNull();
+    expect(human.hp).toBe(93);
+    expect(vamp.hp).toBe(vamp.maxHp);
+    expect(events.some((e) => e.type === "hit" && e.attacker === vamp && e.target === human)).toBe(true);
   });
 
   it("높이가 다르면(다른 플랫폼) 교전하지 않는다", () => {
@@ -122,6 +145,8 @@ describe("전투와 전염", () => {
     expect(human.ownerVampireId).toBe(vamp.id);
     expect(human.maxHp).toBe(SLAVE_BASE.maxHp);
     expect(human.hp).toBe(SLAVE_BASE.maxHp);
+    expect(human.zombiePattern).toBeNull();
+    expect(human.zombieRevivesLeft).toBe(0);
     expect(events.some((e) => e.type === "infect" && e.owner === vamp)).toBe(true);
   });
 
@@ -147,6 +172,69 @@ describe("전투와 전염", () => {
     tickCombat(state, 0.1);
     expect(human.side).toBe("slave");
     expect(human.ownerVampireId).toBe(early.id);
+  });
+
+  it("노란 릴리 특성 뱀파이어가 막타를 치면 좀비가 RILI와 부활 1회를 얻는다", () => {
+    state.chars.items = [];
+    const vamp = createCharacter(state, "vampire", { x: 100, y: 100, atk: 999 });
+    vamp.zombieTrait = "zombie-yellow-revive";
+    vamp._atkCd = 0;
+    const human = createCharacter(state, "human", { x: 110, y: 100, maxHp: 5, hp: 5, atk: 1 });
+    tickCombat(state, 0.1);
+    expect(human.side).toBe("slave");
+    expect(human.ownerVampireId).toBe(vamp.id);
+    expect(human.zombiePattern).toBe("RILI_YELLOW");
+    expect(human.zombieRevivesLeft).toBe(1);
+  });
+
+  it("RILI 좀비는 첫 사망에 부활하며 패턴이 사라지고 두 번째 사망은 최종이다", () => {
+    state.chars.items = [];
+    const owner = createCharacter(state, "vampire", { x: 10, y: 100 });
+    const zombie = createCharacter(state, "slave", {
+      x: 200, y: 100, maxHp: 5, hp: 0.5, ownerVampireId: owner.id,
+      zombiePattern: "RILI_YELLOW", zombieRevivesLeft: 1,
+    });
+    state.wave.active = true;
+    let events = tickCombat(state, 1);
+    expect(state.chars.items).toContain(zombie);
+    expect(zombie.hp).toBe(zombie.maxHp);
+    expect(zombie.zombieRevivesLeft).toBe(0);
+    expect(zombie.zombiePattern).toBeNull();
+    expect(events.some((e) => e.type === "zombieRevive")).toBe(true);
+
+    zombie.hp = 0.5;
+    events = tickCombat(state, 1);
+    expect(state.chars.items).not.toContain(zombie);
+    expect(events.some((e) => e.type === "zombieRevive")).toBe(false);
+  });
+
+  it("붉은 릴리 특성 막타로 생성된 좀비는 독 폭발 상태를 얻는다", () => {
+    state.chars.items = [];
+    const vamp = createCharacter(state, "vampire", { x: 100, y: 100, atk: 999 });
+    vamp.zombieTrait = "zombie-red-poison";
+    vamp._atkCd = 0;
+    const human = createCharacter(state, "human", { x: 110, y: 100, maxHp: 5, hp: 5, atk: 1 });
+    tickCombat(state, 0.1);
+    expect(human.side).toBe("slave");
+    expect(human.zombiePattern).toBe("RILI_RED_POISON");
+    expect(human.zombieRevivesLeft).toBe(0);
+  });
+
+  it("독 폭발은 최대 5중첩이며 1초마다 중첩당 최대 체력 1% 피해를 준다", () => {
+    state.chars.items = [];
+    const zombie = createCharacter(state, "slave", {
+      x: 100, y: 100, zombiePattern: "RILI_RED_POISON",
+    });
+    const human = createCharacter(state, "human", {
+      x: 120, y: 100, maxHp: 100, hp: 100, atk: 0,
+    });
+    const events = [];
+    for (let i = 0; i < 7; i++) explodeZombiePoison(zombie, state, events);
+    expect(human.poisonStacks).toBe(ZOMBIE_POISON_MAX_STACKS);
+    zombie.zombiePattern = null; // 다음 combat tick에서 추가 폭발 없음
+    human.x = 260; // 일반 교전 피해 없이 독 피해만 검증
+    tickCombat(state, 1);
+    expect(human.hp).toBeCloseTo(95);
   });
 
   it("웨이브 도중에만 노예 체력이 초당 1 감소한다", () => {

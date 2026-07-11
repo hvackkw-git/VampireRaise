@@ -21,6 +21,18 @@ const CANVAS_H = TANK_H + PANEL_H;
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
+/** 논리 32px 박스가 아닌 실제 새우 몸통의 화면 중심/상단. */
+function visualBounds(c) {
+  const cfg = CHAR_SPRITES[c.side];
+  const topPad = cfg?.topPad ?? 0;
+  const size = cfg?.size ?? c.h;
+  return {
+    x: c.x + c.w / 2,
+    y: c.y + topPad + (size - topPad) / 2,
+    top: c.y + topPad,
+  };
+}
+
 let layerLogic, layerPlatform, layerChars, layerFx, rgbTintEl, tankEl, canvasEl, canvasWrapperEl;
 let uiScale = 1;
 
@@ -38,12 +50,17 @@ export function initTankView() {
   window.addEventListener("resize", resizeTank);
 }
 
+/** 테스트용 감지 범위 표시를 수조 전체에서 즉시 토글한다. */
+export function setDetectRangesVisible(visible) {
+  tankEl?.classList.toggle("detect-ranges-hidden", !visible);
+}
+
 let coreCounterEl = null;
 
 /**
- * 스폰 존 표시: 오른쪽 위(인간)·왼쪽 아래(뱀파이어)에 2×2 크기의 하얀 네모를
+ * 스폰 존 표시: 오른쪽 위(Holy Shrimp)·왼쪽 아래(Vamp Shrimp)에 2×2 크기의 하얀 네모를
  * 배경 위·캐릭터 아래 레이어(layerLogic 앞)에 한 번만 그린다. 순수 시각 마커.
- * 뱀파이어 존 가운데에는 베이스 코어 숫자를 표시한다.
+ * Vamp Shrimp 존 가운데에는 베이스 코어 숫자를 표시한다.
  */
 function renderSpawnZones() {
   const layer = document.createElement("div");
@@ -66,7 +83,7 @@ function renderSpawnZones() {
   tankEl.insertBefore(layer, layerLogic);
 }
 
-/** 베이스 코어 숫자 갱신 (뱀파이어 존 가운데). 얼마 안 남으면 위험 색으로 표시. */
+/** 베이스 코어 숫자 갱신 (Vamp Shrimp 존 가운데). 얼마 안 남으면 위험 색으로 표시. */
 export function setCoreCounter(hp) {
   if (!coreCounterEl) return;
   const v = String(Math.max(0, Math.round(hp)));
@@ -190,15 +207,13 @@ export function renderChars(state, nowMs, ui) {
       el.dataset.charId = String(c.id);
       const aura = document.createElement("div"); // 레벨 오러 (스프라이트 뒤, 맨 뒤)
       aura.className = "char-aura";
-      for (const layer of ["aura-glow", "aura-ring", "aura-spark"]) {
-        const s = document.createElement("span");
-        s.className = layer;
-        aura.appendChild(s);
-      }
       const detect = document.createElement("div"); // 감지 범위 원 (스프라이트 뒤)
       detect.className = "char-detect";
       const sprite = document.createElement("div");
       sprite.className = "char-sprite";
+      const pattern = document.createElement("div");
+      pattern.className = "char-pattern";
+      pattern.hidden = true;
       const hpbar = document.createElement("div");
       hpbar.className = "char-hpbar";
       const hpFill = document.createElement("i");
@@ -209,23 +224,55 @@ export function renderChars(state, nowMs, ui) {
       el.appendChild(detect);
       el.appendChild(shield);
       el.appendChild(sprite);
+      el.appendChild(pattern);
       el.appendChild(hpbar);
       layerChars.appendChild(el);
-      entry = { el, aura, detect, sprite, hpFill, shield, lastSide: null, lastFrame: -1, shieldOn: false, lastAuraTier: -1 };
+      entry = {
+        el, aura, detect, sprite, pattern, hpFill, shield,
+        lastSide: null, lastFrame: -1, lastPattern: undefined,
+        shieldOn: false, lastAuraTier: -1,
+      };
       charEls.set(c.id, entry);
     }
     const cfg = CHAR_SPRITES[c.side];
     if (entry.lastSide !== c.side) {
       entry.el.style.width = `${cfg.size}px`;
       entry.el.style.height = `${cfg.size}px`;
+      entry.sprite.style.top = `${cfg.topPad}px`;
+      entry.sprite.style.height = `${cfg.size - cfg.topPad}px`;
       entry.sprite.style.backgroundImage = `url('${cfg.src}')`;
       entry.sprite.style.backgroundSize = `${cfg.size * cfg.frames}px ${cfg.size}px`;
+      entry.pattern.style.top = `${cfg.topPad}px`;
+      entry.pattern.style.height = `${cfg.size - cfg.topPad}px`;
+      entry.pattern.style.backgroundSize = `${cfg.size * cfg.frames}px ${cfg.size}px`;
       entry.el.className = `char side-${c.side}`;
       entry.lastSide = c.side;
       entry.lastFrame = -1;
       entry.lastDetectR = -1; // 진영 바뀌면 감지 원 갱신 강제
     }
-    // 감지 원: 캐릭터 중심 기준 반경. 뱀파이어는 인식범위 스킬로 커지므로 변할 때마다 갱신.
+    const poisonStacks = Math.max(0, Math.min(5, Math.floor(Number(c.poisonStacks) || 0)));
+    let patternFile = "";
+    let patternOpacity = 1;
+    if (poisonStacks > 0) {
+      patternFile = "assets/shrimp_variants/zombie-speckle.png";
+      patternOpacity = 0.5 + poisonStacks * 0.1;
+    } else if (c.side === "slave") {
+      if (c.zombiePattern === "RILI_YELLOW") {
+        patternFile = "assets/shrimp_variants/zombie-rili-yellow.png";
+      } else if (c.zombiePattern === "RILI_RED_POISON") {
+        patternFile = "assets/shrimp_variants/zombie-rili.png";
+      } else if (c.zombiePattern === "RILI_BLACK") {
+        patternFile = "assets/shrimp_variants/zombie-rili-black.png";
+      }
+    }
+    const patternKey = `${patternFile}:${patternOpacity}`;
+    if (entry.lastPattern !== patternKey) {
+      entry.lastPattern = patternKey;
+      entry.pattern.hidden = !patternFile;
+      entry.pattern.style.backgroundImage = patternFile ? `url('${patternFile}')` : "";
+      entry.pattern.style.opacity = String(patternOpacity);
+    }
+    // 감지 원: 캐릭터 중심 기준 반경. Vamp Shrimp는 인식범위 스킬로 커지므로 변할 때마다 갱신.
     const r = effectiveDetectRange(c);
     if (entry.lastDetectR !== r) {
       entry.lastDetectR = r;
@@ -234,19 +281,19 @@ export function renderChars(state, nowMs, ui) {
       entry.detect.style.left = `${cfg.size / 2 - r}px`;
       entry.detect.style.top = `${cfg.size / 2 - r}px`;
     }
-    // 레벨 오러: 레벨 구간(5레벨=1단계)이 바뀔 때만 CSS 변수를 갱신한다.
-    const auraTier = auraTierForLevel(c.level);
-    if (entry.lastAuraTier !== auraTier) {
-      entry.lastAuraTier = auraTier;
-      const a = auraStyleForTier(auraTier);
-      const st = entry.aura.style;
-      st.setProperty("--aura-sz", `${a.size}px`);
-      st.setProperty("--aura-op", String(a.opacity));
-      st.setProperty("--aura-core", a.core);
-      st.setProperty("--aura-edge", a.edge);
-      st.setProperty("--aura-ring-op", String(a.ringOpacity));
-      st.setProperty("--aura-spark-op", String(a.sparkOpacity));
-      st.setProperty("--aura-spin", `${a.spin}s`);
+    entry.detect.hidden = ui.showDetectRanges === false;
+    // 레벨 오러는 Vamp Shrimp 전용. Holy/Jombie Shrimp는 표시와 애니메이션을 모두 끈다.
+    const auraEnabled = c.side === "vampire";
+    entry.aura.hidden = !auraEnabled;
+    if (auraEnabled) {
+      const auraTier = auraTierForLevel(c.level);
+      if (entry.lastAuraTier !== auraTier) {
+        entry.lastAuraTier = auraTier;
+        const a = auraStyleForTier(auraTier);
+        const st = entry.aura.style;
+        st.setProperty("--aura-row", `${-a.row * 64}px`);
+        st.setProperty("--aura-duration", `${a.duration}s`);
+      }
     }
     // FIGHT/DASH는 빠르게 프레임을 돌려 몸싸움·질주 느낌을 낸다
     const moving = Math.abs(c.vx) > 1 || c.state === "CRAWL" || c.state === "JUMP"
@@ -254,13 +301,16 @@ export function renderChars(state, nowMs, ui) {
     const fast = c.state === "FIGHT" || c.state === "DASH";
     const frame = moving ? Math.floor(nowMs / (fast ? 60 : 90)) % cfg.frames : 0;
     if (entry.lastFrame !== frame) {
-      entry.sprite.style.backgroundPosition = `${-frame * cfg.size}px 0`;
+      const framePosition = `${-frame * cfg.size}px ${-cfg.topPad}px`;
+      entry.sprite.style.backgroundPosition = framePosition;
+      entry.pattern.style.backgroundPosition = framePosition;
       entry.lastFrame = frame;
     }
     entry.el.style.left = `${c.x}px`;
     entry.el.style.top = `${c.y}px`;
     // 스프라이트 기본 방향: 왼쪽 → 오른쪽 이동 시 좌우 반전
     entry.sprite.style.transform = c.dir > 0 ? "scaleX(-1)" : "";
+    entry.pattern.style.transform = entry.sprite.style.transform;
     entry.el.classList.toggle("stunned", c.state === "STUN");
     // 보라 실드 오라: 지속(_shieldT>0) 동안 표시, 남은 흡수량을 세기로 반영
     const shieldOn = (c._shieldT ?? 0) > 0 && (c._shieldHp ?? 0) > 0;
@@ -271,9 +321,8 @@ export function renderChars(state, nowMs, ui) {
     if (shieldOn && c._shieldMax) {
       entry.shield.style.opacity = String(0.35 + 0.5 * (c._shieldHp / c._shieldMax));
     }
-    // 패널이 자동으로 비추는 캐릭터는 은은한 표시, 직접 탭한 선택은 금색 표시
-    entry.el.classList.toggle("focused",
-      ui.panelCharId === c.id && ui.selectedCharId !== c.id);
+    // 자동 패널 대상에는 선택 표시를 띄우지 않고, 직접 탭한 캐릭터만 표시한다.
+    entry.el.classList.remove("focused");
     entry.el.classList.toggle("selected", ui.selectedCharId === c.id);
     entry.hpFill.style.width = `${Math.max(0, Math.min(100, (c.hp / c.maxHp) * 100))}%`;
     // 돌진 잔상: 45ms 간격으로 고스트를 남긴다. 색은 이번 돌진의 사이클을 스폰 순서대로
@@ -304,9 +353,12 @@ function spawnDashGhost(c, entry, color) {
   g.className = "char-ghost";
   g.style.width = `${c.w}px`;
   g.style.height = `${c.h}px`;
+  const cfg = CHAR_SPRITES[c.side];
   const img = entry.sprite.style.backgroundImage;
   const size = entry.sprite.style.backgroundSize;
-  const pos = entry.sprite.style.backgroundPosition;
+  // 본체는 실제 14px 높이로 잘라 그리지만 잔상은 변경 전과 같은 32px 원본 마스크를
+  // 사용한다. 본체의 -topPad 위치를 복사하면 잔상이 c.y보다 18px 위로 올라간다.
+  const pos = `${-(entry.lastFrame ?? 0) * cfg.size}px 0px`;
   g.style.backgroundColor = color;
   g.style.webkitMaskImage = img;
   g.style.maskImage = img;
@@ -346,12 +398,12 @@ export function renderPings(state) {
     }
     // 같은 대상에 여러 진영 핑이 찍히면 좌우로 살짝 벌린다
     const offset = c.side === "human" ? 5 : c.side === "slave" ? -5 : 0;
-    // 대상이 수조 밖(예: 상단에서 낙하 중인 인간, y<0)이거나 가장자리에 있어도
+    // 대상이 수조 밖(예: 상단에서 낙하 중인 Holy Shrimp, y<0)이거나 가장자리에 있어도
     // 핑이 잘려 사라지지 않도록 화면 안으로 클램프한다.
     // 상단 여백 4px는 ping-bob 애니메이션(-3px)까지 감안한 값.
     const PING_W = 8, PING_H = 8;
     const left = clamp(t.x + t.w / 2 - 4 + offset, 0, TANK_W - PING_W);
-    const top = clamp(t.y - 2, 4, TANK_H - PING_H);
+    const top = clamp(visualBounds(t).top - PING_H, 4, TANK_H - PING_H);
     el.style.left = `${left}px`;
     el.style.top = `${top}px`;
   }
@@ -398,25 +450,44 @@ export function spawnFloatText(x, y, text, cls = "") {
 export function renderCombatEvents(events) {
   for (const ev of events) {
     if (ev.type === "hit" || ev.type === "projectileHit") {
-      spawnFloatText(ev.target.x + ev.target.w / 2 - 6, ev.target.y - 8, `-${ev.dmg}`);
+      const v = visualBounds(ev.target);
+      spawnFloatText(v.x - 6, v.top - 8, `-${ev.dmg}`);
     } else if (ev.type === "levelup") {
-      spawnFloatText(ev.char.x, ev.char.y - 12, "LEVEL UP!", "fx-levelup");
+      const v = visualBounds(ev.char);
+      spawnFloatText(ev.char.x, v.top - 12, "LEVEL UP!", "fx-levelup");
     } else if (ev.type === "infect") {
-      spawnFloatText(ev.char.x - 2, ev.char.y - 12, "전염!", "fx-infect");
+      const v = visualBounds(ev.char);
+      spawnFloatText(ev.char.x - 2, v.top - 12, "전염!", "fx-infect");
     } else if (ev.type === "dashZap") {
-      spawnDashFx(ev.x, ev.y, "fx-zap", "⚡");
+      const v = ev.target ? visualBounds(ev.target) : { x: ev.x, y: ev.y };
+      spawnDashFx(v.x, v.y, "fx-zap", "⚡");
     } else if (ev.type === "dashExplosion") {
-      spawnExplosion(ev.x, ev.y, ev.radius);
+      const v = ev.char ? visualBounds(ev.char) : { x: ev.x, y: ev.y };
+      spawnExplosion(v.x, v.y, ev.radius);
     } else if (ev.type === "dashShield") {
-      spawnDashFx(ev.char.x + ev.char.w / 2, ev.char.y + ev.char.h / 2, "fx-shieldcast");
-      spawnFloatText(ev.char.x - 4, ev.char.y - 14, `🛡 +${ev.amount}`, "fx-shield");
+      const v = visualBounds(ev.char);
+      spawnDashFx(v.x, v.y, "fx-shieldcast");
+      spawnFloatText(ev.char.x - 4, v.top - 14, `🛡 +${ev.amount}`, "fx-shield");
     } else if (ev.type === "dashStun") {
-      spawnDashFx(ev.target.x + ev.target.w / 2, ev.target.y - 4, "fx-stunburst", "✦");
-      spawnFloatText(ev.target.x, ev.target.y - 16, "STUN!", "fx-stun");
+      const v = visualBounds(ev.target);
+      spawnDashFx(v.x, v.y, "fx-stunburst", "✦");
+      spawnFloatText(ev.target.x, v.top - 16, "STUN!", "fx-stun");
     } else if (ev.type === "multiHit") {
-      spawnFloatText(ev.target.x + ev.target.w / 2 - 8, ev.target.y - 18, "연타!", "fx-multihit");
+      const v = visualBounds(ev.target);
+      spawnFloatText(v.x - 8, v.top - 18, "연타!", "fx-multihit");
     } else if (ev.type === "shieldBlock") {
-      spawnFloatText(ev.target.x + ev.target.w / 2 - 6, ev.target.y - 8, `🛡${ev.absorbed}`, "fx-shieldblock");
+      const v = visualBounds(ev.target);
+      spawnFloatText(v.x - 6, v.top - 8, `🛡${ev.absorbed}`, "fx-shieldblock");
+    } else if (ev.type === "zombieRevive") {
+      const v = visualBounds(ev.char);
+      spawnFloatText(ev.char.x, v.top - 14, "부활!", "fx-infect");
+    } else if (ev.type === "zombiePoisonExplosion") {
+      const v = visualBounds(ev.char);
+      spawnDashFx(v.x, v.y, "fx-poisonburst", "✦");
+      spawnFloatText(ev.char.x, v.top - 14, "독!", "fx-poison");
+    } else if (ev.type === "poisonTick") {
+      const v = visualBounds(ev.target);
+      spawnFloatText(v.x - 6, v.top - 8, `-${ev.dmg.toFixed(1)}`, "fx-poison");
     }
   }
 }

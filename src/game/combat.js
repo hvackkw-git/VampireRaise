@@ -9,7 +9,11 @@ import {
   CHAR_SPRITES, SLAVE_BASE,
 } from "../constants.js";
 import { revengeAttackMult, multiHitChance } from "../skills/dashColors.js";
+import { hasZombieTrait, zombieHpBonus } from "../skills/zombieSkills.js";
 import { absorbWithShield } from "./dashEffects.js";
+
+export const ZOMBIE_POISON_RADIUS = 46;
+export const ZOMBIE_POISON_MAX_STACKS = 5;
 
 const center = (c) => ({ x: c.x + c.w / 2, y: c.y + c.h / 2 });
 const dist = (a, b) => {
@@ -20,6 +24,7 @@ const dy = (a, b) => Math.abs((a.y + a.h / 2) - (b.y + b.h / 2));
 
 /** 교전을 시작할 수 있는(지상에 서 있는) 상태 */
 const GROUND_STATES = new Set(["CRAWL", "FIGHT"]);
+const TARGETABLE_STATES = new Set(["CRAWL", "FIGHT", "STUN"]);
 
 /** 살아있는 캐릭터 목록 */
 export function aliveChars(state) {
@@ -51,24 +56,87 @@ export function grantExp(c, amount, events) {
   }
 }
 
-/** 인간 → 노예 전염 (스프라이트 크기가 다르면 발 위치를 유지하며 박스 교체) */
-export function infectToSlave(c, ownerVampire = null) {
+/** Holy Shrimp → Jombie Shrimp 전염 (스프라이트 크기가 다르면 발 위치를 유지하며 박스 교체) */
+export function infectToSlave(c, ownerVampire = null, {
+  yellowRevive = false, redPoison = false,
+} = {}) {
   c.side = "slave";
   c.ownerVampireId = ownerVampire?.id ?? null;
   const size = CHAR_SPRITES.slave?.size ?? c.h;
   c.y += c.h - size; // 발(y+h) 고정
   c.w = size;
   c.h = size;
-  c.maxHp = SLAVE_BASE.maxHp;
+  c.maxHp = SLAVE_BASE.maxHp + zombieHpBonus(ownerVampire);
   c.hp = c.maxHp;
   c.maxMp = SLAVE_BASE.maxMp;
   c.mp = c.maxMp;
+  c.zombiePattern = yellowRevive ? "RILI_YELLOW" : redPoison ? "RILI_RED_POISON" : null;
+  c.zombieRevivesLeft = yellowRevive ? 1 : 0;
+  c.poisonStacks = 0;
+  c._poisonClock = 0;
   c.dead = false;
   c.state = "CRAWL";
   c.timer = 0.5;
   c.vx = 0; c.vy = 0;
   c._fightTargetId = null;
   c._ping = null;
+}
+
+/** 부활 특성 Jombie Shrimp를 한 번 되살리고 소모된 RILI 패턴을 제거한다. */
+export function reviveZombieOnce(c, events = []) {
+  if (c?.side !== "slave" || !(c.zombieRevivesLeft > 0)) return false;
+  c.zombieRevivesLeft -= 1;
+  c.zombiePattern = null;
+  c.hp = c.maxHp;
+  c.dead = false;
+  c.state = "CRAWL";
+  c.timer = 0.5;
+  c.vx = 0;
+  c.vy = 0;
+  c._fightTargetId = null;
+  c._ping = null;
+  events.push({ type: "zombieRevive", char: c });
+  return true;
+}
+
+/** 붉은 RILI Jombie Shrimp의 최종 사망: 주변 적에게 지속 독을 1중첩한다. */
+export function explodeZombiePoison(c, state, events = []) {
+  if (c?.side !== "slave" || c.zombiePattern !== "RILI_RED_POISON") return 0;
+  const origin = center(c);
+  let hits = 0;
+  for (const target of state.chars.items) {
+    if (target === c || target.dead || !isEnemySide(c.side, target.side)) continue;
+    const p = center(target);
+    if (Math.hypot(p.x - origin.x, p.y - origin.y) > ZOMBIE_POISON_RADIUS) continue;
+    const previousStacks = Math.max(0, Math.floor(Number(target.poisonStacks) || 0));
+    target.poisonStacks = Math.min(
+      ZOMBIE_POISON_MAX_STACKS,
+      previousStacks + 1,
+    );
+    if (previousStacks === 0) target._poisonClock = 0;
+    hits++;
+  }
+  events.push({ type: "zombiePoisonExplosion", char: c, radius: ZOMBIE_POISON_RADIUS, hits });
+  return hits;
+}
+
+function tickPoison(state, simDt, events) {
+  for (const c of state.chars.items) {
+    if (c.dead || !(c.poisonStacks > 0)) continue;
+    c._poisonClock = (Number(c._poisonClock) || 0) + simDt;
+    while (c._poisonClock >= 1 && c.hp > 0) {
+      c._poisonClock -= 1;
+      const dmg = c.maxHp * 0.01 * Math.min(ZOMBIE_POISON_MAX_STACKS, c.poisonStacks);
+      c.hp -= dmg;
+      events.push({ type: "poisonTick", target: c, dmg });
+    }
+    if (c.hp > 0) continue;
+    c.hp = 0;
+    c.dead = true;
+    c.state = "DEAD";
+    c._fightTargetId = null;
+    events.push({ type: "kill", target: c, poison: true });
+  }
 }
 
 function vampireOrder(c) {
@@ -89,6 +157,8 @@ function tickSlaveDecay(state, simDt, events) {
     c.hp -= SLAVE_BASE.hpDecayPerSecond * simDt;
     if (c.hp > 0) continue;
     c.hp = 0;
+    if (reviveZombieOnce(c, events)) continue;
+    explodeZombiePoison(c, state, events);
     c.dead = true;
     c.state = "DEAD";
     c._fightTargetId = null;
@@ -116,8 +186,8 @@ function disengage(c) {
  * 1) 교전 시작: 지상 상태의 적이 ENGAGE_RANGE 안에 오면 양쪽 모두 FIGHT로 마주본다.
  * 2) 교전 유지: 대상이 죽거나 FIGHT_BREAK_RANGE 밖으로 벗어나면 해제.
  *    유지 중에는 쿨다운마다 공격.
- * 3) 처치: 인간이 뱀파이어 진영에게 죽으면 그 자리에서 노예로 전염.
- *    뱀파이어는 dead 마크(부활 대상), 노예는 제거.
+ * 3) 처치: Holy Shrimp가 Vamp Shrimp 진영에게 죽으면 그 자리에서 Jombie Shrimp로 전염.
+ *    Vamp Shrimp는 dead 마크(부활 대상), Jombie Shrimp는 제거.
  * @returns {Array<object>} events — engage/hit/kill/infect/levelup (연출·보상용)
  */
 export function tickCombat(state, simDt) {
@@ -140,10 +210,11 @@ export function tickCombat(state, simDt) {
     const found = findNearestEnemy(c, chars);
     if (!found || found.dist > ENGAGE_RANGE) continue;
     const t = found.char;
-    if (!GROUND_STATES.has(t.state)) continue;
+    if (!TARGETABLE_STATES.has(t.state)) continue;
     if (dy(c, t) > ENGAGE_MAX_DY) continue;
     engage(c, t);
-    if (t.state !== "FIGHT") engage(t, c); // 상대도 하던 일을 멈추고 맞선다
+    // 스턴 대상은 적으로 계속 인식하되 행동 불능 상태를 덮어쓰지 않는다.
+    if (t.state !== "FIGHT" && t.state !== "STUN") engage(t, c);
     events.push({ type: "engage", a: c, b: t });
   }
 
@@ -183,13 +254,18 @@ export function tickCombat(state, simDt) {
     state._dashHits = [];
   }
 
+  const lethalAttackers = new Map();
   for (const r of hitRecords) {
     if (r.attacker.dead || r.target.dead) continue;
     // 보라=실드: 대상이 실드를 두르고 있으면 피해를 먼저 흡수한다.
     const { dealt, absorbed } = absorbWithShield(r.target, r.dmg);
+    const hpBefore = r.target.hp;
     r.target.hp -= dealt;
+    if (dealt > 0 && hpBefore > 0 && r.target.hp <= 0 && !lethalAttackers.has(r.target)) {
+      lethalAttackers.set(r.target, r.attacker);
+    }
     if (absorbed > 0) events.push({ type: "shieldBlock", target: r.target, absorbed });
-    // 빨강=복수: 뱀파이어가 '피격'당하면 다음 공격에 쓸 복수 버프를 예약한다.
+    // 빨강=복수: Vamp Shrimp가 '피격'당하면 다음 공격에 쓸 복수 버프를 예약한다.
     if (r.target.side === "vampire") r.target._revengePending = true;
     if (dealt > 0) events.push({ type: "hit", attacker: r.attacker, target: r.target, dmg: dealt });
   }
@@ -197,8 +273,12 @@ export function tickCombat(state, simDt) {
   const killed = [...new Set(hitRecords.map((r) => r.target))].filter((t) => !t.dead && t.hp <= 0);
   for (const t of killed) {
     t.hp = 0;
-    const owner = t.side === "human" ? chooseZombieOwner(hitRecords, t) : null;
-    const killer = owner ?? hitRecords.find((r) => r.target === t)?.attacker;
+    const lethalAttacker = lethalAttackers.get(t) ?? null;
+    const lethalVampire = lethalAttacker?.side === "vampire" ? lethalAttacker : null;
+    const owner = t.side === "human"
+      ? (lethalVampire ?? chooseZombieOwner(hitRecords, t))
+      : null;
+    const killer = lethalAttacker ?? owner ?? hitRecords.find((r) => r.target === t)?.attacker;
     if (killer) {
       grantExp(killer, expForKill(t.level), events);
       disengage(killer);
@@ -206,9 +286,14 @@ export function tickCombat(state, simDt) {
     if (t.side === "human" && owner) {
       state.blood += KILL_BLOOD_REWARD;
       events.push({ type: "kill", target: t });
-      infectToSlave(t, owner);
+      const traitFromLastHit = lethalVampire === owner;
+      const yellowRevive = traitFromLastHit && hasZombieTrait(owner, "zombie-yellow-revive");
+      const redPoison = traitFromLastHit && hasZombieTrait(owner, "zombie-red-poison");
+      infectToSlave(t, owner, { yellowRevive, redPoison });
       events.push({ type: "infect", char: t, owner });
     } else {
+      if (reviveZombieOnce(t, events)) continue;
+      explodeZombiePoison(t, state, events);
       t.dead = true;
       t.state = "DEAD";
       t._fightTargetId = null;
@@ -217,8 +302,9 @@ export function tickCombat(state, simDt) {
   }
 
   tickSlaveDecay(state, simDt, events);
+  tickPoison(state, simDt, events);
 
-  // 노예/인간 시체는 제거 (뱀파이어 시체는 부활 대상으로 보존)
+  // Jombie/Holy Shrimp 시체는 제거 (Vamp Shrimp 시체는 부활 대상으로 보존)
   state.chars.items = state.chars.items.filter((c) => !c.dead || c.side === "vampire");
   return events;
 }

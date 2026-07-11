@@ -20,7 +20,7 @@ export function initHud(state, { onDecorate, onReset, getBlockPowered, isDecorat
     state.chars.items.filter((c) => c.side === "vampire").length;
 
   const showStartFailure = () => {
-    if (state.wave.lastStartError === "noPath") showToast("아래까지 이어지는 인간 이동 경로가 없습니다");
+    if (state.wave.lastStartError === "noPath") showToast("아래까지 이어지는 Holy Shrimp 이동 경로가 없습니다");
   };
 
   const tryStartWave = () => {
@@ -55,9 +55,9 @@ export function initHud(state, { onDecorate, onReset, getBlockPowered, isDecorat
       return;
     }
     state.blood -= cost;
-    // 뱀파이어는 상단 낙하가 아니라 맨 아래(바닥)에서 스폰 — createCharacter 기본값이 바닥·CRAWL
+    // Vamp Shrimp는 상단 낙하가 아니라 맨 아래(바닥)에서 스폰 — createCharacter 기본값이 바닥·CRAWL
     createCharacter(state, "vampire");
-    showToast("🧛 새 뱀파이어가 합류했습니다");
+    showToast("🦐 새 Vamp Shrimp가 합류했습니다");
   });
 
   btnDecorate.addEventListener("click", () => {

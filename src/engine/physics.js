@@ -17,7 +17,7 @@ import {
 } from "../constants.js";
 
 /**
- * 현재 걷기 속도. 인간은 원거리 사거리 안에 적이 들어오면(_rangedBraced) 자세를 잡느라
+ * 현재 걷기 속도. Holy Shrimp는 원거리 사거리 안에 적이 들어오면(_rangedBraced) 자세를 잡느라
  * 이속이 1/4로 줄어든다 — ai.tickAggro가 매 프레임 _rangedBraced를 갱신한다.
  */
 function crawlSpeed(c) {
@@ -87,15 +87,26 @@ function triggerSpike(c, now) {
 
 /** 스턴 발동 */
 function triggerStun(c, now) {
+  c._dropThroughId = c._platformId;
   c._platformId = null;
   c.state = "STUN";
   c.vx = 0;
+  c.vy = Math.max(0, Number(c.vy) || 0);
   c._stunUntil = now + STUN_DURATION_MS;
   c._stunImmuneUntil = now + STUN_DURATION_MS + 1000;
 }
 
 /** 위로 뛰는 점프 시작 (최하단 플랫폼 도달을 보장하는 기본 각도 -52~-68°) */
 export function startJump(c, rng = Math.random, minDeg = JUMP_MIN_DEG, spanDeg = JUMP_SPAN_DEG) {
+  if (c.side === "human") {
+    if (c._platformId != null) startDrop(c);
+    else {
+      c.state = "FALL";
+      c.vx = 0;
+      c.vy = Math.max(0, Number(c.vy) || 0);
+    }
+    return false;
+  }
   const angle = -(minDeg + rng() * spanDeg);
   const speed = JUMP_SPEED_MIN + rng() * JUMP_SPEED_SPAN;
   const rad = (angle * Math.PI) / 180;
@@ -104,6 +115,7 @@ export function startJump(c, rng = Math.random, minDeg = JUMP_MIN_DEG, spanDeg =
   c.vy = Math.sin(rad) * speed;
   c._platformId = null;
   c._jumpApexY = null;
+  return true;
 }
 
 /**
@@ -127,36 +139,50 @@ function tryLand(c, ctx, simDt) {
   const { platforms, blockPowered, now } = ctx;
   if (c.vy <= 0 || c._platformId != null) return false;
   const nextX = c.x + c.vx * simDt;
+  const nextY = c.y + c.vy * simDt;
+  const candidates = [];
   for (const plat of platforms) {
     if (plat.id === c._dropThroughId) continue; // 드롭스루: 방금 떠난 발판은 통과
     if (!charSweepsPlatformX(c, plat, nextX)) continue;
     if (!isTangiblePlatform(plat, blockPowered)) continue;
     // 가시 트리거 후 바닥까지 통과 (블랙홀은 정상 워프)
     if (plat.blockType !== "black_hole_block" && now < (c._spikeIgnoreUntil ?? 0)) continue;
-    const nextY = c.y + c.vy * simDt;
     const landY = plat.blockType === "slide_block"
       ? getSlopeTopY(plat, c.x + c.w / 2) : plat.y;
     if (c.y + c.h <= landY && nextY + c.h >= landY) {
-      if (tryWarp(c, plat, platforms, now)) return true;
-      c.y = landY - c.h;
-      c._platformId = plat.id;
-      c._dropThroughId = null; // 아래 발판에 안착 → 드롭스루 종료
-      c.vy = 0; c.vx = 0; c._jumpApexY = null;
-      if (plat.blockType === "spike_block" && getSpikeDir(plat.rotation ?? 0) === "up") {
-        triggerSpike(c, now);
-      } else if (plat.blockType === "spring_block") {
-        // 스프링: 고각(-60~-80°)으로 다시 튕김
-        c._platformId = null;
-        startJump(c, ctx.rng, 60, 20);
-        plat.lastBounceAt = now;
-      } else {
-        c.state = "CRAWL";
-        c.timer = 0.8 + (ctx.rng?.() ?? Math.random()) * 1.4;
-      }
-      return true;
+      candidates.push({ plat, landY });
     }
   }
-  return false;
+  if (candidates.length === 0) return false;
+
+  // 한 프레임에 여러 발판을 가로질러도 현재 위치에서 가장 가까운 윗면에 착지한다.
+  candidates.sort((a, b) => a.landY - b.landY || a.plat.id - b.plat.id);
+  const { plat, landY } = candidates[0];
+  const wasStunned = c.state === "STUN" && now < c._stunUntil;
+  if (tryWarp(c, plat, platforms, now)) return true;
+  c.y = landY - c.h;
+  c._platformId = plat.id;
+  c._dropThroughId = null; // 아래 발판에 안착 → 드롭스루 종료
+  c.vy = 0; c.vx = 0; c._jumpApexY = null;
+  if (plat.blockType === "spike_block" && getSpikeDir(plat.rotation ?? 0) === "up") {
+    triggerSpike(c, now);
+  } else if (plat.blockType === "spring_block") {
+    if (c.side === "human") {
+      // 적 Holy Shrimp는 점프하지 않는다. 스프링도 방금 밟은 발판으로 표시해 통과 낙하한다.
+      startDrop(c);
+    } else {
+      // 스프링: 고각(-60~-80°)으로 다시 튕김
+      c._platformId = null;
+      startJump(c, ctx.rng, 60, 20);
+      plat.lastBounceAt = now;
+    }
+  } else if (wasStunned) {
+    c.state = "STUN";
+  } else {
+    c.state = "CRAWL";
+    c.timer = 0.8 + (ctx.rng?.() ?? Math.random()) * 1.4;
+  }
+  return true;
 }
 
 /** 바닥 착지 처리 */
@@ -200,6 +226,15 @@ export function tickCharacter(c, ctx, simDt) {
   if (c.state === "IDLE" || c.state === "STAY") {
     c.state = "CRAWL";
     c.timer = 0;
+  }
+  // Holy Shrimp는 어떤 AI/복원 경로에서 JUMP가 들어와도 상승하지 않는다.
+  if (c.side === "human" && c.state === "JUMP") {
+    if (c._platformId != null) startDrop(c);
+    else {
+      c.state = "FALL";
+      c.vx = 0;
+      c.vy = Math.max(0, Number(c.vy) || 0);
+    }
   }
   c.timer -= simDt;
 
@@ -257,19 +292,31 @@ export function tickCharacter(c, ctx, simDt) {
     const hb = getCharHitbox(c);
     const hbLeft = hb.x, hbRight = hb.x + hb.w;
     const bodyTop = getCharBodyTop(c);
+    let droppedForObstacle = false;
     for (const plat of platforms) {
       if (plat.id === c._platformId) continue;
       if (!isTangiblePlatform(plat, blockPowered)) continue;
       if (c.y + c.h <= plat.y || bodyTop >= plat.y + PLATFORM_H) continue;
       const MARGIN = 1;
       const step = Math.abs(c.vx) * simDt + MARGIN;
-      const hitRight = c.dir > 0 && hbRight <= plat.x && hbRight + step > plat.x;
-      const hitLeft = c.dir < 0 && hbLeft >= plat.x + PLATFORM_W && hbLeft - step < plat.x + PLATFORM_W;
+      const hbCenter = (hbLeft + hbRight) / 2;
+      const platCenter = plat.x + PLATFORM_W / 2;
+      // 블록 경계를 이번 프레임에 넘는 경우뿐 아니라, 좁은 격자에서 몸통이 이미
+      // 살짝 겹친 경우도 진행 방향 앞의 장애물로 처리한다.
+      const hitRight = c.dir > 0 && platCenter > hbCenter
+        && hbLeft < plat.x + PLATFORM_W && hbRight + step > plat.x;
+      const hitLeft = c.dir < 0 && platCenter < hbCenter
+        && hbRight > plat.x && hbLeft - step < plat.x + PLATFORM_W;
       if (!hitRight && !hitLeft) continue;
       if (tryWarp(c, plat, platforms, now)) break;
       const spikeDir = plat.blockType === "spike_block" ? getSpikeDir(plat.rotation ?? 0) : null;
       if ((hitRight && spikeDir === "left") || (hitLeft && spikeDir === "right")) {
         triggerSpike(c, now); break;
+      }
+      if (c.side === "human" && c._platformId != null) {
+        startDrop(c);
+        droppedForObstacle = true;
+        break;
       }
       c.dir *= -1; c.vx = c.dir * spd;
       c._blockBounces = (c._blockBounces || 0) + 1;
@@ -277,16 +324,17 @@ export function tickCharacter(c, ctx, simDt) {
       break;
     }
     // 튕김 감쇠 / 4회 이상 연속 튕기면 점프 탈출 (Shrimprium 동작)
-    if (c._blockBounces > 0) {
+    if (!droppedForObstacle && c._blockBounces > 0) {
       c._blockBounceDecay = (c._blockBounceDecay || 0) + simDt;
       if (c._blockBounceDecay > 1.2) { c._blockBounces = 0; c._blockBounceDecay = 0; }
     }
-    if ((c._blockBounces || 0) >= 4) {
+    if (!droppedForObstacle && (c._blockBounces || 0) >= 4) {
       c._blockBounces = 0; c._blockBounceDecay = 0;
-      startJump(c, rng, 40, 20);
-    } else if (c.timer <= 0) {
+      if (c.side === "human" && c._platformId != null) startDrop(c);
+      else if (c.side !== "human") startJump(c, rng, 40, 20);
+    } else if (!droppedForObstacle && c.timer <= 0) {
       defaultMoveDecide(c, ctx, rng);
-    } else if (c.side !== "human" && c._platformId != null
+    } else if (!droppedForObstacle && c.side !== "human" && c._platformId != null
       && aboutToLeavePlatformEdge(c, onPlat, platforms, blockPowered, simDt)) {
       // 플랫폼 가장자리: 좁은 발판(20px)은 CRAWL 타이머가 끝나기 전에 걸어 나가
       // 버려 defaultMoveDecide(도약 판단)가 실행되지 않는다. 바닥에서처럼 도약
@@ -303,14 +351,22 @@ export function tickCharacter(c, ctx, simDt) {
   }
 
   else if (c.state === "DASH") {
-    // 뱀파이어 패시브 돌진: 중력·지형 전부 무시하고 직선 비행.
+    // Vamp Shrimp 패시브 돌진: 중력·지형 전부 무시하고 직선 비행.
     // 조향(vx/vy)은 ai.tickAggro가 매 프레임 대상 방향으로 갱신한다 — 여기선 적분만.
   }
 
   else if (c.state === "FALL" || c.state === "STUN") {
-    c.vy += PX_GRAVITY * simDt;
-    if (c.state === "STUN" || now < (c._spikeIgnoreUntil ?? 0)) {
-      // 스턴/가시 낙하: 플랫폼 무시, 바닥만
+    if (c.state === "STUN" && onPlat) {
+      c.y = effectiveGroundY;
+      c.vx = 0;
+      c.vy = 0;
+    } else {
+      c.vy += PX_GRAVITY * simDt;
+    }
+    if (c.state === "STUN" && onPlat) {
+      // 스턴이 끝날 때까지 착지한 플랫폼 위에 머문다.
+    } else if (now < (c._spikeIgnoreUntil ?? 0)) {
+      // 가시 낙하는 기존대로 플랫폼을 무시하고 바닥까지 떨어진다.
       landOnFloor(c, ctx);
     } else if (!tryLand(c, ctx, simDt)) {
       landOnFloor(c, ctx);
@@ -380,7 +436,7 @@ function aboutToLeavePlatformEdge(c, onPlat, platforms, blockPowered, simDt) {
   return true;
 }
 
-/** 멈춤 없는 기본 이동: 인간은 걷고, 새우 진영은 주기적으로 위 플랫폼을 향해 도약한다. */
+/** 멈춤 없는 기본 이동: Holy Shrimp는 걷고, 다른 새우 진영은 주기적으로 위 플랫폼을 향해 도약한다. */
 export function defaultMoveDecide(c, ctx, rng = Math.random) {
   c.state = "CRAWL";
   if (c.side === "human") {

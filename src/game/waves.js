@@ -1,5 +1,5 @@
 // src/game/waves.js
-// 웨이브 진행: 인간 스폰 스케줄, 클리어/패배 판정, 자동 웨이브.
+// 웨이브 진행: Holy Shrimp 스폰 스케줄, 클리어/패배 판정, 자동 웨이브.
 
 import {
   CHAR_SIZE, FLOOR_Y,
@@ -11,7 +11,7 @@ import {
 import { createCharacter } from "../state/gameState.js";
 import { findHumanSpawnRoutes } from "./descentNavigation.js";
 
-/** 뱀파이어 진영(뱀파이어+노예) 생존 수 */
+/** Vamp Shrimp 진영(Vamp Shrimp+Jombie Shrimp) 생존 수 */
 export function vampireSideAlive(state) {
   return state.chars.items.filter(
     (c) => !c.dead && (c.side === "vampire" || c.side === "slave"),
@@ -34,14 +34,14 @@ export function grantAccountExp(state, amount, events = []) {
   }
 }
 
-/** 인간 스폰 존(오른쪽 위) 안에 좌상단 x가 들어오는 하강 경로만 남긴다. */
+/** Holy Shrimp 스폰 존(오른쪽 위) 안에 좌상단 x가 들어오는 하강 경로만 남긴다. */
 function routesInHumanZone(routes) {
   const minX = HUMAN_SPAWN_ZONE.x;
   const maxX = HUMAN_SPAWN_ZONE.x + HUMAN_SPAWN_ZONE.w - CHAR_SIZE;
   return routes.filter((r) => r.x >= minX - 0.5 && r.x <= maxX + 0.5);
 }
 
-/** 웨이브 시작: 인간 스폰 존에서 바닥까지 내려오는 경로가 있을 때만 인간을 배정한다. */
+/** 웨이브 시작: Holy Shrimp 스폰 존에서 바닥까지 내려오는 경로가 있을 때만 Holy Shrimp를 배정한다. */
 export function startWave(state, blockPowered = null) {
   const w = state.wave;
   if (w.active) {
@@ -71,7 +71,7 @@ export function startWave(state, blockPowered = null) {
   return true;
 }
 
-/** 죽은 뱀파이어 전원 부활 (풀피, 왼쪽 아래 스폰 존 바닥에서 재시작) */
+/** 죽은 Vamp Shrimp 전원 부활 (풀피, 왼쪽 아래 스폰 존 바닥에서 재시작) */
 export function reviveVampires(state, rng = Math.random) {
   for (const c of state.chars.items) {
     if (c.side !== "vampire" || !c.dead) continue;
@@ -87,8 +87,8 @@ export function reviveVampires(state, rng = Math.random) {
 }
 
 /**
- * 뱀파이어 스폰 존(베이스)에 도달한 인간을 처리한다.
- * 존에 들어온 인간은 즉시 제거되고 코어(state.core.hp)가 1 줄어든다.
+ * Vamp Shrimp 스폰 존(베이스)에 도달한 Holy Shrimp를 처리한다.
+ * 존에 들어온 Holy Shrimp는 즉시 제거되고 코어(state.core.hp)가 1 줄어든다.
  * @returns {Array<object>} invade 이벤트 목록
  */
 export function tickBaseInvasion(state) {
@@ -111,7 +111,7 @@ export function tickBaseInvasion(state) {
   return events;
 }
 
-/** 게임오버(코어 소진): 웨이브 1로 리셋·인간 제거·코어 회복·뱀파이어 부활 */
+/** 게임오버(코어 소진): 웨이브 1로 리셋·Holy Shrimp 제거·코어 회복·Vamp Shrimp 부활 */
 function triggerGameOver(state, rng) {
   state.chars.items = state.chars.items.filter((c) => c.side !== "human");
   const w = state.wave;
@@ -148,16 +148,16 @@ export function tickWaves(state, simDt, rng = Math.random, blockPowered = null) 
       events.push({ type: "spawn", char: c });
     }
 
-    // 베이스 침입: 뱀파이어 존에 도달한 인간 처리 → 코어 감소
+    // 베이스 침입: Vamp Shrimp 존에 도달한 Holy Shrimp 처리 → 코어 감소
     events.push(...tickBaseInvasion(state));
-    // 게임오버: 코어 소진 → 웨이브 1로 리셋, 코어 회복, 뱀파이어 부활
+    // 게임오버: 코어 소진 → 웨이브 1로 리셋, 코어 회복, Vamp Shrimp 부활
     if (state.core.hp <= 0) {
       triggerGameOver(state, rng);
       events.push({ type: "gameover" });
       return events;
     }
 
-    // 패배: 뱀파이어 진영 전멸 → 인간 제거, 웨이브 1로 리셋, 뱀파이어 부활
+    // 패배: Vamp Shrimp 진영 전멸 → Holy Shrimp 제거, 웨이브 1로 리셋, Vamp Shrimp 부활
     if (vampireSideAlive(state) === 0) {
       state.chars.items = state.chars.items.filter((c) => c.side !== "human");
       w.active = false;
@@ -169,7 +169,7 @@ export function tickWaves(state, simDt, rng = Math.random, blockPowered = null) 
       return events;
     }
 
-    // 클리어: 스폰 완료 + 인간 전멸
+    // 클리어: 스폰 완료 + Holy Shrimp 전멸
     if (w.pendingSpawns.length === 0 && humansAlive(state) === 0) {
       const reward = waveReward(w.current);
       state.blood += reward;

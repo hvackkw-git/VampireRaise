@@ -56,6 +56,40 @@ button { font-family: inherit; color: inherit; }
 .hud-chip:empty { display: none; }
 #hudHumans { color: #7ec8e3; }
 
+.test-controls {
+  top: 19px;
+  right: 6px;
+  display: flex;
+  gap: 4px;
+}
+.test-control {
+  width: 25px;
+  height: 23px;
+  padding: 0;
+  border: 1px solid #514064;
+  border-radius: 4px;
+  background: rgba(20, 10, 34, 0.82);
+  color: #9b8aaa;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+.test-control.on {
+  border-color: #6fb7cc;
+  color: #bdefff;
+  background: rgba(28, 65, 76, 0.88);
+}
+.test-level-up {
+  width: 35px;
+  border-color: #8e3448;
+  color: #ff9aaa;
+  background: rgba(70, 20, 30, 0.88);
+  font-size: 9px;
+  font-weight: 700;
+}
+.char-detect[hidden],
+#tank.detect-ranges-hidden .char-detect { display: none !important; }
+
 #versionBadge {
   right: 6px; bottom: 6px;
   padding: 2px 6px;
@@ -109,13 +143,13 @@ button { font-family: inherit; color: inherit; }
   border-top: 2px solid #55396b;
   pointer-events: none;
 }
-/* 스폰 존: 2×2 크기의 하얀 네모 (배경 위·블록/캐릭터 아래) */
+/* 스폰 위치는 유지하되 플레이 화면에는 경계 상자를 노출하지 않는다. */
 .spawn-zone-layer { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
 .spawn-zone {
   position: absolute;
-  background: rgba(255, 255, 255, 0.16);
-  border: 2px solid rgba(255, 255, 255, 0.85);
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.35);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
   box-sizing: border-box;
   image-rendering: pixelated;
 }
@@ -152,11 +186,24 @@ button { font-family: inherit; color: inherit; }
   width: 32px; height: 32px;
 }
 .char-sprite {
-  position: relative;
-  width: 100%; height: 100%;
+  position: absolute;
+  left: 0;
+  width: 100%;
+  overflow: hidden;
   background-repeat: no-repeat;
   image-rendering: pixelated;
 }
+.char-pattern {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  z-index: 1;
+}
+.char-pattern[hidden] { display: none; }
 /* 감지 범위 원 (테스트용 반투명 표시) — 원 안에 적이 들어오면 인식 */
 .char-detect {
   position: absolute;
@@ -176,13 +223,7 @@ button { font-family: inherit; color: inherit; }
   border: 1px solid rgba(154, 104, 216, 0.3);
 }
 .char.stunned .char-sprite { filter: grayscale(1) brightness(0.55); }
-/* 패널이 비추는 캐릭터(자동 포커스)는 은은하게, 직접 탭한 캐릭터는 금색으로 표시 */
-.char.focused::after {
-  content: "";
-  position: absolute; inset: -3px;
-  border: 1px dashed rgba(255, 210, 87, 0.35);
-  border-radius: 6px;
-}
+/* 직접 탭한 캐릭터만 금색 선택 표시 */
 .char.selected::after {
   content: "";
   position: absolute; inset: -3px;
@@ -269,6 +310,7 @@ button { font-family: inherit; color: inherit; }
 .fx-float.fx-shield { color: #c99bff; font-size: 11px; text-shadow: 0 0 6px #9a4dff; }
 .fx-float.fx-shieldblock { color: #d9c2ff; }
 .fx-float.fx-stun { color: #fff2a8; font-size: 11px; text-shadow: 0 0 6px #ffce3a; }
+.fx-float.fx-poison { color: #ff6b6b; text-shadow: 0 0 5px #a81232; }
 .fx-float.fx-multihit {
   color: #7dff9a; font-size: 12px; font-weight: 800;
   text-shadow: 0 0 6px #16d24a, 0 1px 2px #000;
@@ -311,6 +353,11 @@ button { font-family: inherit; color: inherit; }
   font-size: 15px;
   color: #fff6c8;
   text-shadow: 0 0 8px #ffd94d, 0 0 16px #fff;
+  animation: fx-stunburst 0.6s ease-out forwards;
+}
+.fx-burst.fx-poisonburst {
+  color: #ff596f;
+  text-shadow: 0 0 7px #ff2448;
   animation: fx-stunburst 0.6s ease-out forwards;
 }
 @keyframes fx-stunburst {
@@ -382,69 +429,32 @@ button { font-family: inherit; color: inherit; }
   100% { opacity: 0; transform: rotate(var(--a)) translateY(-34px) scaleY(1.3); }
 }
 
-/* ── 새우 오러(레벨 구간별 빨강 계열, 새우 뒤에서 회전) ──
-   tankView가 auraStyleForTier() 값을 --aura-* 변수로 꽂는다. 단계가 오를수록
-   지름·불투명도가 커지고(글로우), 소용돌이 링(2단계~)·스파크 링(4단계~)이 켜진다. */
+/* 새우 오러: 기존 CSS 효과를 64x64 프레임 8장, 10행으로 구운 투명 PNG 시트. */
 .char-aura {
   position: absolute;
-  left: 50%; top: 56%; /* 새우 몸통(하단 ~14px) 중심 근처 */
-  width: var(--aura-sz, 34px);
-  height: var(--aura-sz, 34px);
+  left: 50%; top: 78%; /* 18px 투명 여백 아래, 실제 14px 몸통의 중심 */
+  width: 64px; height: 64px;
   transform: translate(-50%, -50%);
   pointer-events: none;
-  opacity: var(--aura-op, 0);
-  z-index: 0; /* 스프라이트보다 뒤(새우가 오러 위에 그려진다) */
+  z-index: 0;
+  background-image: url("assets/aura/shrimp-aura-sheet.png");
+  background-repeat: no-repeat;
+  background-position: 0 var(--aura-row, 0);
+  background-size: 512px 640px;
+  image-rendering: pixelated;
+  animation: shrimp-aura-frames var(--aura-duration, 1.15s) steps(8) infinite;
+  will-change: background-position;
 }
-.char-aura > span {
-  position: absolute; inset: 0;
-  border-radius: 50%;
-  will-change: transform, opacity;
-}
-/* 은은하게 숨쉬는 코어 글로우 — 모든 단계에서 표시 */
-.aura-glow {
-  background: radial-gradient(circle,
-    var(--aura-core, #ff5a6e) 0%,
-    var(--aura-edge, #d0243c) 42%,
-    rgba(120, 0, 12, 0.25) 66%,
-    transparent 74%);
-  animation: aura-breathe 2.4s ease-in-out infinite;
-}
-/* 회전하는 소용돌이 링 (2단계부터 --aura-ring-op로 등장) */
-.aura-ring {
-  opacity: var(--aura-ring-op, 0);
-  background: conic-gradient(from 0deg,
-    transparent 0deg,
-    var(--aura-core, #ff5a6e) 55deg,
-    transparent 120deg,
-    var(--aura-edge, #d0243c) 200deg,
-    transparent 265deg,
-    var(--aura-core, #ff5a6e) 320deg,
-    transparent 360deg);
-  -webkit-mask: radial-gradient(circle, transparent 50%, #000 58%, #000 92%, transparent 99%);
-          mask: radial-gradient(circle, transparent 50%, #000 58%, #000 92%, transparent 99%);
-  animation: aura-spin var(--aura-spin, 6s) linear infinite;
-}
-/* 반대로 도는 스파크 링 (4단계부터 --aura-spark-op로 등장) */
-.aura-spark {
-  opacity: var(--aura-spark-op, 0);
-  background: repeating-conic-gradient(from 0deg,
-    var(--aura-core, #ffd0a0) 0deg 4deg, transparent 4deg 26deg);
-  -webkit-mask: radial-gradient(circle, transparent 68%, #000 76%, #000 96%, transparent 100%);
-          mask: radial-gradient(circle, transparent 68%, #000 76%, #000 96%, transparent 100%);
-  filter: drop-shadow(0 0 3px var(--aura-core, #ff7a5a));
-  animation: aura-spin-rev calc(var(--aura-spin, 6s) * 0.75) linear infinite;
-}
-@keyframes aura-spin { to { transform: rotate(360deg); } }
-@keyframes aura-spin-rev { to { transform: rotate(-360deg); } }
-@keyframes aura-breathe {
-  0%, 100% { transform: scale(0.9); opacity: 0.82; }
-  50%      { transform: scale(1.1); opacity: 1; }
+.char-aura[hidden] { display: none; }
+@keyframes shrimp-aura-frames {
+  from { background-position: 0 var(--aura-row, 0); }
+  to { background-position: -512px var(--aura-row, 0); }
 }
 
 /* 보라 실드 오라(지속 표시) */
 .char-shield {
   position: absolute;
-  left: 50%; top: 52%;
+  left: 50%; top: 78%;
   width: 40px; height: 40px;
   transform: translate(-50%, -50%);
   border-radius: 50%;
@@ -915,8 +925,28 @@ button { font-family: inherit; color: inherit; }
   box-shadow: 0 0 7px rgba(111, 183, 204, 0.5);
 }
 .skill-tree-node.dash-node:disabled { cursor: default; opacity: 0.6; }
-.skill-tree-detail {
+.skill-tree-node.zombie-node::before { display: none; }
+.skill-tree-node.zombie-node {
+  border-color: #8faa4d;
+  background: #202914;
+  color: #d8ef9a;
+}
+.skill-tree-node.zombie-node.selected,
+.skill-tree-node.zombie-node:hover {
+  background: #2c3a19;
+  box-shadow: 0 0 7px rgba(143, 170, 77, 0.45);
+}
+.skill-tree-node.zombie-node.locked { opacity: 0.35; }
+.skill-tree-footer {
   flex: 0 0 32px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.skill-tree-detail {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -930,6 +960,24 @@ button { font-family: inherit; color: inherit; }
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.skill-tree-level-up {
+  flex: 0 0 52px;
+  width: 52px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #8b6b2a;
+  border-radius: 4px;
+  background: #302817;
+  color: #f0d47a;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.skill-tree-level-up:hover { background: #44371d; }
+.skill-tree-level-up:disabled {
+  opacity: 0.42;
+  cursor: default;
 }
 
 /* ── Dash 잔상 색상 투자 ── */

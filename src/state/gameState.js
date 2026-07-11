@@ -17,11 +17,22 @@ function nextVampireOrder(state) {
   return (orders.length ? Math.max(...orders) : 0) + 1;
 }
 
+function normalizeZombieTrait(value) {
+  if (value === "zombie-rili-revive") return "zombie-yellow-revive";
+  if (value === "zombie-yellow-poison") return "zombie-red-poison";
+  return typeof value === "string" ? value : null;
+}
+
+function normalizeZombiePattern(value) {
+  if (value === "RILI_RED") return "RILI_YELLOW";
+  return typeof value === "string" ? value : null;
+}
+
 export function createCharacter(state, side, opts = {}) {
   const id = state.chars.nextId++;
   const size = CHAR_SPRITES[side]?.size ?? CHAR_SIZE;
   const baseStats = side === "slave" ? SLAVE_BASE : VAMPIRE_BASE;
-  // 뱀파이어는 왼쪽 아래 스폰 존(바닥)에서만 스폰. 그 외(노예 등)는 기존 무작위 위치.
+  // Vamp Shrimp는 왼쪽 아래 스폰 존(바닥)에서만 스폰. 그 외(Jombie Shrimp 등)는 기존 무작위 위치.
   const defaultX = side === "vampire"
     ? spawnXInZone(VAMPIRE_SPAWN_ZONE, size)
     : Math.random() * (TANK_W - size);
@@ -45,11 +56,11 @@ export function createCharacter(state, side, opts = {}) {
     _fightTargetId: null,       // 교전 대상 (FIGHT 상태)
     _ping: null,                // 추적 핑 { targetId } — 1초마다 갱신
     _pingCd: Math.random(),     // 핑 갱신 시차 분산
-    _dashTargetId: null,        // 혈귀 돌진 대상 (뱀파이어 패시브)
+    _dashTargetId: null,        // 혈귀 돌진 대상 (Vamp Shrimp 패시브)
     _dashTimeLeft: 0,
     _dashCd: 0,
     _atkCd: Math.random(),      // 첫 공격 타이밍 분산
-    _projectileCd: Math.random(), // 인간 투사체 첫 발사 타이밍 분산
+    _projectileCd: Math.random(), // Holy Shrimp 투사체 첫 발사 타이밍 분산
     // ── 성장 ──
     level: opts.level ?? 1,
     exp: 0,
@@ -59,7 +70,7 @@ export function createCharacter(state, side, opts = {}) {
     mp: opts.mp ?? opts.maxMp ?? baseStats.maxMp ?? HUMAN_BASE_MP,
     atk: opts.atk ?? baseStats.atk,
     job: null,                  // 향후 직업 분류
-    skills: side === "vampire" ? ["dash"] : [], // 장착 스킬 (v1: 뱀파이어 혈귀 돌진)
+    skills: side === "vampire" ? ["dash"] : [], // 장착 스킬 (v1: Vamp Shrimp 혈귀 돌진)
     skillPoints: side === "vampire"
       ? Math.max(0, Number(opts.skillPoints ?? ((opts.level ?? 1) - 1)) || 0)
       : 0,
@@ -80,8 +91,15 @@ export function createCharacter(state, side, opts = {}) {
     detectPoints: side === "vampire" ? Math.max(0, Number(opts.detectPoints ?? 0) || 0) : 0,
     // 대쉬 숙련 포인트 — 위 풀에서 투자. 포인트당 돌진 쿨타임·마나소모 -10%씩.
     dashCdManaPoints: side === "vampire" ? Math.max(0, Number(opts.dashCdManaPoints ?? 0) || 0) : 0,
-    projectileSkill: opts.projectileSkill ?? null, // 인간 투사체 성장 훅(count/homing/damage/cooldown/range/speed)
-    ownerVampireId: opts.ownerVampireId ?? null, // 노예 소유 뱀파이어 id
+    // Jombie Shrimp 체력 스킬 — 소유 Jombie Shrimp의 최대 체력에 포인트당 +1.
+    zombieHpPoints: side === "vampire" ? Math.max(0, Math.floor(Number(opts.zombieHpPoints) || 0)) : 0,
+    zombieTrait: side === "vampire" ? normalizeZombieTrait(opts.zombieTrait) : null,
+    zombiePattern: side === "slave" ? normalizeZombiePattern(opts.zombiePattern) : null,
+    zombieRevivesLeft: side === "slave" ? Math.max(0, Math.floor(Number(opts.zombieRevivesLeft) || 0)) : 0,
+    poisonStacks: Math.max(0, Math.min(5, Math.floor(Number(opts.poisonStacks) || 0))),
+    _poisonClock: 0,
+    projectileSkill: opts.projectileSkill ?? null, // Holy Shrimp 투사체 성장 훅(count/homing/damage/cooldown/range/speed)
+    ownerVampireId: opts.ownerVampireId ?? null, // Jombie Shrimp 소유 Vamp Shrimp id
     vampireOrder: side === "vampire" ? (opts.vampireOrder ?? nextVampireOrder(state)) : null,
     dead: false,
   };
@@ -95,7 +113,7 @@ export function createInitialState() {
     version: 1,
     blood: 0,
     account: { level: 1, exp: 0 }, // 계정 성장 (웨이브 클리어로 경험치 획득)
-    core: { hp: BASE_CORE_HP, max: BASE_CORE_HP }, // 베이스 코어: 인간이 뱀파이어 존에 들어오면 감소, 0이면 게임오버
+    core: { hp: BASE_CORE_HP, max: BASE_CORE_HP }, // 베이스 코어: Holy Shrimp가 Vamp Shrimp 존에 들어오면 감소, 0이면 게임오버
     wave: {
       current: 1,
       active: false,
@@ -131,7 +149,7 @@ export function serialize(state) {
     chars: {
       nextId: state.chars.nextId,
       items: state.chars.items
-        .filter((c) => c.side !== "human") // 인간은 웨이브 소속 — 저장 안 함
+        .filter((c) => c.side !== "human") // Holy Shrimp는 웨이브 소속 — 저장 안 함
         .map((c) => ({
           id: c.id, side: c.side, x: c.x, y: c.y, dir: c.dir,
           level: c.level, exp: c.exp, maxHp: c.maxHp, hp: c.hp,
@@ -141,6 +159,10 @@ export function serialize(state) {
           skillPoints: c.skillPoints, learnedSkills: c.learnedSkills,
           dashColors: c.dashColors, dashPoints: c.dashPoints, detectPoints: c.detectPoints,
           dashCdManaPoints: c.dashCdManaPoints,
+          zombieHpPoints: c.zombieHpPoints,
+          zombieTrait: c.zombieTrait,
+          zombiePattern: c.zombiePattern,
+          zombieRevivesLeft: c.zombieRevivesLeft,
           dead: c.dead,
         })),
     },
@@ -205,6 +227,10 @@ export function loadState(storage = globalThis.localStorage) {
       dashPoints: rec.dashPoints,
       detectPoints: rec.detectPoints,
       dashCdManaPoints: rec.dashCdManaPoints,
+      zombieHpPoints: rec.zombieHpPoints,
+      zombieTrait: rec.zombieTrait,
+      zombiePattern: rec.zombiePattern,
+      zombieRevivesLeft: rec.zombieRevivesLeft,
     });
     c.id = rec.id;
     c.dir = rec.dir === -1 ? -1 : 1;

@@ -2,12 +2,13 @@
 // 하단 상시 패널 (1행×4열): [HP/MP/EXP 바] [데미지] [장착 스킬 2×2] [핫키 2×3].
 // 계정 레벨·경험치 바는 게임 영역 상단(levelBar)에 별도로 표시된다.
 // 표시 대상 캐릭터는 index.js가 결정한다 — 직접 탭한 캐릭터가 있으면 그 캐릭터를 보여주고,
-// 없으면(선택 해제 상태) renderSquadPanel로 스탯/데미지/장착 스킬 자리에 생존 뱀파이어
+// 없으면(선택 해제 상태) renderSquadPanel로 스탯/데미지/장착 스킬 자리에 생존 Vamp Shrimp
 // 얼굴 그리드(2행6열)를 대신 보여준다 (핫키는 그대로 유지). 얼굴을 탭하면 그 캐릭터가 선택된다.
 
 import { expToNext, accountExpToNext } from "../constants.js";
 
-const SIDE_ICON = { vampire: "🧛", human: "🙍", slave: "🧟" };
+const SIDE_ICON = { vampire: "🦐", human: "🦐", slave: "🦐" };
+const SIDE_NAME = { vampire: "Vamp Shrimp", human: "Holy Shrimp", slave: "Jombie Shrimp" };
 
 /** 스킬 도감 — 장착 스킬 슬롯에 표시할 이름·스프라이트 */
 const SKILL_BOOK = {
@@ -106,7 +107,7 @@ export function renderInfoPanel(char, account = null) {
   els.panel.classList.remove("squad-mode");
   els.panel.classList.toggle("no-char", !char);
   if (!char) {
-    els.statName.textContent = "— 뱀파이어 없음 —";
+    els.statName.textContent = "— Vamp Shrimp 없음 —";
     setBar(els.hpFill, els.hpNum, 0, 0);
     setBar(els.mpFill, els.mpNum, 0, 0);
     setBar(els.expFill, els.expNum, 0, 0);
@@ -116,7 +117,7 @@ export function renderInfoPanel(char, account = null) {
   }
   const order = Number.isFinite(char.vampireOrder) ? `${char.vampireOrder}번 ` : "";
   els.statName.textContent =
-    `${SIDE_ICON[char.side] ?? ""} ${order}Lv.${char.level}`;
+    `${SIDE_ICON[char.side] ?? ""} ${order}${SIDE_NAME[char.side] ?? "Shrimp"} Lv.${char.level}`;
   setBar(els.hpFill, els.hpNum, char.hp, char.maxHp);
   setBar(els.mpFill, els.mpNum, char.mp ?? 0, char.maxMp ?? 0);
   setBar(els.expFill, els.expNum, char.exp, expToNext(char.level));
@@ -126,8 +127,8 @@ export function renderInfoPanel(char, account = null) {
 
 /**
  * 선택한 캐릭터가 없을 때(탭 해제 상태) 보여주는 화면 — 스탯/데미지/장착 스킬 자리에
- * 생존 뱀파이어 얼굴 그리드(2행6열)를 대신 띄운다. 얼굴을 탭하면 그 캐릭터가 선택된다.
- * @param {object[]} vampires 생존 뱀파이어 목록
+ * 생존 Vamp Shrimp 얼굴 그리드(2행6열)를 대신 띄운다. 얼굴을 탭하면 그 캐릭터가 선택된다.
+ * @param {object[]} vampires 생존 Vamp Shrimp 목록
  * @param {{level:number, exp:number}|null} account 계정 성장 상태 (상단 levelBar)
  */
 export function renderSquadPanel(vampires, account = null) {
@@ -150,7 +151,7 @@ export function renderSquadPanel(vampires, account = null) {
     slot.disabled = !v;
     if (v) {
       slot.innerHTML = `${SIDE_ICON.vampire}<small>${v.vampireOrder ?? i + 1}</small>`;
-      slot.title = `${v.vampireOrder ?? i + 1}번 뱀파이어 Lv.${v.level}`;
+      slot.title = `${v.vampireOrder ?? i + 1}번 Vamp Shrimp Lv.${v.level}`;
       slot.onclick = () => onSelectVampireCb?.(v.id);
     } else {
       slot.innerHTML = "";

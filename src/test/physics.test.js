@@ -182,6 +182,77 @@ describe("기믹 블록", () => {
     }
     expect(stunned).toBe(true);
   });
+
+  it("스턴 낙하 중 바닥이 아니라 바로 아래 플랫폼에 착지해 머문다", () => {
+    const nearest = { id: 21, x: 100, y: 380, blockType: "platform_block" };
+    const farther = { id: 22, x: 100, y: 480, blockType: "platform_block" };
+    const c = makeChar({
+      x: 100, y: 268, state: "STUN", vy: 400,
+      _platformId: null, _stunUntil: 20000,
+    });
+    // 먼 발판을 먼저 넣어도 Y가 가까운 발판을 선택해야 한다.
+    tickCharacter(c, makeCtx([farther, nearest]), 0.5);
+    expect(c._platformId).toBe(nearest.id);
+    expect(c.y).toBe(nearest.y - CHAR_SIZE);
+    expect(c.state).toBe("STUN");
+    expect(c.vy).toBe(0);
+  });
+});
+
+describe("적 인간 이동 제한", () => {
+  it("플랫폼 위에서 전방 블록에 막히면 점프·반전 대신 아래로 드롭한다", () => {
+    const current = { id: 31, x: 140, y: 400, blockType: "platform_block" };
+    const blocker = { id: 32, x: 160, y: 380, blockType: "platform_block" };
+    const lower = { id: 33, x: 140, y: 480, blockType: "platform_block" };
+    const c = makeChar({
+      // 20px 격자에서 몸통이 오른쪽 블록에 이미 0.5px 겹친 실게임 배치.
+      side: "human", x: 137.5, y: 400 - CHAR_SIZE,
+      state: "CRAWL", dir: 1, timer: 99, _platformId: current.id,
+    });
+    const ctx = makeCtx([current, blocker, lower]);
+
+    tickCharacter(c, ctx, 1 / 60);
+    expect(c.state).toBe("FALL");
+    expect(c._platformId).toBeNull();
+    expect(c._dropThroughId).toBe(current.id);
+    expect(c.state).not.toBe("JUMP");
+
+    for (let t = 0; t < 2 && c._platformId == null; t += 1 / 60) {
+      tickCharacter(c, ctx, 1 / 60);
+      expect(c.state).not.toBe("JUMP");
+    }
+    expect(c._platformId).toBe(lower.id);
+  });
+
+  it("Holy Shrimp에 JUMP 상태가 직접 들어와도 즉시 아래로 낙하한다", () => {
+    const current = { id: 35, x: 100, y: 400, blockType: "platform_block" };
+    const c = makeChar({
+      side: "human", x: 100, y: 400 - CHAR_SIZE,
+      state: "JUMP", vy: -220, _platformId: current.id,
+    });
+
+    tickCharacter(c, makeCtx([current]), 1 / 60);
+
+    expect(c.state).toBe("FALL");
+    expect(c.vy).toBeGreaterThanOrEqual(0);
+    expect(c._dropThroughId).toBe(current.id);
+    expect(c._platformId).toBeNull();
+  });
+
+  it("인간은 직접 점프와 스프링 도약을 하지 않는다", () => {
+    const c = makeChar({ side: "human" });
+    expect(startJump(c, () => 0.5)).toBe(false);
+    expect(c.state).not.toBe("JUMP");
+
+    const spring = { id: 34, x: 100, y: 400, blockType: "spring_block" };
+    const falling = makeChar({ side: "human", x: 100, y: 340, state: "FALL", vy: 0 });
+    const ctx = makeCtx([spring]);
+    for (let t = 0; t < 1; t += 1 / 60) {
+      tickCharacter(falling, ctx, 1 / 60);
+      expect(falling.state).not.toBe("JUMP");
+    }
+    expect(falling.y + falling.h).toBeGreaterThan(spring.y);
+  });
 });
 
 describe("FIGHT 상태", () => {
