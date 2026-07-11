@@ -76,10 +76,12 @@ export function initSkillTreePanel({ getCharacter, getCharacters, onChange, onOp
       if (skill.dash.kind === "color") {
         button.style.setProperty("--dash-color", DASH_COLOR_HEX[skill.dash.key]);
       }
-      button.innerHTML = '<span class="skill-node-count">0</span>';
+      const icon = skill.dash.icon ? `<img class="skill-node-icon" src="${skill.dash.icon}" alt="" draggable="false">` : "";
+      button.innerHTML = `${icon}<span class="skill-node-count">0</span>`;
     } else if (skill.zombie) {
       button.classList.add("zombie-node");
-      button.innerHTML = '<span class="skill-node-count">0</span>';
+      const icon = skill.zombie.icon ? `<img class="skill-node-icon" src="${skill.zombie.icon}" alt="" draggable="false">` : "";
+      button.innerHTML = `${icon}<span class="skill-node-count">0</span>`;
     } else {
       button.classList.add("empty-node");
     }
