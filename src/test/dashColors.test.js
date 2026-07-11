@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   DASH_COLORS, DASH_COLOR_HEX, defaultDashColors, DEFAULT_DASH_POINTS,
-  dashGhostCount, dashColorCycle, dashGhostColorSequence, ghostColorAtProgress,
+  dashGhostCount, dashColorCycle, dashGhostTrail,
   investDashColor, resetDashColors, normalizeDashPoints,
   BASE_DETECT_RANGE, effectiveDetectRange, revengeAttackMult, dashDistanceMult,
   detectRangeMult, investDetect,
@@ -17,7 +17,7 @@ function memoryStorage() {
   };
 }
 
-/** 사이클을 N개까지 타일링(시퀀스를 새우→꼬리 순으로 읽은 것과 같아야 한다) */
+/** 사이클을 n개까지 타일링 */
 function tiled(cycle, n) {
   return Array.from({ length: n }, (_, i) => cycle[i % cycle.length]);
 }
@@ -57,26 +57,24 @@ describe("Dash 잔상 색 로직", () => {
   });
 
   it("빨강만 있으면 전부 빨강", () => {
-    const seq = dashGhostColorSequence({ red: 1 });
-    expect(new Set(seq)).toEqual(new Set(["red"]));
-    expect(seq.length).toBe(dashGhostCount({ red: 1 }));
+    expect(new Set(dashGhostTrail({ red: 1 }, 10))).toEqual(new Set(["red"]));
   });
 
-  it("결정적: 시퀀스는 사이클을 N개까지 타일링한 뒤 뒤집은 것(새우 근처=사이클 첫 색)", () => {
-    const points = { red: 6, orange: 2 };
-    const seq = dashGhostColorSequence(points);
-    const N = dashGhostCount(points);
-    expect(seq).toHaveLength(N);
-    expect(seq[seq.length - 1]).toBe("red"); // 새우 근처 = 사이클 첫 색
-    // 새우→꼬리로 읽으면(역순) 사이클 타일링과 같다
-    expect([...seq].reverse()).toEqual(tiled(dashColorCycle(points), N));
+  it("트레일: 잔상은 스폰 순서대로 사이클을 그대로 반복한다(길이 무관)", () => {
+    // 빨6 주2 → 사이클 [빨빨빨주], 스폰 순서대로 반복
+    expect(dashGhostTrail({ red: 6, orange: 2 }, 10)).toEqual(
+      tiled(["red", "red", "red", "orange"], 10),
+    );
+    // 짧은 돌진(적은 개수)이어도 앞에서부터 순서대로 나온다 — 색이 건너뛰지 않는다
+    expect(dashGhostTrail({ red: 6, orange: 2 }, 5)).toEqual(
+      ["red", "red", "red", "orange", "red"],
+    );
   });
 
-  it("빨주노초 반복: 새우에서 바깥으로 빨주노초빨주노초…", () => {
-    const points = { red: 1, orange: 1, yellow: 1, green: 1 };
-    const seq = dashGhostColorSequence(points);
-    const fromShrimp = [...seq].reverse(); // 새우(마지막 index)부터 바깥으로
-    expect(fromShrimp).toEqual(tiled(["red", "orange", "yellow", "green"], seq.length));
+  it("빨주노초 반복: 스폰 순서대로 빨주노초빨주노초…", () => {
+    expect(dashGhostTrail({ red: 1, orange: 1, yellow: 1, green: 1 }, 9)).toEqual(
+      tiled(["red", "orange", "yellow", "green"], 9),
+    );
   });
 
   it("뱀파이어 기본 dashColors는 복수 1포인트, 저장·복원된다", () => {
@@ -182,12 +180,5 @@ describe("Dash 잔상 색 로직", () => {
     expect(dashDistanceMult({})).toBeCloseTo(2.0);
     expect(dashDistanceMult({ orange: 1 })).toBeCloseTo(2.1);
     expect(dashDistanceMult({ orange: 2 })).toBeCloseTo(2.2);
-  });
-
-  it("ghostColorAtProgress: 0=꼬리 색, 1근처=새우 근처 색", () => {
-    const seq = ["orange", "orange", "red", "red"];
-    expect(ghostColorAtProgress(seq, 0)).toBe("orange");
-    expect(ghostColorAtProgress(seq, 0.99)).toBe("red");
-    expect(ghostColorAtProgress([], 0.5)).toBe("red"); // 빈 시퀀스 안전값
   });
 });
