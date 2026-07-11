@@ -253,8 +253,9 @@ export function renderChars(state, nowMs, ui) {
       ui.panelCharId === c.id && ui.selectedCharId !== c.id);
     entry.el.classList.toggle("selected", ui.selectedCharId === c.id);
     entry.hpFill.style.width = `${Math.max(0, Math.min(100, (c.hp / c.maxHp) * 100))}%`;
-    // 돌진 잔상: 45ms 간격으로 고스트를 남긴다. 색은 이번 돌진의 사이클(빨빨빨주…)을
-    // 스폰 순서대로 따라간다 — 경로 곡률/돌진 길이와 무관하게 항상 순서대로 나온다.
+    // 돌진 잔상: 45ms 간격으로 고스트를 남긴다. 색은 이번 돌진의 사이클을 스폰 순서대로
+    // 반복해 칠한다(k번째 잔상 = cycle[k % len]) — 예) 빨6·노3 → [빨,빨,노] → 빨빨노빨빨노….
+    // 새 돌진마다 사이클 처음(빨강)부터 다시 돈다.
     const dashing = c.state === "DASH";
     if (dashing && !entry.wasDashing) entry.ghostIdx = 0; // 새 돌진 시작 → 사이클 처음부터
     entry.wasDashing = dashing;

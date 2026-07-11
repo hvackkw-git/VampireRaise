@@ -76,6 +76,16 @@ function endDash(c, platforms = [], { arrived = false, blockPowered = null, fx =
   c._dashCd = DASH_COOLDOWN_S * dashCdManaMult(c.dashCdManaPoints);
 }
 
+/** 웨이포인트 경로의 총 길이(px) — 비행 시간·잔상 진행률 계산용 */
+function dashPathLength(path) {
+  if (!Array.isArray(path) || path.length < 2) return 0;
+  let len = 0;
+  for (let i = 1; i < path.length; i++) {
+    len += Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y);
+  }
+  return len;
+}
+
 /**
  * 돌진 개시 — 상태·경로·목표를 세팅한다. (_ping은 호출부에서 목적에 맞게 지정)
  * 지상(CRAWL)·원거리 반격·점프(공중) 모두 같은 방식으로 비행에 진입한다.
@@ -87,7 +97,12 @@ function beginDash(c, found) {
   c._dashRoute = found.route.path;
   c._dashGoal = found.goal;
   c._dashRouteIndex = 1;
-  c._dashTimeLeft = DASH_MAX_S;
+  // 이번 돌진의 예상 비행 시간 = 실제 따라갈 경로 길이 ÷ 속도.
+  // (점프 돌진의 좌표보정 leg까지 포함한 c._dashRoute 전체 길이 — 예산 판정용 route.dist와 다르다)
+  // 타임아웃은 이 시간에 비례시킨다. 예전엔 DASH_MAX_S(1.5s) 고정이라 인식범위·주황 투자로
+  // 예산이 390px(260px/s × 1.5s)를 넘는 긴 돌진이 중간에 타임아웃 → 그 자리에서 뚝 떨어졌다.
+  const durS = dashPathLength(c._dashRoute) / DASH_SPD;
+  c._dashTimeLeft = Math.max(DASH_MAX_S, durS * 1.5 + 0.3);
   c._platformId = null;
   c._jumpApexY = null; // 점프 중 돌진 진입 시 잔여 점프 상태 정리
   c._dropThroughId = null; // 하강(드롭스루) 중 돌진 진입 시 잔여 드롭 상태 정리

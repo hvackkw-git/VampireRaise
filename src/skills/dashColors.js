@@ -237,7 +237,8 @@ export function dashColorCycle(points = {}) {
 
 /**
  * 잔상 트레일 = dashColorCycle을 스폰 순서대로 반복(k번째 잔상 = cycle[k % len]).
- * 런타임(tankView)은 45ms마다 이 인덱스를 하나씩 올려 칠한다. 아래는 그 결과를 미리 펼친 것(문서·테스트용).
+ * 예) 빨6 노3 → 사이클 [빨,빨,노] → 빨빨노빨빨노…. 런타임(tankView)은 45ms마다
+ * 이 인덱스를 하나씩 올려 칠한다. 아래는 그 결과를 미리 펼친 것(문서·테스트용).
  * @param {{[color:string]: number}} points
  * @param {number} count 펼칠 잔상 개수
  * @returns {string[]}

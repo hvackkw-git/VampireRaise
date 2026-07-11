@@ -61,6 +61,11 @@ describe("Dash 잔상 색 로직", () => {
   });
 
   it("트레일: 잔상은 스폰 순서대로 사이클을 그대로 반복한다(길이 무관)", () => {
+    // 빨6 노3 → 최소 3을 1단위로 → 사이클 [빨,빨,노] → 빨빨노빨빨노…
+    expect(dashColorCycle({ red: 6, yellow: 3 })).toEqual(["red", "red", "yellow"]);
+    expect(dashGhostTrail({ red: 6, yellow: 3 }, 9)).toEqual(
+      tiled(["red", "red", "yellow"], 9),
+    );
     // 빨6 주2 → 사이클 [빨빨빨주], 스폰 순서대로 반복
     expect(dashGhostTrail({ red: 6, orange: 2 }, 10)).toEqual(
       tiled(["red", "red", "red", "orange"], 10),
