@@ -189,7 +189,7 @@ function frame(nowMs) {
   tickPistons(platforms, signals.powered, yBounds);
 
   // 2) 감지·핑 추적(1초 갱신) → 캐릭터 물리
-  tickAggro(state, simDt, Math.random, signals.powered);
+  const dashEvents = tickAggro(state, simDt, Math.random, signals.powered, nowMs);
   const ctx = { platforms, blockPowered: signals.powered, now: nowMs, rng: Math.random };
   for (const c of chars) {
     tickCharacter(c, ctx, simDt);
@@ -200,7 +200,7 @@ function frame(nowMs) {
   // 3) 투사체 → 전투·전염 → 4) 웨이브
   const projectileEvents = tickHumanProjectiles(state, simDt);
   const combatEvents = tickCombat(state, simDt);
-  renderCombatEvents([...projectileEvents, ...combatEvents]);
+  renderCombatEvents([...dashEvents, ...projectileEvents, ...combatEvents]);
   const waveEvents = tickWaves(state, simDt, Math.random, signals.powered);
   for (const ev of waveEvents) {
     if (ev.type === "clear") showToast(`✅ 웨이브 클리어! +🩸 ${ev.reward}`);

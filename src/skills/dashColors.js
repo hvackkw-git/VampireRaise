@@ -34,13 +34,13 @@ export function effectiveDetectRange(char) {
 //   ├───┼──────┼─────────────────────┼──────────────────────┼───────────────┤
 //   │ O │ 빨강 │ 복수(피격 시 공격력)│ ×1.0 → 1.1 → 1.2     │ combat 피격    │
 //   │ O │ 주황 │ 거리(돌진 사거리)   │ ×2 → 2.1 → 2.2       │ ai 돌진 예산   │
-//   │   │ 노랑 │ 경로상 적 데미지    │ dmg×0.1 → 0.2        │ ai 돌진 틱     │
-//   │   │ 초록 │ 연타 확률           │ 0% → 10%             │ combat 공격 롤 │
-//   │   │ 파랑 │ 도착 후 폭발        │ dmg×0.1 → 0.2        │ ai endDash     │
-//   │   │ 보라 │ 도착 후 실드(5초)   │ Hp×0.1 → 0.2         │ ai endDash     │
-//   │   │ 하양 │ 도착 후 스턴(인간)  │ 1초 → 2초            │ ai endDash     │
+//   │ O │ 노랑 │ 경로상 적 데미지    │ dmg×0.1 → 0.2        │ dashEffects/틱 │
+//   │ O │ 초록 │ 연타 확률           │ 0% → 10% → 20%       │ combat 공격 롤 │
+//   │ O │ 파랑 │ 도착 후 폭발        │ dmg×0.1 → 0.2        │ dashEffects/도착│
+//   │ O │ 보라 │ 도착 후 실드(5초)   │ Hp×0.1 → 0.2         │ dashEffects/도착│
+//   │ O │ 하양 │ 도착 후 스턴(인간)  │ 1초 → 2초            │ dashEffects/도착│
 //   └───┴──────┴─────────────────────┴──────────────────────┴───────────────┘
-//   빨강=revengeAttackMult(), 주황=dashDistanceMult(). 나머지 색 헬퍼는 이 자리에 이어 추가.
+//   헬퍼: revenge/dashDistance/pathDamage/multiHit/explosionDamage/shieldHp/stunSeconds Mult.
 //   포인트 출처: 현재는 char.dashColors 맵(독립). 향후 스킬트리 노드 습득 → dashColors 반영 배선 필요.
 //   ─ 색 외 스킬 ─ 인식범위(detectPoints): 포인트당 ×1.1 → detectRangeMult()/effectiveDetectRange().
 //     실제 감지·돌진 예산·잔상 개수·감지 원 시각에 모두 반영된다.
@@ -165,6 +165,26 @@ export function revengeAttackMult(points = {}) {
  */
 export function dashDistanceMult(points = {}, base = DASH_ROUTE_MULT) {
   return base + 0.1 * Math.max(0, Number(points.orange) || 0);
+}
+/** 노랑 · 경로 데미지: 돌진 경로에서 스친 적에게 공격력×(0.1·노랑) 피해 */
+export function pathDamageMult(points = {}) {
+  return 0.1 * Math.max(0, Number(points.yellow) || 0);
+}
+/** 초록 · 연타: 근접 공격이 한 번 더 나갈 확률 (포인트당 +10%, 최대 100%) */
+export function multiHitChance(points = {}) {
+  return Math.min(1, 0.1 * Math.max(0, Number(points.green) || 0));
+}
+/** 파랑 · 폭발: 도착 지점 주변 적에게 공격력×(0.1·파랑) 폭발 피해 */
+export function explosionDamageMult(points = {}) {
+  return 0.1 * Math.max(0, Number(points.blue) || 0);
+}
+/** 보라 · 실드: 도착 시 최대 HP×(0.1·보라) 흡수 실드(지속 5초) */
+export function shieldHpMult(points = {}) {
+  return 0.1 * Math.max(0, Number(points.purple) || 0);
+}
+/** 하양 · 스턴: 도착 시 대상(인간) 스턴 지속(초) — 포인트당 1초 */
+export function stunSeconds(points = {}) {
+  return 1.0 * Math.max(0, Number(points.white) || 0);
 }
 
 /**

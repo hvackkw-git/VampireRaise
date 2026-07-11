@@ -195,11 +195,14 @@ export function renderChars(state, nowMs, ui) {
       hpbar.className = "char-hpbar";
       const hpFill = document.createElement("i");
       hpbar.appendChild(hpFill);
+      const shield = document.createElement("div"); // 보라 실드 오라 (지속 중 표시)
+      shield.className = "char-shield";
       el.appendChild(detect);
+      el.appendChild(shield);
       el.appendChild(sprite);
       el.appendChild(hpbar);
       layerChars.appendChild(el);
-      entry = { el, detect, sprite, hpFill, lastSide: null, lastFrame: -1 };
+      entry = { el, detect, sprite, hpFill, shield, lastSide: null, lastFrame: -1, shieldOn: false };
       charEls.set(c.id, entry);
     }
     const cfg = CHAR_SPRITES[c.side];
@@ -236,6 +239,15 @@ export function renderChars(state, nowMs, ui) {
     // 스프라이트 기본 방향: 왼쪽 → 오른쪽 이동 시 좌우 반전
     entry.sprite.style.transform = c.dir > 0 ? "scaleX(-1)" : "";
     entry.el.classList.toggle("stunned", c.state === "STUN");
+    // 보라 실드 오라: 지속(_shieldT>0) 동안 표시, 남은 흡수량을 세기로 반영
+    const shieldOn = (c._shieldT ?? 0) > 0 && (c._shieldHp ?? 0) > 0;
+    if (shieldOn !== entry.shieldOn) {
+      entry.shield.classList.toggle("on", shieldOn);
+      entry.shieldOn = shieldOn;
+    }
+    if (shieldOn && c._shieldMax) {
+      entry.shield.style.opacity = String(0.35 + 0.5 * (c._shieldHp / c._shieldMax));
+    }
     // 패널이 자동으로 비추는 캐릭터는 은은한 표시, 직접 탭한 선택은 금색 표시
     entry.el.classList.toggle("focused",
       ui.panelCharId === c.id && ui.selectedCharId !== c.id);
@@ -362,8 +374,55 @@ export function renderCombatEvents(events) {
       spawnFloatText(ev.char.x, ev.char.y - 12, "LEVEL UP!", "fx-levelup");
     } else if (ev.type === "infect") {
       spawnFloatText(ev.char.x - 2, ev.char.y - 12, "전염!", "fx-infect");
+    } else if (ev.type === "dashZap") {
+      spawnDashFx(ev.x, ev.y, "fx-zap", "⚡");
+    } else if (ev.type === "dashExplosion") {
+      spawnExplosion(ev.x, ev.y, ev.radius);
+    } else if (ev.type === "dashShield") {
+      spawnDashFx(ev.char.x + ev.char.w / 2, ev.char.y + ev.char.h / 2, "fx-shieldcast");
+      spawnFloatText(ev.char.x - 4, ev.char.y - 14, `🛡 +${ev.amount}`, "fx-shield");
+    } else if (ev.type === "dashStun") {
+      spawnDashFx(ev.target.x + ev.target.w / 2, ev.target.y - 4, "fx-stunburst", "✦");
+      spawnFloatText(ev.target.x, ev.target.y - 16, "STUN!", "fx-stun");
+    } else if (ev.type === "multiHit") {
+      spawnFloatText(ev.target.x + ev.target.w / 2 - 8, ev.target.y - 18, "연타!", "fx-multihit");
+    } else if (ev.type === "shieldBlock") {
+      spawnFloatText(ev.target.x + ev.target.w / 2 - 6, ev.target.y - 8, `🛡${ev.absorbed}`, "fx-shieldblock");
     }
   }
+}
+
+/** 중심 좌표에 잠깐 나타났다 사라지는 화려한 FX 조각 */
+function spawnDashFx(cx, cy, cls, glyph = "") {
+  const s = document.createElement("span");
+  s.className = `fx-burst ${cls}`;
+  if (glyph) s.textContent = glyph;
+  s.style.left = `${cx}px`;
+  s.style.top = `${cy}px`;
+  layerFx.appendChild(s);
+  s.addEventListener("animationend", () => s.remove());
+}
+
+/** 파랑 폭발: 충격파 링 + 중심 플래시 + 스파크 파편 */
+function spawnExplosion(cx, cy, radius) {
+  const wrap = document.createElement("div");
+  wrap.className = "fx-explosion";
+  wrap.style.left = `${cx}px`;
+  wrap.style.top = `${cy}px`;
+  wrap.style.setProperty("--ex-r", `${radius}px`);
+  const ring = document.createElement("span"); ring.className = "fx-ex-ring";
+  const flash = document.createElement("span"); flash.className = "fx-ex-flash";
+  wrap.append(ring, flash);
+  for (let i = 0; i < 8; i++) {
+    const sp = document.createElement("i");
+    sp.className = "fx-ex-spark";
+    sp.style.setProperty("--a", `${i * 45}deg`);
+    wrap.appendChild(sp);
+  }
+  layerFx.appendChild(wrap);
+  let done = 0;
+  wrap.addEventListener("animationend", () => { if (++done >= 1) wrap.remove(); });
+  setTimeout(() => wrap.remove(), 900); // 안전 제거
 }
 
 /** 토스트 */

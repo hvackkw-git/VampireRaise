@@ -30,6 +30,9 @@ import { isLogicLayerBlock, getSpikeDir, PLATFORM_W, PLATFORM_H } from "../platf
 import { findNearestEnemy, aliveChars } from "./combat.js";
 import { createHumanDescentNavigator } from "./descentNavigation.js";
 import { dashGhostColorSequence, effectiveDetectRange } from "../skills/dashColors.js";
+import {
+  resetDashEffects, applyDashPathDamage, applyDashArrivalEffects,
+} from "./dashEffects.js";
 
 /** 감지·추적이 동작하는 상태 (지상 행동 중일 때만 주변을 살핀다) */
 const AWARE_STATES = new Set(["CRAWL"]);
@@ -40,7 +43,11 @@ const AWARE_STATES = new Set(["CRAWL"]);
  * - 중단(대상 사망·타임아웃·목표 플랫폼 소실): 그 자리에서 멈추고 자연 낙하 —
  *   목표 지점으로 순간이동하지 않는다.
  */
-function endDash(c, platforms = [], { arrived = false, blockPowered = null } = {}) {
+function endDash(c, platforms = [], { arrived = false, blockPowered = null, fx = null } = {}) {
+  // 도착 후 색상 효과(파랑 폭발/보라 실드/하양 스턴) — 착지 좌표 확정 전에 현재 위치 기준으로 발동
+  if (arrived && fx) {
+    applyDashArrivalEffects(c, fx.chars, fx.target, fx.state, fx.nowMs, fx.dashEvents);
+  }
   const goal = c._dashGoal;
   const goalPlatform = arrived && goal?.platformId != null
     ? platforms.find((p) => p.id === goal.platformId && isSolidForRoute(p, blockPowered))
@@ -90,6 +97,7 @@ function beginDash(c, found) {
   c._dashGhostSeq = dashGhostColorSequence(c.dashColors ?? { red: 1 }, {
     detectRange: effectiveDetectRange(c),
   });
+  resetDashEffects(c); // 이번 돌진의 경로 피해 중복 방지 집합 초기화
 }
 
 /**
@@ -459,9 +467,10 @@ function findNearestJumpDashRoute(c, chars, platforms, blockPowered = null) {
  * @param {() => number} rng
  * @param {Map<number, boolean>|null} blockPowered 이번 프레임 신호 결과 — 게이트 투명화 반영용
  */
-export function tickAggro(state, simDt, rng = Math.random, blockPowered = null) {
+export function tickAggro(state, simDt, rng = Math.random, blockPowered = null, nowMs = 0) {
   const chars = aliveChars(state);
   const byId = new Map(chars.map((c) => [c.id, c]));
+  const dashEvents = []; // 색상 효과 연출용 시각 이벤트
   let descentNavigator = null;
   for (const c of chars) {
     if (c._dashCd > 0) c._dashCd -= simDt;
@@ -481,10 +490,14 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null) 
       // 잔상 색 매핑용 진행도: 0(출발)→1(도착/새우 위치)
       c._dashProgress = Math.max(0, Math.min(1,
         1 - Math.hypot(tx - cx, ty - cy) / (c._dashDist0 || 1)));
-      // TODO(dash색상 효과·미구현): 노랑=경로상 스친 적에게 dmg×0.1~0.2 훅 자리(비행 궤적 중).
+      // 노랑 · 경로 데미지: 비행 중 스친 적에게 1회씩 피해
+      applyDashPathDamage(c, chars, state, dashEvents);
       const arriveDist = goal.platformId != null ? 4 : DASH_ARRIVE_DIST;
       if (Math.hypot(tx - cx, ty - cy) <= arriveDist) {
-        endDash(c, state.platforms.items, { arrived: true, blockPowered });
+        endDash(c, state.platforms.items, {
+          arrived: true, blockPowered,
+          fx: { chars, target: t, state, nowMs, dashEvents },
+        });
         continue;
       }
       const route = c._dashRoute;
@@ -627,6 +640,7 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null) 
       c.timer = Math.max(c.timer, 0.2); // 계속 걷도록 유지 (핑이 살아있는 동안)
     }
   }
+  return dashEvents;
 }
 
 // 핑이 없을 때도 physics의 defaultMoveDecide가 걷기/도약을 계속 유지한다.
