@@ -3,6 +3,8 @@ import {
   DASH_COLORS, DASH_COLOR_HEX, defaultDashColors, DEFAULT_DASH_POINTS,
   dashGhostCount, allocateGhostSlots, dashGhostColorSequence, ghostColorAtProgress,
   investDashColor, resetDashColors, normalizeDashPoints,
+  BASE_DETECT_RANGE, effectiveDetectRange, revengeAttackMult, dashDistanceMult,
+  detectRangeMult, investDetect,
 } from "../skills/dashColors.js";
 import { createInitialState, saveState, loadState } from "../state/gameState.js";
 
@@ -61,20 +63,20 @@ describe("Dash 잔상 색 로직", () => {
   });
 
   it("빨강만 있으면 전부 빨강", () => {
-    const seq = dashGhostColorSequence({ red: 1 }, seededRng(7));
+    const seq = dashGhostColorSequence({ red: 1 }, { rng: seededRng(7) });
     expect(new Set(seq)).toEqual(new Set(["red"]));
     expect(seq.length).toBe(dashGhostCount({ red: 1 }));
   });
 
   it("빨강+주황이면 새우 근처(끝)는 빨강, 꼬리(앞)는 주황", () => {
-    const seq = dashGhostColorSequence({ red: 3, orange: 3 }, seededRng(3));
+    const seq = dashGhostColorSequence({ red: 3, orange: 3 }, { rng: seededRng(3) });
     expect(seq[seq.length - 1]).toBe("red"); // 새우 근처
     expect(seq[0]).toBe("orange");           // 꼬리
   });
 
   it("골고루 찍으면 무지개(모든 색이 최소 1번, 팔레트 순서)", () => {
     const points = { red: 3, orange: 3, yellow: 3, green: 3, blue: 3, purple: 3, white: 3 };
-    const seq = dashGhostColorSequence(points, seededRng(11));
+    const seq = dashGhostColorSequence(points, { rng: seededRng(11) });
     const t = tally(seq);
     for (const c of DASH_COLORS) expect(t[c]).toBeGreaterThan(0);
     // 시퀀스는 팔레트 역순(끝이 빨강)으로 단조 정렬 — 색 경계가 한 번씩만 바뀐다
@@ -87,7 +89,7 @@ describe("Dash 잔상 색 로직", () => {
   });
 
   it("치우친 포인트는 그 색이 가장 많다", () => {
-    const seq = dashGhostColorSequence({ red: 10, blue: 1 }, seededRng(99));
+    const seq = dashGhostColorSequence({ red: 10, blue: 1 }, { rng: seededRng(99) });
     const t = tally(seq);
     expect(t.red).toBeGreaterThan(t.blue ?? 0);
   });
@@ -98,7 +100,7 @@ describe("Dash 잔상 색 로직", () => {
     const skewed = { red: 30, blue: 1 };
     let missing = 0, present = 0;
     for (let s = 1; s <= 30; s++) {
-      const seq = dashGhostColorSequence(skewed, seededRng(s));
+      const seq = dashGhostColorSequence(skewed, { rng: seededRng(s) });
       if (seq.includes("blue")) present++; else missing++;
     }
     expect(missing).toBeGreaterThan(0); // 운 나쁘면 안 나옴
@@ -115,11 +117,13 @@ describe("Dash 잔상 색 로직", () => {
     expect(vamp.dashPoints).toBe(DEFAULT_DASH_POINTS); // 기본 듬뿍
     vamp.dashColors = { red: 2, orange: 1, blue: 1 };
     vamp.dashPoints = 12;
+    vamp.detectPoints = 3;
     saveState(state, storage);
     const restored = loadState(storage);
     const rv = restored.chars.items.find((c) => c.side === "vampire");
     expect(rv.dashColors).toEqual({ red: 2, orange: 1, blue: 1 });
     expect(rv.dashPoints).toBe(12);
+    expect(rv.detectPoints).toBe(3);
   });
 
   it("색상 투자: 포인트만 있으면 레벨 제한 없이 찍힌다", () => {
@@ -153,6 +157,61 @@ describe("Dash 잔상 색 로직", () => {
     normalizeDashPoints(dirty);
     expect(dirty.dashColors).toEqual({ red: 2 });
     expect(dirty.dashPoints).toBe(0);
+  });
+
+  it("잔상 개수는 인식 범위에 비례해 늘어난다(향후 인식 범위 성장 반영)", () => {
+    const points = { red: 1 };
+    const base = dashGhostCount(points, BASE_DETECT_RANGE);
+    expect(dashGhostCount(points, BASE_DETECT_RANGE * 2)).toBeGreaterThan(base);
+    expect(dashGhostCount(points, BASE_DETECT_RANGE / 2)).toBeLessThan(base);
+    // detectRange 미지정 시 기본값과 동일
+    expect(dashGhostCount(points)).toBe(base);
+    // effectiveDetectRange: c.detectRange 있으면 그것, 없으면 기본값
+    expect(effectiveDetectRange({ detectRange: 150 })).toBe(150);
+    expect(effectiveDetectRange({})).toBe(BASE_DETECT_RANGE);
+  });
+
+  it("인식범위 스킬: 포인트당 ×1.1로 실제 범위가 커지고 잔상도 늘어난다", () => {
+    expect(detectRangeMult(0)).toBeCloseTo(1.0);
+    expect(detectRangeMult(1)).toBeCloseTo(1.1);
+    expect(detectRangeMult(2)).toBeCloseTo(1.2);
+    // 뱀파이어는 detectPoints로 실효 범위가 실제로 증가
+    const v0 = { side: "vampire", detectPoints: 0 };
+    const v2 = { side: "vampire", detectPoints: 2 };
+    expect(effectiveDetectRange(v0)).toBeCloseTo(BASE_DETECT_RANGE);
+    expect(effectiveDetectRange(v2)).toBeCloseTo(BASE_DETECT_RANGE * 1.2);
+    // 인식 범위가 커지면 잔상 개수도 증가
+    expect(dashGhostCount({ red: 1 }, effectiveDetectRange(v2)))
+      .toBeGreaterThan(dashGhostCount({ red: 1 }, effectiveDetectRange(v0)));
+  });
+
+  it("인식범위 투자·초기화: 같은 풀을 쓰고 초기화 시 함께 환불", () => {
+    const char = { dashColors: {}, dashPoints: 3, detectPoints: 0 };
+    expect(investDetect(char)).toBe(true);
+    expect(investDetect(char)).toBe(true);
+    expect(char.detectPoints).toBe(2);
+    expect(char.dashPoints).toBe(1);
+    investDashColor(char, "orange"); // dashPoints 0
+    expect(investDetect(char)).toBe(false); // 풀 소진
+    // 초기화: 색 1 + 인식 2 = 3 환불
+    const refunded = resetDashColors(char);
+    expect(refunded).toBe(3);
+    expect(char.detectPoints).toBe(0);
+    expect(char.dashColors).toEqual({});
+    expect(char.dashPoints).toBe(3);
+  });
+
+  it("빨강=복수 배율: 1p는 ×1.0, 이후 포인트당 +0.1", () => {
+    expect(revengeAttackMult({ red: 1 })).toBeCloseTo(1.0);
+    expect(revengeAttackMult({ red: 2 })).toBeCloseTo(1.1);
+    expect(revengeAttackMult({ red: 3 })).toBeCloseTo(1.2);
+    expect(revengeAttackMult({})).toBeCloseTo(1.0); // 안전값
+  });
+
+  it("주황=거리 배율: 기본 2에서 포인트당 +0.1", () => {
+    expect(dashDistanceMult({})).toBeCloseTo(2.0);
+    expect(dashDistanceMult({ orange: 1 })).toBeCloseTo(2.1);
+    expect(dashDistanceMult({ orange: 2 })).toBeCloseTo(2.2);
   });
 
   it("ghostColorAtProgress: 0=꼬리 색, 1근처=새우 근처 색", () => {

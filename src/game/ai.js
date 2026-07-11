@@ -29,7 +29,7 @@ import { startJump, NON_PLATFORM_BLOCK_TYPES } from "../engine/physics.js";
 import { isLogicLayerBlock, getSpikeDir, PLATFORM_W, PLATFORM_H } from "../platform/platformBlockRenderer.js";
 import { findNearestEnemy, aliveChars } from "./combat.js";
 import { createHumanDescentNavigator } from "./descentNavigation.js";
-import { dashGhostColorSequence } from "../skills/dashColors.js";
+import { dashGhostColorSequence, effectiveDetectRange } from "../skills/dashColors.js";
 
 /** 감지·추적이 동작하는 상태 (지상 행동 중일 때만 주변을 살핀다) */
 const AWARE_STATES = new Set(["CRAWL"]);
@@ -87,7 +87,9 @@ function beginDash(c, found) {
   const cx = c.x + c.w / 2, cy = c.y + c.h / 2;
   c._dashDist0 = Math.max(1, Math.hypot((found.goal?.x ?? cx) - cx, (found.goal?.y ?? cy) - cy));
   c._dashProgress = 0;
-  c._dashGhostSeq = dashGhostColorSequence(c.dashColors ?? { red: 1 });
+  c._dashGhostSeq = dashGhostColorSequence(c.dashColors ?? { red: 1 }, {
+    detectRange: effectiveDetectRange(c),
+  });
 }
 
 /**
@@ -324,7 +326,9 @@ export function estimateRouteDist(c, t, platforms, blockPowered = null) {
 }
 
 function dashRouteMultiplier(c) {
-  return Number.isFinite(c?.dashRouteMult) ? c.dashRouteMult : DASH_ROUTE_MULT;
+  // 주황 · 거리 스킬: 기본 예산(2)에 주황 포인트당 +0.1. dashRouteMult 오버라이드가 있으면 그것을 기준으로 가산.
+  const base = Number.isFinite(c?.dashRouteMult) ? c.dashRouteMult : DASH_ROUTE_MULT;
+  return base + 0.1 * Math.max(0, Number(c?.dashColors?.orange) || 0);
 }
 
 function rangedDashRouteMultiplier(c) {
@@ -351,7 +355,7 @@ function updateRangedBrace(c, chars) {
 }
 
 function isInDetectRange(c, enemy) {
-  const range = DETECT_RANGE[c.side] ?? 0;
+  const range = effectiveDetectRange(c);
   const a = centerOf(c);
   const b = centerOf(enemy);
   return Math.hypot(b.x - a.x, b.y - a.y) <= range;
@@ -362,7 +366,7 @@ function dashGoalForEnemy(c, enemy, platforms, blockPowered = null) {
 }
 
 function findDashRouteToTarget(c, enemy, platforms, routeMult, blockPowered = null) {
-  const detectRange = DETECT_RANGE[c.side] ?? 0;
+  const detectRange = effectiveDetectRange(c);
   const budget = detectRange * routeMult;
   const goal = dashGoalForEnemy(c, enemy, platforms, blockPowered);
   if (!goal) return null;
@@ -372,7 +376,7 @@ function findDashRouteToTarget(c, enemy, platforms, routeMult, blockPowered = nu
 }
 
 function firstWalkableDashRoutePoint(c, enemy, platforms, blockPowered = null) {
-  const detectRange = DETECT_RANGE[c.side] ?? 0;
+  const detectRange = effectiveDetectRange(c);
   const budget = detectRange * dashRouteMultiplier(c);
   const goal = dashGoalForEnemy(c, enemy, platforms, blockPowered);
   if (!goal) return null;
@@ -421,7 +425,7 @@ function jumpDashStartCenter(c, platforms, blockPowered = null) {
  * 보정 시작 위치→목표 경로 길이(route.dist)로 한다.
  */
 function findJumpDashRouteToTarget(c, enemy, platforms, routeMult, blockPowered = null) {
-  const detectRange = DETECT_RANGE[c.side] ?? 0;
+  const detectRange = effectiveDetectRange(c);
   const budget = detectRange * routeMult;
   const goal = dashGoalForEnemy(c, enemy, platforms, blockPowered);
   if (!goal) return null;
@@ -582,7 +586,7 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null) 
     if (c._pingCd <= 0) {
       c._pingCd = PING_REFRESH_S;
       const found = findNearestEnemy(c, chars);
-      if (found && found.dist <= (DETECT_RANGE[c.side] ?? 0)) {
+      if (found && found.dist <= effectiveDetectRange(c)) {
         const pingPoint = c.side === "vampire"
           ? (firstWalkableDashRoutePoint(c, found.char, state.platforms.items, blockPowered)
             ?? nearestPlatformStandPointTo(found.char, state.platforms.items, c.h, blockPowered, c))

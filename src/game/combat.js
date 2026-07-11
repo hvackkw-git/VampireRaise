@@ -8,6 +8,7 @@ import {
   expToNext, expForKill, LEVELUP_HP_GAIN, LEVELUP_ATK_GAIN, KILL_BLOOD_REWARD,
   CHAR_SPRITES, SLAVE_BASE,
 } from "../constants.js";
+import { revengeAttackMult } from "../skills/dashColors.js";
 
 const center = (c) => ({ x: c.x + c.w / 2, y: c.y + c.h / 2 });
 const dist = (a, b) => {
@@ -152,13 +153,20 @@ export function tickCombat(state, simDt) {
     if (c._atkCd > 0) continue;
     c._atkCd = ATTACK_COOLDOWN_S;
     // TODO(dash색상 효과·미구현): 초록=연타확률(0~10%)로 이 공격이 한 번 더 hitRecords에 추가되는 훅.
-    hitRecords.push({ attacker: c, target: t, dmg: c.atk });
+    // 빨강=복수: 피격으로 쌓인 버프가 있으면 이번 공격력에 배율 적용 후 소모(1회 반격).
+    let dmg = c.atk;
+    if (c.side === "vampire" && c._revengePending) {
+      dmg = Math.round(dmg * revengeAttackMult(c.dashColors));
+      c._revengePending = false;
+    }
+    hitRecords.push({ attacker: c, target: t, dmg });
   }
 
   for (const r of hitRecords) {
     if (r.attacker.dead || r.target.dead) continue;
     r.target.hp -= r.dmg;
-    // TODO(dash색상 효과·미구현): 빨강=복수 — 뱀파이어가 '피격'당하면 다음 공격력 ×1.1~1.2 버프 훅.
+    // 빨강=복수: 뱀파이어가 '피격'당하면 다음 공격에 쓸 복수 버프를 예약한다.
+    if (r.target.side === "vampire") r.target._revengePending = true;
     events.push({ type: "hit", attacker: r.attacker, target: r.target, dmg: r.dmg });
   }
 

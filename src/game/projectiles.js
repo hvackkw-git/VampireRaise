@@ -100,6 +100,8 @@ export function tickHumanProjectiles(state, simDt) {
     if (!hit) { kept.push(p); continue; }
     hit.hp -= p.damage;
     const attacker = byId.get(p.attackerId) ?? null;
+    // 빨강=복수: 원거리 피격도 '피격'이므로 복수 버프를 예약한다.
+    if (hit.side === "vampire") hit._revengePending = true;
     if (hit.side === "vampire" && attacker) requestRangedDash(hit, attacker.id);
     events.push({ type: "projectileHit", attacker, target: hit, dmg: p.damage });
     if (hit.hp <= 0) {
