@@ -160,7 +160,7 @@ export function rebirth(state, rng = Math.random) {
 
 /**
  * 웨이브 틱.
- * @returns {Array<object>} events — spawn/invade/gameover/clear/defeat/autostart
+ * @returns {Array<object>} events — spawn/invade/gameover/clear/autostart
  */
 export function tickWaves(state, simDt, rng = Math.random, blockPowered = null) {
   const events = [];
@@ -192,17 +192,9 @@ export function tickWaves(state, simDt, rng = Math.random, blockPowered = null) 
       return events;
     }
 
-    // 패배: Vamp Shrimp 진영 전멸 → Holy Shrimp 제거, 웨이브 1로 리셋, Vamp Shrimp 부활
-    if (vampireSideAlive(state) === 0) {
-      state.chars.items = state.chars.items.filter((c) => c.side !== "human");
-      w.active = false;
-      w.pendingSpawns = [];
-      w.current = 1;
-      w.nextAutoAt = null;
-      reviveVampires(state, rng);
-      events.push({ type: "defeat" });
-      return events;
-    }
+    // Vamp Shrimp 진영이 전멸해도 더 이상 웨이브가 끝나지 않는다 — 죽은 새우는
+    // 각자 쿨타임(combat.js tickVampireAutoRevive) 후 알아서 되살아난다.
+    // 웨이브를 정말 끝내는 것은 베이스 코어 소진(게임오버)뿐이다.
 
     // 클리어: 스폰 완료 + Holy Shrimp 전멸
     if (w.pendingSpawns.length === 0 && humansAlive(state) === 0) {

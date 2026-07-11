@@ -375,18 +375,20 @@ describe("웨이브", () => {
     expect(state.chars.items[0].dead).toBe(false); // 부활
   });
 
-  it("뱀파이어 진영 전멸 시 패배: 웨이브 1 리셋·인간 제거·뱀파이어 부활", () => {
+  it("뱀파이어 진영이 전멸해도 더 이상 웨이브가 끝나지 않는다 (베이스가 깨져야 리셋)", () => {
     state.wave.current = 7;
     startWave(state);
     for (let t = 0; t < 12; t += 0.1) tickWaves(state, 0.1);
     for (const c of state.chars.items) {
       if (c.side === "vampire") { c.dead = true; }
     }
+    expect(vampireSideAlive(state)).toBe(0);
+    const humansBefore = humansAlive(state);
     const events = tickWaves(state, 0.1);
-    expect(events.some((e) => e.type === "defeat")).toBe(true);
-    expect(state.wave.current).toBe(1);
-    expect(humansAlive(state)).toBe(0);
-    expect(vampireSideAlive(state)).toBeGreaterThan(0);
+    expect(events.some((e) => e.type === "defeat")).toBe(false);
+    expect(state.wave.current).toBe(7); // 리셋되지 않는다
+    expect(state.wave.active).toBe(true);
+    expect(humansAlive(state)).toBe(humansBefore); // 인간도 제거되지 않는다
   });
 
   it("부활한 뱀파이어는 상단 낙하가 아니라 맨 아래 바닥에서 재시작한다", () => {

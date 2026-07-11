@@ -26,7 +26,7 @@ export default {
   },
   events: {
     allMaxLevel: "All Vamp Shrimp are at max level.", levelAll: "{count} Vamp Shrimp gained 1 level.",
-    waveClear: "✅ Wave cleared! +🩸 {reward}", defeat: "💀 Squad wiped out. Restarting from Wave 1.",
+    waveClear: "✅ Wave cleared! +🩸 {reward}",
     accountLevel: "🌟 Account Level {level} reached!", routeBlocked: "Auto Wave stopped: the Holy Shrimp route is blocked.",
     gameOver: "☠️ Base lost! Game over. Restarting from Wave 1.", recall: "RECALL!",
     infect: "INFECTED!", multiHit: "MULTI-HIT!", revive: "REVIVED!", poison: "POISON!",

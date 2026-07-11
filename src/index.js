@@ -267,7 +267,6 @@ function frame(nowMs) {
   const waveEvents = tickWaves(state, simDt, Math.random, signals.powered);
   for (const ev of waveEvents) {
     if (ev.type === "clear") showToast(t("events.waveClear", { reward: ev.reward }));
-    else if (ev.type === "defeat") showToast(t("events.defeat"));
     else if (ev.type === "autostart") showToast(t("hud.waveStart", { wave: ev.wave }));
     else if (ev.type === "acctlevel") showToast(t("events.accountLevel", { level: ev.level }));
     else if (ev.type === "routeblocked") showToast(t("events.routeBlocked"));
