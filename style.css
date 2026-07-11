@@ -157,24 +157,6 @@ button { font-family: inherit; color: inherit; }
   background-repeat: no-repeat;
   image-rendering: pixelated;
 }
-/* 스킬 패턴 오버레이: 색상별로 구운 스프라이트를 몸통 위에 겹친다.
-   컨테이너는 몸통과 함께 좌우 반전되고, 각 레이어는 프레임 위치를 몸통과 동기화한다. */
-.char-patterns {
-  position: absolute; inset: 0;
-  transform-origin: center;
-  pointer-events: none;
-}
-.char-pattern {
-  position: absolute; inset: 0;
-  background-repeat: no-repeat;
-  image-rendering: pixelated;
-}
-/* 오러 glow: 장착 오러 스킬 색(--aura-glow)으로 드롭섀도우 */
-.char.has-aura .char-sprite {
-  filter:
-    drop-shadow(0 0 3px var(--aura-glow, #fff))
-    drop-shadow(0 0 7px var(--aura-glow, #fff));
-}
 /* 감지 범위 원 (테스트용 반투명 표시) — 원 안에 적이 들어오면 인식 */
 .char-detect {
   position: absolute;
@@ -721,50 +703,6 @@ button { font-family: inherit; color: inherit; }
   color: #bdc8cb;
   font-size: 9px;
   text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* 장착 슬롯 스트립 (스킬 트리 하단): 패시브·액티브·이동기·오러 4칸, 클릭 시 순환 장착 */
-.skill-tree-slots {
-  flex: 0 0 auto;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 4px;
-}
-.equip-slot {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 4px 2px 5px;
-  border: 1px solid #465258;
-  border-radius: 4px;
-  background: #141b1f;
-  color: #8da0a6;
-  cursor: pointer;
-}
-.equip-slot:disabled { opacity: 0.5; cursor: default; }
-.equip-slot.filled { border-color: #6c7d84; background: #1a2429; }
-.equip-slot-label {
-  font-size: 8px;
-  line-height: 10px;
-  letter-spacing: 0;
-  color: #7f9096;
-}
-.equip-slot-chip {
-  width: 14px; height: 14px;
-  border-radius: 3px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: transparent;
-}
-.equip-slot.filled .equip-slot-label { color: #b7c2c5; }
-.equip-slot-name {
-  max-width: 100%;
-  overflow: hidden;
-  font-size: 8px;
-  line-height: 10px;
-  color: #c3ced1;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
