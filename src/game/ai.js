@@ -22,6 +22,7 @@ import {
   HUMAN_PROJECTILE_RANGE, VAMPIRE_SPAWN_ZONE,
   isEnemySide,
 } from "../constants.js";
+import { dashCdManaMult } from "../skills/dashColors.js";
 
 /** 인간이 행군하는 베이스(뱀파이어 스폰 존) 중심 x */
 const BASE_GOAL_X = VAMPIRE_SPAWN_ZONE.x + VAMPIRE_SPAWN_ZONE.w / 2;
@@ -72,7 +73,7 @@ function endDash(c, platforms = [], { arrived = false, blockPowered = null, fx =
   c._dashRoute = null;
   c._dashRouteIndex = 0;
   c._dashGoal = null;
-  c._dashCd = DASH_COOLDOWN_S;
+  c._dashCd = DASH_COOLDOWN_S * dashCdManaMult(c.dashCdManaPoints);
 }
 
 /**
@@ -81,7 +82,7 @@ function endDash(c, platforms = [], { arrived = false, blockPowered = null, fx =
  */
 function beginDash(c, found) {
   c.state = "DASH";
-  c.mp = Math.max(0, (c.mp ?? 0) - DASH_MP_COST);
+  c.mp = Math.max(0, (c.mp ?? 0) - DASH_MP_COST * dashCdManaMult(c.dashCdManaPoints));
   c._dashTargetId = found.char.id;
   c._dashRoute = found.route.path;
   c._dashGoal = found.goal;

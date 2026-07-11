@@ -44,6 +44,7 @@ export function effectiveDetectRange(char) {
 //   포인트 출처: 현재는 char.dashColors 맵(독립). 향후 스킬트리 노드 습득 → dashColors 반영 배선 필요.
 //   ─ 색 외 스킬 ─ 인식범위(detectPoints): 포인트당 ×1.1 → detectRangeMult()/effectiveDetectRange().
 //     실제 감지·돌진 예산·잔상 개수·감지 원 시각에 모두 반영된다.
+//   ─ 대쉬 숙련(dashCdManaPoints): 포인트당 -10% → dashCdManaMult(). 돌진 쿨타임·마나소모에 반영된다(ai.js beginDash/endDash).
 
 /** 팔레트 순서 — 잔상 정렬·무지개 기준 */
 export const DASH_COLORS = Object.freeze([
@@ -86,6 +87,8 @@ export function normalizeDashPoints(char) {
   char.dashPoints = Math.max(0, Math.floor(char.dashPoints));
   if (!Number.isFinite(char.detectPoints)) char.detectPoints = 0;
   char.detectPoints = Math.max(0, Math.floor(char.detectPoints));
+  if (!Number.isFinite(char.dashCdManaPoints)) char.dashCdManaPoints = 0;
+  char.dashCdManaPoints = Math.max(0, Math.floor(char.dashCdManaPoints));
   return char;
 }
 
@@ -99,6 +102,28 @@ export function investDetect(char) {
   if (char.dashPoints <= 0) return false;
   char.dashPoints -= 1;
   char.detectPoints += 1;
+  return true;
+}
+
+/**
+ * 대쉬 숙련 배율 — 포인트당 -10% (0p=×1.0, 1p=×0.9, 2p=×0.8 …), 최대 90% 감소.
+ * 돌진 쿨타임·마나소모 모두 이 배율을 곱해 적용한다.
+ * @param {number} points
+ */
+export function dashCdManaMult(points = 0) {
+  return Math.max(0.1, 1 - 0.1 * Math.max(0, Number(points) || 0));
+}
+
+/**
+ * 대쉬 숙련(쿨타임·마나소모 감소)에 1포인트 투자. 같은 풀(dashPoints)을 쓰며 레벨 제한 없음.
+ * @returns {boolean} 성공 여부
+ */
+export function investDashCdMana(char) {
+  if (!char) return false;
+  normalizeDashPoints(char);
+  if (char.dashPoints <= 0) return false;
+  char.dashPoints -= 1;
+  char.dashCdManaPoints += 1;
   return true;
 }
 
@@ -122,10 +147,12 @@ export function investDashColor(char, color) {
 export function resetDashColors(char) {
   if (!char) return 0;
   normalizeDashPoints(char);
-  const refunded = Object.values(char.dashColors).reduce((a, b) => a + b, 0) + char.detectPoints;
+  const refunded = Object.values(char.dashColors).reduce((a, b) => a + b, 0)
+    + char.detectPoints + char.dashCdManaPoints;
   char.dashPoints += refunded;
   char.dashColors = {};
   char.detectPoints = 0;
+  char.dashCdManaPoints = 0;
   return refunded;
 }
 

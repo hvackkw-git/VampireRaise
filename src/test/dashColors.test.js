@@ -4,7 +4,7 @@ import {
   dashGhostCount, dashColorCycle, dashGhostTrail,
   investDashColor, resetDashColors, normalizeDashPoints,
   BASE_DETECT_RANGE, effectiveDetectRange, revengeAttackMult, dashDistanceMult,
-  detectRangeMult, investDetect,
+  detectRangeMult, investDetect, investDashCdMana, dashCdManaMult,
 } from "../skills/dashColors.js";
 import { createInitialState, saveState, loadState } from "../state/gameState.js";
 
@@ -180,5 +180,26 @@ describe("Dash 잔상 색 로직", () => {
     expect(dashDistanceMult({})).toBeCloseTo(2.0);
     expect(dashDistanceMult({ orange: 1 })).toBeCloseTo(2.1);
     expect(dashDistanceMult({ orange: 2 })).toBeCloseTo(2.2);
+  });
+
+  it("대쉬 숙련=쿨타임/마나 배율: 포인트당 -10%, 최대 90% 감소", () => {
+    expect(dashCdManaMult(0)).toBeCloseTo(1.0);
+    expect(dashCdManaMult(1)).toBeCloseTo(0.9);
+    expect(dashCdManaMult(2)).toBeCloseTo(0.8);
+    expect(dashCdManaMult(20)).toBeCloseTo(0.1); // 하한 캡
+  });
+
+  it("대쉬 숙련 투자·초기화: 같은 풀을 쓰고 초기화 시 함께 환불", () => {
+    const char = { dashColors: {}, dashPoints: 2, dashCdManaPoints: 0 };
+    expect(investDashCdMana(char)).toBe(true);
+    expect(investDashCdMana(char)).toBe(true);
+    expect(char.dashCdManaPoints).toBe(2);
+    expect(char.dashPoints).toBe(0);
+    expect(investDashCdMana(char)).toBe(false); // 풀 소진
+
+    const refunded = resetDashColors(char);
+    expect(refunded).toBe(2);
+    expect(char.dashCdManaPoints).toBe(0);
+    expect(char.dashPoints).toBe(2);
   });
 });
