@@ -2,6 +2,22 @@
 // 스킬포인트 비율에 따라 잔상 색이 바뀐다. 팔레트 순서는 무지개 순(빨→주→노→초→파→보→하).
 // 잔상 개수는 노트 설계대로 "빨강+주황" 포인트로 결정하며 여기서 하드코딩한다.
 // 순수 함수만 두어 테스트하기 쉽게 한다(뷰/상태 의존 없음).
+//
+// ── Dash 색상 스킬 효과 카탈로그 (설계 노트 IMG_7727) ──
+//   현재 구현: "잔상 색 분배(시각)"만. 아래 실제 전투 효과는 미구현 — 훅 자리에 주석 표기.
+//   ┌──────┬─────────────────────┬──────────────────────┬───────────────┐
+//   │ 색   │ 효과                │ 계산(1p→2p)          │ 훅 위치        │
+//   ├──────┼─────────────────────┼──────────────────────┼───────────────┤
+//   │ 빨강 │ 복수(피격 시 공격력)│ ×1.0 → 1.1 → 1.2     │ combat 피격    │
+//   │ 주황 │ 거리(돌진 사거리)   │ ×2 → 2.1             │ ai 돌진 예산   │
+//   │ 노랑 │ 경로상 적 데미지    │ dmg×0.1 → 0.2        │ ai 돌진 틱     │
+//   │ 초록 │ 연타 확률           │ 0% → 10%             │ combat 공격 롤 │
+//   │ 파랑 │ 도착 후 폭발        │ dmg×0.1 → 0.2        │ ai endDash     │
+//   │ 보라 │ 도착 후 실드(5초)   │ Hp×0.1 → 0.2         │ ai endDash     │
+//   │ 하양 │ 도착 후 스턴(인간)  │ 1초 → 2초            │ ai endDash     │
+//   └──────┴─────────────────────┴──────────────────────┴───────────────┘
+//   각 색의 투자 포인트 → 효과 배율 변환은 향후 dashColorEffect(color, points) 헬퍼로 추가 예정.
+//   포인트 출처: 현재는 char.dashColors 맵(독립). 향후 스킬트리 노드 습득 → dashColors 반영 배선 필요.
 
 /** 팔레트 순서 — 잔상 정렬·무지개 기준 */
 export const DASH_COLORS = Object.freeze([
@@ -22,6 +38,53 @@ export const DASH_COLOR_HEX = Object.freeze({
 /** 뱀파이어 기본 색상 포인트 — 복수(빨강) 1포인트가 기본 적용 → 처음엔 전부 빨강 */
 export function defaultDashColors() {
   return { red: 1 };
+}
+
+/** 색상 투자용 기본 포인트 풀 — 레벨 제한 없이 듬뿍(자유 배분·재배분 실험용) */
+export const DEFAULT_DASH_POINTS = 30;
+
+/** 색상 키가 유효한지 */
+export function isDashColor(color) {
+  return DASH_COLORS.includes(color);
+}
+
+/** 뱀파이어의 색상 포인트 상태를 안전한 값으로 정규화 */
+export function normalizeDashPoints(char) {
+  if (!char) return char;
+  if (!char.dashColors || typeof char.dashColors !== "object") char.dashColors = defaultDashColors();
+  for (const k of Object.keys(char.dashColors)) {
+    if (!isDashColor(k) || !(char.dashColors[k] > 0)) delete char.dashColors[k];
+    else char.dashColors[k] = Math.floor(char.dashColors[k]);
+  }
+  if (!Number.isFinite(char.dashPoints)) char.dashPoints = DEFAULT_DASH_POINTS;
+  char.dashPoints = Math.max(0, Math.floor(char.dashPoints));
+  return char;
+}
+
+/**
+ * 색상에 1포인트 투자. 레벨 제한 없음 — 풀(dashPoints)만 있으면 가능.
+ * @returns {boolean} 성공 여부
+ */
+export function investDashColor(char, color) {
+  if (!char || !isDashColor(color)) return false;
+  normalizeDashPoints(char);
+  if (char.dashPoints <= 0) return false;
+  char.dashPoints -= 1;
+  char.dashColors[color] = (char.dashColors[color] || 0) + 1;
+  return true;
+}
+
+/**
+ * 투자한 색상 포인트를 모두 풀로 되돌리고 색 배분을 비운다(자유 재배분).
+ * @returns {number} 되돌린 포인트 수
+ */
+export function resetDashColors(char) {
+  if (!char) return 0;
+  normalizeDashPoints(char);
+  const refunded = Object.values(char.dashColors).reduce((a, b) => a + b, 0);
+  char.dashPoints += refunded;
+  char.dashColors = {};
+  return refunded;
 }
 
 // ── 잔상 개수 하드코딩(빨강+주황 포인트 기준) ──

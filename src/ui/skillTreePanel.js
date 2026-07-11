@@ -1,6 +1,15 @@
 import {
   SKILL_BY_ID, SKILL_TREE, learnSkill, normalizeSkillProgress, skillStatus,
 } from "../skills/skillTree.js";
+import {
+  DASH_COLORS, DASH_COLOR_HEX, dashGhostCount, investDashColor,
+  normalizeDashPoints, resetDashColors,
+} from "../skills/dashColors.js";
+
+const DASH_COLOR_LABEL = {
+  red: "빨강 · 복수", orange: "주황 · 거리", yellow: "노랑 · 경로데미지",
+  green: "초록 · 연타", blue: "파랑 · 폭발", purple: "보라 · 실드", white: "하양 · 스턴",
+};
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -22,9 +31,45 @@ export function initSkillTreePanel({ getCharacter, onChange, onOpenChange } = {}
   const nodes = document.getElementById("skillTreeNodes");
   const detail = document.getElementById("skillTreeDetail");
   const closeButton = document.getElementById("btnSkillTreeClose");
+  const dashRows = document.getElementById("dashColorRows");
+  const dashGhostN = document.getElementById("dashGhostN");
+  const dashPointsLeft = document.getElementById("dashPointsLeft");
+  const dashResetBtn = document.getElementById("btnDashReset");
+  const dashCountEls = new Map(); // color → 개수 표시 span
   const nodeEls = new Map();
   const lineEls = [];
   let selectedSkillId = SKILL_TREE[0].id;
+
+  // Dash 색상 투자 행: 색별 스와치 + 개수 + "+" 버튼. 레벨 제한 없이 포인트만 있으면 투자.
+  for (const color of DASH_COLORS) {
+    const row = document.createElement("div");
+    row.className = "dash-alloc-row";
+    const swatch = document.createElement("span");
+    swatch.className = "dash-swatch";
+    swatch.style.background = DASH_COLOR_HEX[color];
+    const label = document.createElement("span");
+    label.className = "dash-alloc-label";
+    label.textContent = DASH_COLOR_LABEL[color] ?? color;
+    const count = document.createElement("strong");
+    count.className = "dash-alloc-count";
+    count.textContent = "0";
+    const plus = document.createElement("button");
+    plus.type = "button";
+    plus.className = "dash-alloc-plus";
+    plus.textContent = "+";
+    plus.setAttribute("aria-label", `${DASH_COLOR_LABEL[color] ?? color} 투자`);
+    plus.addEventListener("click", () => {
+      const char = getCharacter?.();
+      if (investDashColor(char, color)) { onChange?.(char); render(); }
+    });
+    row.append(swatch, label, count, plus);
+    dashRows?.appendChild(row);
+    dashCountEls.set(color, count);
+  }
+  dashResetBtn?.addEventListener("click", () => {
+    const char = getCharacter?.();
+    if (char && resetDashColors(char) >= 0) { onChange?.(char); render(); }
+  });
 
   for (const skill of SKILL_TREE) {
     for (const parentId of skill.parents) {
@@ -57,6 +102,29 @@ export function initSkillTreePanel({ getCharacter, onChange, onOpenChange } = {}
     nodeEls.set(skill.id, button);
   }
 
+  function renderDashColors(char) {
+    const disabled = !char;
+    if (dashResetBtn) dashResetBtn.disabled = disabled;
+    if (disabled) {
+      if (dashGhostN) dashGhostN.textContent = "0";
+      if (dashPointsLeft) dashPointsLeft.textContent = "0";
+      for (const el of dashCountEls.values()) el.textContent = "0";
+      for (const row of dashRows?.children ?? []) row.querySelector(".dash-alloc-plus")?.setAttribute("disabled", "");
+      return;
+    }
+    normalizeDashPoints(char);
+    const noPoints = char.dashPoints <= 0;
+    if (dashGhostN) dashGhostN.textContent = String(dashGhostCount(char.dashColors));
+    if (dashPointsLeft) dashPointsLeft.textContent = String(char.dashPoints);
+    for (const color of DASH_COLORS) {
+      dashCountEls.get(color).textContent = String(char.dashColors[color] || 0);
+    }
+    for (const row of dashRows?.children ?? []) {
+      const plus = row.querySelector(".dash-alloc-plus");
+      if (plus) plus.disabled = noPoints; // 레벨 제한 없음 — 포인트가 없을 때만 비활성
+    }
+  }
+
   function render() {
     if (panel.classList.contains("hidden")) return;
     const char = getCharacter?.();
@@ -66,10 +134,12 @@ export function initSkillTreePanel({ getCharacter, onChange, onOpenChange } = {}
       points.textContent = "0";
       detail.textContent = "스킬 트리 사용 불가";
       for (const button of nodeEls.values()) button.disabled = true;
+      renderDashColors(null);
       return;
     }
 
     normalizeSkillProgress(char);
+    renderDashColors(char);
     const order = Number.isFinite(char.vampireOrder) ? `${char.vampireOrder}번 새우` : "새우";
     owner.textContent = order;
     level.textContent = String(char.level);

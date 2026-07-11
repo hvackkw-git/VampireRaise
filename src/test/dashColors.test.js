@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
-  DASH_COLORS, DASH_COLOR_HEX, defaultDashColors,
+  DASH_COLORS, DASH_COLOR_HEX, defaultDashColors, DEFAULT_DASH_POINTS,
   dashGhostCount, allocateGhostSlots, dashGhostColorSequence, ghostColorAtProgress,
+  investDashColor, resetDashColors, normalizeDashPoints,
 } from "../skills/dashColors.js";
 import { createInitialState, saveState, loadState } from "../state/gameState.js";
 
@@ -111,11 +112,47 @@ describe("Dash 잔상 색 로직", () => {
     const state = createInitialState();
     const vamp = state.chars.items.find((c) => c.side === "vampire");
     expect(vamp.dashColors).toEqual({ red: 1 });
+    expect(vamp.dashPoints).toBe(DEFAULT_DASH_POINTS); // 기본 듬뿍
     vamp.dashColors = { red: 2, orange: 1, blue: 1 };
+    vamp.dashPoints = 12;
     saveState(state, storage);
     const restored = loadState(storage);
     const rv = restored.chars.items.find((c) => c.side === "vampire");
     expect(rv.dashColors).toEqual({ red: 2, orange: 1, blue: 1 });
+    expect(rv.dashPoints).toBe(12);
+  });
+
+  it("색상 투자: 포인트만 있으면 레벨 제한 없이 찍힌다", () => {
+    const char = { dashColors: {}, dashPoints: 3 };
+    expect(investDashColor(char, "orange")).toBe(true);
+    expect(investDashColor(char, "orange")).toBe(true);
+    expect(investDashColor(char, "blue")).toBe(true);
+    expect(char.dashColors).toEqual({ orange: 2, blue: 1 });
+    expect(char.dashPoints).toBe(0);
+    // 포인트 없으면 실패
+    expect(investDashColor(char, "red")).toBe(false);
+    expect(char.dashColors.red).toBeUndefined();
+    // 잘못된 색은 실패
+    expect(investDashColor({ dashColors: {}, dashPoints: 5 }, "pink")).toBe(false);
+  });
+
+  it("색상 초기화: 투자 포인트를 전부 환불하고 배분을 비운다", () => {
+    const char = { dashColors: { red: 3, orange: 2 }, dashPoints: 5 };
+    const refunded = resetDashColors(char);
+    expect(refunded).toBe(5);
+    expect(char.dashPoints).toBe(10);
+    expect(char.dashColors).toEqual({});
+  });
+
+  it("normalizeDashPoints: 기본 풀은 듬뿍, 잘못된 값 정리", () => {
+    const fresh = {};
+    normalizeDashPoints(fresh);
+    expect(fresh.dashPoints).toBe(DEFAULT_DASH_POINTS);
+    expect(fresh.dashColors).toEqual({ red: 1 });
+    const dirty = { dashColors: { red: 2, pink: 3, blue: 0 }, dashPoints: -4 };
+    normalizeDashPoints(dirty);
+    expect(dirty.dashColors).toEqual({ red: 2 });
+    expect(dirty.dashPoints).toBe(0);
   });
 
   it("ghostColorAtProgress: 0=꼬리 색, 1근처=새우 근처 색", () => {

@@ -45,6 +45,9 @@ function endDash(c, platforms = [], { arrived = false, blockPowered = null } = {
   const goalPlatform = arrived && goal?.platformId != null
     ? platforms.find((p) => p.id === goal.platformId && isSolidForRoute(p, blockPowered))
     : null;
+  // TODO(dash색상 효과·미구현): arrived 시 도착 지점 효과 발동 훅.
+  //   파랑=폭발(주변 적 dmg×0.1~0.2) / 보라=실드(Hp×0.1~0.2, 5초) / 하양=스턴(대상 인간 1~2초).
+  //   각 색 투자 포인트(c.dashColors)에 비례. dashColorEffect(color, points) 헬퍼 추가 예정.
   if (goalPlatform) {
     c.x = goal.x - c.w / 2;
     c.y = goalPlatform.y - c.h;
@@ -474,6 +477,7 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null) 
       // 잔상 색 매핑용 진행도: 0(출발)→1(도착/새우 위치)
       c._dashProgress = Math.max(0, Math.min(1,
         1 - Math.hypot(tx - cx, ty - cy) / (c._dashDist0 || 1)));
+      // TODO(dash색상 효과·미구현): 노랑=경로상 스친 적에게 dmg×0.1~0.2 훅 자리(비행 궤적 중).
       const arriveDist = goal.platformId != null ? 4 : DASH_ARRIVE_DIST;
       if (Math.hypot(tx - cx, ty - cy) <= arriveDist) {
         endDash(c, state.platforms.items, { arrived: true, blockPowered });
