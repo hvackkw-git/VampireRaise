@@ -10,6 +10,7 @@ import {
   HUMAN_SPAWN_ZONE, VAMPIRE_SPAWN_ZONE,
 } from "../constants.js";
 import { DASH_COLOR_HEX, effectiveDetectRange } from "../skills/dashColors.js";
+import { auraTierForLevel, auraStyleForTier } from "../skills/shrimpAura.js";
 
 const blockEls = new Map(); // platId → { el, img, lastSrc, lastRot }
 const charEls = new Map();  // charId → { el, sprite, hpFill, lastSide }
@@ -187,6 +188,13 @@ export function renderChars(state, nowMs, ui) {
       const el = document.createElement("div");
       el.className = "char";
       el.dataset.charId = String(c.id);
+      const aura = document.createElement("div"); // 레벨 오러 (스프라이트 뒤, 맨 뒤)
+      aura.className = "char-aura";
+      for (const layer of ["aura-glow", "aura-ring", "aura-spark"]) {
+        const s = document.createElement("span");
+        s.className = layer;
+        aura.appendChild(s);
+      }
       const detect = document.createElement("div"); // 감지 범위 원 (스프라이트 뒤)
       detect.className = "char-detect";
       const sprite = document.createElement("div");
@@ -197,12 +205,13 @@ export function renderChars(state, nowMs, ui) {
       hpbar.appendChild(hpFill);
       const shield = document.createElement("div"); // 보라 실드 오라 (지속 중 표시)
       shield.className = "char-shield";
+      el.appendChild(aura);
       el.appendChild(detect);
       el.appendChild(shield);
       el.appendChild(sprite);
       el.appendChild(hpbar);
       layerChars.appendChild(el);
-      entry = { el, detect, sprite, hpFill, shield, lastSide: null, lastFrame: -1, shieldOn: false };
+      entry = { el, aura, detect, sprite, hpFill, shield, lastSide: null, lastFrame: -1, shieldOn: false, lastAuraTier: -1 };
       charEls.set(c.id, entry);
     }
     const cfg = CHAR_SPRITES[c.side];
@@ -224,6 +233,20 @@ export function renderChars(state, nowMs, ui) {
       entry.detect.style.height = `${r * 2}px`;
       entry.detect.style.left = `${cfg.size / 2 - r}px`;
       entry.detect.style.top = `${cfg.size / 2 - r}px`;
+    }
+    // 레벨 오러: 레벨 구간(5레벨=1단계)이 바뀔 때만 CSS 변수를 갱신한다.
+    const auraTier = auraTierForLevel(c.level);
+    if (entry.lastAuraTier !== auraTier) {
+      entry.lastAuraTier = auraTier;
+      const a = auraStyleForTier(auraTier);
+      const st = entry.aura.style;
+      st.setProperty("--aura-sz", `${a.size}px`);
+      st.setProperty("--aura-op", String(a.opacity));
+      st.setProperty("--aura-core", a.core);
+      st.setProperty("--aura-edge", a.edge);
+      st.setProperty("--aura-ring-op", String(a.ringOpacity));
+      st.setProperty("--aura-spark-op", String(a.sparkOpacity));
+      st.setProperty("--aura-spin", `${a.spin}s`);
     }
     // FIGHT/DASH는 빠르게 프레임을 돌려 몸싸움·질주 느낌을 낸다
     const moving = Math.abs(c.vx) > 1 || c.state === "CRAWL" || c.state === "JUMP"
