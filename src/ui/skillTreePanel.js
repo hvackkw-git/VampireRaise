@@ -79,7 +79,7 @@ export function initSkillTreePanel({ getCharacter, getCharacters, onChange, onOp
       button.innerHTML = '<span class="skill-node-count">0</span>';
     } else if (skill.zombie) {
       button.classList.add("zombie-node");
-      button.innerHTML = '<span class="skill-node-count">Z</span>';
+      button.innerHTML = '<span class="skill-node-count">0</span>';
     } else {
       button.classList.add("empty-node");
     }
@@ -148,7 +148,7 @@ export function initSkillTreePanel({ getCharacter, getCharacters, onChange, onOp
         const learnedTrait = trait && char.zombieTrait === skill.zombie.key;
         const cur = hpSkill ? zombieHpPoints(char) : learnedTrait ? 1 : 0;
         const countEl = button.querySelector(".skill-node-count");
-        if (countEl) countEl.textContent = hpSkill ? String(cur) : trait ? (learnedTrait ? "✓" : "5") : "Z";
+        if (countEl) countEl.textContent = String(cur);
         if (hpSkill) button.disabled = char.skillPoints <= 0;
         else if (trait) {
           button.disabled = !skill.zombie.implemented || !!char.zombieTrait
