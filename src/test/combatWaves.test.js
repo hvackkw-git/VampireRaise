@@ -65,6 +65,39 @@ describe("교전 (마주보고 싸우기)", () => {
   });
 });
 
+describe("빨강 · 복수 스킬 (피격 시 다음 공격력 증가)", () => {
+  function setupDuel(dashColors) {
+    const vamp = state.chars.items[0];
+    state.chars.items = [vamp];
+    vamp.dashColors = dashColors;
+    vamp.x = 100; vamp.y = FLOOR_Y - vamp.h; vamp.state = "CRAWL";
+    vamp.atk = 10; vamp.maxHp = 200; vamp.hp = 200; vamp._atkCd = 5; // 처음엔 뱀파이어가 공격 안 함
+    const human = createCharacter(state, "human", { x: 118, y: vamp.y, maxHp: 200, atk: 4 });
+    human._atkCd = 0; // 인간이 먼저 뱀파이어를 때린다
+    return { vamp, human };
+  }
+
+  it("red 2포인트면 피격 후 다음 공격이 ×1.1", () => {
+    const { vamp, human } = setupDuel({ red: 2 });
+    tickCombat(state, 0.016); // 인간이 뱀파이어를 피격 → 복수 예약
+    expect(vamp._revengePending).toBe(true);
+    vamp._atkCd = 0; // 이제 뱀파이어가 반격
+    const before = human.hp;
+    tickCombat(state, 0.016);
+    expect(before - human.hp).toBe(11); // 10 × 1.1 = 11
+    expect(vamp._revengePending).toBe(false); // 1회 소모
+  });
+
+  it("기본 red 1포인트는 복수 효과 없음(×1.0)", () => {
+    const { vamp, human } = setupDuel({ red: 1 });
+    tickCombat(state, 0.016);
+    vamp._atkCd = 0;
+    const before = human.hp;
+    tickCombat(state, 0.016);
+    expect(before - human.hp).toBe(10); // 배율 없음
+  });
+});
+
 describe("전투와 전염", () => {
   it("사거리 내 적을 공격해 데미지를 준다", () => {
     const vamp = state.chars.items[0];

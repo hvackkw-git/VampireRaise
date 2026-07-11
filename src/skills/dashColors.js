@@ -1,22 +1,32 @@
 // 혈귀 돌진(Dash) 잔상 색상 로직.
 // 스킬포인트 비율에 따라 잔상 색이 바뀐다. 팔레트 순서는 무지개 순(빨→주→노→초→파→보→하).
-// 잔상 개수는 노트 설계대로 "빨강+주황" 포인트로 결정하며 여기서 하드코딩한다.
+// 잔상 개수는 "빨강+주황" 포인트와 "인식 범위"로 결정한다(설계 노트 + 후속 확장).
 // 순수 함수만 두어 테스트하기 쉽게 한다(뷰/상태 의존 없음).
+
+import { DETECT_RANGE, DASH_ROUTE_MULT } from "../constants.js";
+
+/** 잔상 개수 스케일 기준이 되는 뱀파이어 기본 인식 범위 */
+export const BASE_DETECT_RANGE = DETECT_RANGE.vampire;
+
+/** 캐릭터의 실효 인식 범위 — 향후 성장으로 c.detectRange를 올리면 그대로 반영된다 */
+export function effectiveDetectRange(char) {
+  return Number.isFinite(char?.detectRange) ? char.detectRange : BASE_DETECT_RANGE;
+}
 //
 // ── Dash 색상 스킬 효과 카탈로그 (설계 노트 IMG_7727) ──
-//   현재 구현: "잔상 색 분배(시각)"만. 아래 실제 전투 효과는 미구현 — 훅 자리에 주석 표기.
-//   ┌──────┬─────────────────────┬──────────────────────┬───────────────┐
-//   │ 색   │ 효과                │ 계산(1p→2p)          │ 훅 위치        │
-//   ├──────┼─────────────────────┼──────────────────────┼───────────────┤
-//   │ 빨강 │ 복수(피격 시 공격력)│ ×1.0 → 1.1 → 1.2     │ combat 피격    │
-//   │ 주황 │ 거리(돌진 사거리)   │ ×2 → 2.1             │ ai 돌진 예산   │
-//   │ 노랑 │ 경로상 적 데미지    │ dmg×0.1 → 0.2        │ ai 돌진 틱     │
-//   │ 초록 │ 연타 확률           │ 0% → 10%             │ combat 공격 롤 │
-//   │ 파랑 │ 도착 후 폭발        │ dmg×0.1 → 0.2        │ ai endDash     │
-//   │ 보라 │ 도착 후 실드(5초)   │ Hp×0.1 → 0.2         │ ai endDash     │
-//   │ 하양 │ 도착 후 스턴(인간)  │ 1초 → 2초            │ ai endDash     │
-//   └──────┴─────────────────────┴──────────────────────┴───────────────┘
-//   각 색의 투자 포인트 → 효과 배율 변환은 향후 dashColorEffect(color, points) 헬퍼로 추가 예정.
+//   [O]=구현됨, [ ]=미구현(훅 자리에 TODO 주석).
+//   ┌───┬──────┬─────────────────────┬──────────────────────┬───────────────┐
+//   │구현│ 색   │ 효과                │ 계산(포인트별)       │ 위치           │
+//   ├───┼──────┼─────────────────────┼──────────────────────┼───────────────┤
+//   │ O │ 빨강 │ 복수(피격 시 공격력)│ ×1.0 → 1.1 → 1.2     │ combat 피격    │
+//   │ O │ 주황 │ 거리(돌진 사거리)   │ ×2 → 2.1 → 2.2       │ ai 돌진 예산   │
+//   │   │ 노랑 │ 경로상 적 데미지    │ dmg×0.1 → 0.2        │ ai 돌진 틱     │
+//   │   │ 초록 │ 연타 확률           │ 0% → 10%             │ combat 공격 롤 │
+//   │   │ 파랑 │ 도착 후 폭발        │ dmg×0.1 → 0.2        │ ai endDash     │
+//   │   │ 보라 │ 도착 후 실드(5초)   │ Hp×0.1 → 0.2         │ ai endDash     │
+//   │   │ 하양 │ 도착 후 스턴(인간)  │ 1초 → 2초            │ ai endDash     │
+//   └───┴──────┴─────────────────────┴──────────────────────┴───────────────┘
+//   빨강=revengeAttackMult(), 주황=dashDistanceMult(). 나머지 색 헬퍼는 이 자리에 이어 추가.
 //   포인트 출처: 현재는 char.dashColors 맵(독립). 향후 스킬트리 노드 습득 → dashColors 반영 배선 필요.
 
 /** 팔레트 순서 — 잔상 정렬·무지개 기준 */
@@ -95,15 +105,34 @@ const GHOST_MIN = 3;
 const GHOST_MAX = 18;
 
 /**
- * 잔상 개수. 노트: "잔상 갯수는 빨강+주황 스킬에 따라 결정" → 하드코딩.
+ * 잔상 개수 = (빨강+주황 포인트 하드코딩) × (인식 범위 비율).
+ * 인식 범위가 커질수록(향후 성장) 돌진 사거리가 늘어 잔상도 더 길게 남는다.
  * @param {{[color:string]: number}} points 색상별 투자 포인트
+ * @param {number} [detectRange] 실효 인식 범위(기본 = 뱀파이어 기본값)
  * @returns {number}
  */
-export function dashGhostCount(points = {}) {
+export function dashGhostCount(points = {}, detectRange = BASE_DETECT_RANGE) {
   const red = Math.max(0, Number(points.red) || 0);
   const orange = Math.max(0, Number(points.orange) || 0);
-  const n = GHOST_BASE + GHOST_PER_RED * Math.max(0, red - 1) + GHOST_PER_ORANGE * orange;
-  return Math.max(GHOST_MIN, Math.min(GHOST_MAX, Math.round(n)));
+  const byPoints = GHOST_BASE + GHOST_PER_RED * Math.max(0, red - 1) + GHOST_PER_ORANGE * orange;
+  const scale = detectRange > 0 ? detectRange / BASE_DETECT_RANGE : 1;
+  return Math.max(GHOST_MIN, Math.min(GHOST_MAX, Math.round(byPoints * scale)));
+}
+
+// ── 실제 스킬 효과 계산(설계 노트 IMG_7727) ──
+/**
+ * 빨강 · 복수: 피격 후 다음 공격력 배율. 기본 1포인트는 ×1.0(효과 없음),
+ * 이후 포인트당 +0.1 (1.0 → 1.1 → 1.2 …).
+ */
+export function revengeAttackMult(points = {}) {
+  return 1 + 0.1 * Math.max(0, (Number(points.red) || 0) - 1);
+}
+/**
+ * 주황 · 거리: 돌진 경로 예산 배율. 기본(0포인트) = DASH_ROUTE_MULT(2),
+ * 포인트당 +0.1 (2 → 2.1 → 2.2 …).
+ */
+export function dashDistanceMult(points = {}, base = DASH_ROUTE_MULT) {
+  return base + 0.1 * Math.max(0, Number(points.orange) || 0);
 }
 
 /**
@@ -175,11 +204,12 @@ function toColorMap(counts) {
  * 마지막 index = 새우에 가장 가까운 앞쪽. 팔레트 앞 색(빨강)을 앞쪽(새우 근처)에 둔다.
  * → 골고루면 무지개, 빨강+주황만 있으면 새우 근처 빨강 / 꼬리 쪽 주황.
  * @param {{[color:string]: number}} points
- * @param {() => number} [rng]
+ * @param {{ rng?: () => number, detectRange?: number }} [opts]
  * @returns {string[]} 길이 N, 각 원소는 색상 키
  */
-export function dashGhostColorSequence(points = {}, rng = Math.random) {
-  const N = dashGhostCount(points);
+export function dashGhostColorSequence(points = {}, opts = {}) {
+  const { rng = Math.random, detectRange = BASE_DETECT_RANGE } = opts;
+  const N = dashGhostCount(points, detectRange);
   const slots = allocateGhostSlots(points, N, rng);
   // 팔레트 순서(빨→…→하)로 펼친다: [빨,빨,주,주,…]
   const palette = [];
