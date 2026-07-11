@@ -7,6 +7,7 @@ import {
   accountExpForWave, accountExpToNext,
   HUMAN_SPAWN_INTERVAL_S, AUTO_WAVE_DELAY_S,
   HUMAN_SPAWN_ZONE, VAMPIRE_SPAWN_ZONE, spawnXInZone, BASE_CORE_HP,
+  REBIRTH_MAX_VAMPIRES, rebirthWaveRequirement,
 } from "../constants.js";
 import { createCharacter } from "../state/gameState.js";
 import { findHumanSpawnRoutes } from "./descentNavigation.js";
@@ -121,6 +122,40 @@ function triggerGameOver(state, rng) {
   w.nextAutoAt = null;
   state.core.hp = state.core.max ?? BASE_CORE_HP;
   reviveVampires(state, rng);
+}
+
+/** 현재 Vamp Shrimp 마릿수 (생사 무관 — 죽은 개체도 재시작 시 부활한다) */
+export function vampireCount(state) {
+  return state.chars.items.filter((c) => c.side === "vampire").length;
+}
+
+/** 지금 재시작(웨이브 리셋 + Vamp Shrimp 1마리 증원)이 가능한가 */
+export function canRebirth(state) {
+  if (state.wave.active) return false;
+  const count = vampireCount(state);
+  if (count >= REBIRTH_MAX_VAMPIRES) return false;
+  return state.wave.current >= rebirthWaveRequirement(count);
+}
+
+/**
+ * 재시작: 레벨·스킬은 유지한 채 웨이브를 1로 되돌리고 Vamp Shrimp를 1마리 늘린다.
+ * (새 Vamp Shrimp는 레벨 1부터 새로 성장한다)
+ * @returns {boolean} 실행 여부
+ */
+export function rebirth(state, rng = Math.random) {
+  if (!canRebirth(state)) return false;
+  state.chars.items = state.chars.items.filter((c) => c.side !== "human");
+  const w = state.wave;
+  w.active = false;
+  w.pendingSpawns = [];
+  w.current = 1;
+  w.clock = 0;
+  w.nextAutoAt = null;
+  w.lastStartError = null;
+  state.core.hp = state.core.max ?? BASE_CORE_HP;
+  reviveVampires(state, rng);
+  createCharacter(state, "vampire");
+  return true;
 }
 
 /**

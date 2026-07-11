@@ -3,7 +3,8 @@
 
 import {
   TANK_W, FLOOR_Y, CHAR_SIZE, CHAR_SPRITES, VAMPIRE_BASE, SLAVE_BASE, HUMAN_BASE_MP,
-  INITIAL_VAMPIRE_COUNT, VAMPIRE_SPAWN_ZONE, spawnXInZone, BASE_CORE_HP,
+  INITIAL_VAMPIRE_COUNT, INITIAL_VAMPIRE_LEVEL, vampireStatsForLevel,
+  VAMPIRE_SPAWN_ZONE, spawnXInZone, BASE_CORE_HP,
 } from "../constants.js";
 import { defaultDashColors } from "../skills/dashColors.js";
 
@@ -124,7 +125,10 @@ export function createInitialState() {
     chars: { nextId: 1, items: [] },
     projectiles: { nextId: 1, items: [] },
   };
-  for (let i = 0; i < INITIAL_VAMPIRE_COUNT; i++) createCharacter(state, "vampire");
+  const initialStats = vampireStatsForLevel(INITIAL_VAMPIRE_LEVEL);
+  for (let i = 0; i < INITIAL_VAMPIRE_COUNT; i++) {
+    createCharacter(state, "vampire", { level: INITIAL_VAMPIRE_LEVEL, ...initialStats });
+  }
   return state;
 }
 

@@ -7,15 +7,32 @@ import {
 } from "../game/combat.js";
 import {
   startWave, tickWaves, vampireSideAlive, humansAlive, grantAccountExp, reviveVampires,
+  vampireCount, canRebirth, rebirth,
 } from "../game/waves.js";
 import {
   humanCountForWave, humanStatsForWave, expToNext, SLAVE_BASE,
   accountExpForWave, accountExpToNext, FLOOR_Y,
+  REBIRTH_MAX_VAMPIRES, rebirthWaveRequirement,
+  INITIAL_VAMPIRE_COUNT, INITIAL_VAMPIRE_LEVEL, vampireStatsForLevel,
 } from "../constants.js";
 
 let state;
 beforeEach(() => {
   state = createInitialState();
+});
+
+describe("초기 상태", () => {
+  it("Vamp Shrimp 1마리, 레벨 10으로 시작한다", () => {
+    expect(INITIAL_VAMPIRE_COUNT).toBe(1);
+    const vampires = state.chars.items.filter((c) => c.side === "vampire");
+    expect(vampires).toHaveLength(1);
+    const vamp = vampires[0];
+    expect(vamp.level).toBe(INITIAL_VAMPIRE_LEVEL);
+    const stats = vampireStatsForLevel(INITIAL_VAMPIRE_LEVEL);
+    expect(vamp.maxHp).toBe(stats.maxHp);
+    expect(vamp.atk).toBe(stats.atk);
+    expect(vamp.skillPoints).toBe(INITIAL_VAMPIRE_LEVEL - 1);
+  });
 });
 
 describe("교전 (마주보고 싸우기)", () => {
@@ -318,6 +335,7 @@ describe("웨이브", () => {
   });
 
   it("인간 전멸 시 클리어: 보상 지급·웨이브 증가·죽은 뱀파이어 부활", () => {
+    createCharacter(state, "vampire"); // 뱀파이어 진영이 전멸하지 않도록 한 마리 더 배치
     startWave(state);
     for (let t = 0; t < 12; t += 0.1) tickWaves(state, 0.1);
     // 인간 전멸 처리
@@ -388,5 +406,66 @@ describe("웨이브", () => {
     }
     expect(started).toBe(true);
     expect(state.wave.active).toBe(true);
+  });
+});
+
+describe("재시작(Rebirth)", () => {
+  it("새우 1마리 · 웨이브 10 미만이면 재시작 불가", () => {
+    state.wave.current = 9;
+    expect(canRebirth(state)).toBe(false);
+    expect(rebirth(state)).toBe(false);
+    expect(vampireCount(state)).toBe(1);
+  });
+
+  it("새우 1마리 · 웨이브 10 이상이면 레벨·스킬 유지한 채 웨이브 1로, 새우 1마리 추가", () => {
+    const vamp = state.chars.items[0];
+    vamp.level = 15;
+    vamp.skillPoints = 4;
+    vamp.learnedSkills = ["skill-01"];
+    state.wave.current = 12;
+    state.core.hp = state.core.max - 3;
+    expect(canRebirth(state)).toBe(true);
+
+    expect(rebirth(state)).toBe(true);
+    expect(state.wave.current).toBe(1);
+    expect(state.wave.active).toBe(false);
+    expect(state.core.hp).toBe(state.core.max);
+    expect(vampireCount(state)).toBe(2);
+
+    const survivor = state.chars.items.find((c) => c.id === vamp.id);
+    expect(survivor.level).toBe(15);
+    expect(survivor.skillPoints).toBe(4);
+    expect(survivor.learnedSkills).toEqual(["skill-01"]);
+
+    const newcomer = state.chars.items.find((c) => c.side === "vampire" && c.id !== vamp.id);
+    expect(newcomer.level).toBe(1);
+  });
+
+  it("웨이브를 훨씬 넘겨 존버해도 재시작 1회에는 새우가 1마리만 늘어난다", () => {
+    state.wave.current = 25; // 다음 문턱(20)을 훌쩍 넘겼어도
+    expect(rebirth(state)).toBe(true);
+    expect(vampireCount(state)).toBe(2); // 여전히 +1
+  });
+
+  it("새우 마릿수마다 재시작 문턱은 마릿수×10", () => {
+    expect(rebirthWaveRequirement(1)).toBe(10);
+    expect(rebirthWaveRequirement(2)).toBe(20);
+    expect(rebirthWaveRequirement(4)).toBe(40);
+  });
+
+  it("최대 마릿수(5) 도달 시 더 이상 재시작으로 늘어나지 않는다", () => {
+    for (let i = 1; i < REBIRTH_MAX_VAMPIRES; i++) createCharacter(state, "vampire");
+    expect(vampireCount(state)).toBe(REBIRTH_MAX_VAMPIRES);
+    state.wave.current = 999;
+    expect(canRebirth(state)).toBe(false);
+    expect(rebirth(state)).toBe(false);
+    expect(vampireCount(state)).toBe(REBIRTH_MAX_VAMPIRES);
+  });
+
+  it("웨이브 진행 중에는 재시작할 수 없다", () => {
+    state.wave.current = 10;
+    startWave(state);
+    expect(canRebirth(state)).toBe(false);
+    expect(rebirth(state)).toBe(false);
   });
 });

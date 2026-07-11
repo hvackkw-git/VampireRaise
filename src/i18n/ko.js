@@ -4,7 +4,7 @@ export default {
     testTools: "테스트 도구", hideRanges: "인지범위 숨기기", showRanges: "인지범위 보이기",
     levelAll: "Vamp Shrimp 전체 레벨 1 증가", logicLayer: "논리 레이어", done: "완료",
     skillTree: "스킬 트리", startWave: "웨이브 시작", autoWave: "자동 웨이브",
-    summon: "Vamp Shrimp 소환", decorate: "꾸미기", reset: "처음부터 재시작",
+    rebirth: "재시작", decorate: "꾸미기", reset: "처음부터 재시작",
     closeSkillTree: "스킬 트리 닫기", close: "닫기", dashSummary: "Dash 스킬 요약",
     testLevelUp: "테스트 레벨 +1", switchKorean: "한국어로 전환", switchEnglish: "영어로 전환",
   },
@@ -17,9 +17,10 @@ export default {
   hud: {
     noRoute: "아래까지 이어지는 Holy Shrimp 이동 경로가 없습니다", finishDecorating: "꾸미기를 완료한 뒤 웨이브를 시작하세요",
     waveStart: "🌊 웨이브 {wave} 시작!", finishDecoratingAuto: "꾸미기를 완료한 뒤 자동 웨이브를 켜세요",
-    notEnoughBlood: "피가 부족합니다 (🩸 {cost} 필요)", vampJoined: "🦐 새 Vamp Shrimp가 합류했습니다",
     decorateAfterWave: "꾸미기는 웨이브 종료 후에만 가능합니다", resetConfirm: "한 번 더 누르면 처음부터 재시작합니다",
     resetDone: "🔄 처음부터 재시작!",
+    rebirthLocked: "웨이브 {wave} 이상에서 재시작할 수 있습니다", rebirthMaxed: "Vamp Shrimp는 이 방식으로 최대 5마리까지만 늘어납니다",
+    rebirthDone: "🥚 재시작! 레벨·스킬 유지, 웨이브 1부터 · Vamp Shrimp {count}마리",
   },
   events: {
     allMaxLevel: "모든 Vamp Shrimp가 최고 레벨입니다", levelAll: "Vamp Shrimp {count}마리 LV +1",

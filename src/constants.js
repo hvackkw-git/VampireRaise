@@ -152,6 +152,15 @@ export const LEVELUP_ATK_GAIN = 2;
 /** Vamp Shrimp 초기 스탯 */
 export const VAMPIRE_BASE = { maxHp: 60, atk: 8, maxMp: 40 };
 
+/** 레벨 N Vamp Shrimp의 maxHp/atk (레벨업 공식을 역산해 초기 고레벨 새우를 스폰할 때 사용) */
+export function vampireStatsForLevel(level) {
+  const gained = Math.max(0, Math.floor(level) - 1);
+  return {
+    maxHp: VAMPIRE_BASE.maxHp + LEVELUP_HP_GAIN * gained,
+    atk: VAMPIRE_BASE.atk + LEVELUP_ATK_GAIN * gained,
+  };
+}
+
 /** Jombie Shrimp 기본 스탯 — 향후 소유 Vamp Shrimp 스킬트리로 보정 */
 export const SLAVE_BASE = { maxHp: 5, hpDecayPerSecond: 1, maxMp: 10 };
 
@@ -179,9 +188,14 @@ export const HUMAN_SPAWN_INTERVAL_S = 0.8; // Holy Shrimp 순차 스폰 간격
 export const AUTO_WAVE_DELAY_S = 3;        // 자동 웨이브 딜레이
 export const KILL_BLOOD_REWARD = 2;        // Holy Shrimp 처치당 피
 
-/** Vamp Shrimp 소환 비용 (현재 Vamp Shrimp 수 기준) */
-export function summonCost(vampireCount) {
-  return 50 + 75 * Math.max(0, vampireCount - 2);
-}
+export const INITIAL_VAMPIRE_COUNT = 1;
+/** 최초 스폰되는 Vamp Shrimp의 시작 레벨 */
+export const INITIAL_VAMPIRE_LEVEL = 10;
 
-export const INITIAL_VAMPIRE_COUNT = 2;
+// ── 리버스(웨이브 리셋 후 새우 추가) ──
+/** 재시작으로 늘릴 수 있는 Vamp Shrimp 최대 마릿수 (그 이상은 별도 설계 예정) */
+export const REBIRTH_MAX_VAMPIRES = 5;
+/** 현재 Vamp Shrimp 마릿수일 때 재시작 가능한 최소 웨이브 (마릿수 × 10) */
+export function rebirthWaveRequirement(vampireCount) {
+  return vampireCount * 10;
+}
