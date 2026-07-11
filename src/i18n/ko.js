@@ -52,7 +52,7 @@ export default {
     rgb_green_block: "RGB 블록(초록)", rgb_blue_block: "RGB 블록(파랑)", rgb_white_block: "RGB 블록(하양)", stun_block: "스턴 블록",
   },
   skillTree: {
-    title: "스킬 트리", dashSkills: "Dash 스킬", ghosts: "잔상", points: "포인트", ghostsAndPoints: "잔상 {ghosts}개 · 포인트 {points}",
+    title: "스킬 트리", dashSkills: "Dash 스킬", ghosts: "잔상",
     reset: "초기화", investHint: "슬롯을 눌러 투자", noShrimp: "선택된 새우 없음",
     unavailable: "스킬 트리 사용 불가", shrimpNumber: "{number}번 새우", shrimp: "새우",
     current: "현재", choiceCost: "비용 {cost}SP · 2~4 중 택1", choice: "{cost}SP · 택1", emptySlot: "빈 슬롯",

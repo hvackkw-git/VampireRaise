@@ -46,7 +46,6 @@ export function initSkillTreePanel({ getCharacter, getCharacters, onChange, onOp
   const closeButton = document.getElementById("btnSkillTreeClose");
   const levelUpButton = document.getElementById("btnSkillTreeLevelUp");
   const dashGhostN = document.getElementById("dashGhostN");
-  const dashPointsLeft = document.getElementById("dashPointsLeft");
   const dashResetBtn = document.getElementById("btnDashReset");
   const nodeEls = new Map();
   let selectedSkillId = SKILL_TREE.find((s) => s.dash)?.id ?? SKILL_TREE[0].id;
@@ -114,7 +113,6 @@ export function initSkillTreePanel({ getCharacter, getCharacters, onChange, onOp
       points.textContent = "0";
       detail.textContent = t("skillTree.unavailable");
       if (dashGhostN) dashGhostN.textContent = "0";
-      if (dashPointsLeft) dashPointsLeft.textContent = "0";
       if (dashResetBtn) dashResetBtn.disabled = true;
       if (levelUpButton) levelUpButton.disabled = true;
       for (const button of nodeEls.values()) button.disabled = true;
@@ -128,9 +126,8 @@ export function initSkillTreePanel({ getCharacter, getCharacters, onChange, onOp
     owner.textContent = order;
     level.textContent = String(char.level);
     points.textContent = String(char.skillPoints);
-    const noPoints = char.dashPoints <= 0;
+    const noPoints = char.skillPoints <= 0;
     if (dashGhostN) dashGhostN.textContent = String(dashGhostCount(char.dashColors, effectiveDetectRange(char)));
-    if (dashPointsLeft) dashPointsLeft.textContent = String(char.dashPoints);
     if (dashResetBtn) dashResetBtn.disabled = false;
     if (levelUpButton) levelUpButton.disabled = char.level >= 50;
 

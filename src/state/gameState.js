@@ -5,7 +5,7 @@ import {
   TANK_W, FLOOR_Y, CHAR_SIZE, CHAR_SPRITES, VAMPIRE_BASE, SLAVE_BASE, HUMAN_BASE_MP,
   INITIAL_VAMPIRE_COUNT, VAMPIRE_SPAWN_ZONE, spawnXInZone, BASE_CORE_HP,
 } from "../constants.js";
-import { defaultDashColors, DEFAULT_DASH_POINTS } from "../skills/dashColors.js";
+import { defaultDashColors } from "../skills/dashColors.js";
 
 export const SAVE_KEY = "vampireraise.save.v1";
 
@@ -83,11 +83,7 @@ export function createCharacter(state, side, opts = {}) {
           ? { ...opts.dashColors }
           : defaultDashColors())
       : null,
-    // 색상 투자용 포인트 풀 — 레벨 제한 없이 듬뿍(자유 배분·재배분). 스킬트리 SP와는 별개.
-    dashPoints: side === "vampire"
-      ? Math.max(0, Number(opts.dashPoints ?? DEFAULT_DASH_POINTS) || 0)
-      : 0,
-    // 인식범위 스킬 포인트 — 위 풀에서 투자. 포인트당 인식 범위 ×1.1씩 실제로 커진다.
+    // 인식범위 스킬 포인트 — 스킬트리 SP(skillPoints)에서 투자. 포인트당 인식 범위 ×1.1씩 실제로 커진다.
     detectPoints: side === "vampire" ? Math.max(0, Number(opts.detectPoints ?? 0) || 0) : 0,
     // 대쉬 숙련 포인트 — 위 풀에서 투자. 포인트당 돌진 쿨타임·마나소모 -10%씩.
     dashCdManaPoints: side === "vampire" ? Math.max(0, Number(opts.dashCdManaPoints ?? 0) || 0) : 0,
@@ -157,7 +153,7 @@ export function serialize(state) {
           ownerVampireId: c.ownerVampireId, vampireOrder: c.vampireOrder,
           job: c.job, skills: c.skills,
           skillPoints: c.skillPoints, learnedSkills: c.learnedSkills,
-          dashColors: c.dashColors, dashPoints: c.dashPoints, detectPoints: c.detectPoints,
+          dashColors: c.dashColors, detectPoints: c.detectPoints,
           dashCdManaPoints: c.dashCdManaPoints,
           zombieHpPoints: c.zombieHpPoints,
           zombieTrait: c.zombieTrait,
@@ -224,7 +220,6 @@ export function loadState(storage = globalThis.localStorage) {
       skillPoints: rec.skillPoints ?? Math.max(0, (Number(rec.level) || 1) - 1),
       learnedSkills: rec.learnedSkills,
       dashColors: rec.dashColors,
-      dashPoints: rec.dashPoints,
       detectPoints: rec.detectPoints,
       dashCdManaPoints: rec.dashCdManaPoints,
       zombieHpPoints: rec.zombieHpPoints,

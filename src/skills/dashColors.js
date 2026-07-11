@@ -41,7 +41,7 @@ export function effectiveDetectRange(char) {
 //   │ O │ 하양 │ 도착 후 스턴(Holy Shrimp) │ 1초 → 2초       │ dashEffects/도착│
 //   └───┴──────┴─────────────────────┴──────────────────────┴───────────────┘
 //   헬퍼: revenge/dashDistance/pathDamage/multiHit/explosionDamage/shieldHp/stunSeconds Mult.
-//   포인트 출처: 현재는 char.dashColors 맵(독립). 향후 스킬트리 노드 습득 → dashColors 반영 배선 필요.
+//   포인트 출처: char.skillPoints(스킬트리 SP)에서 차감해 char.dashColors 맵에 적립한다.
 //   ─ 색 외 스킬 ─ 인식범위(detectPoints): 포인트당 ×1.1 → detectRangeMult()/effectiveDetectRange().
 //     실제 감지·돌진 예산·잔상 개수·감지 원 시각에 모두 반영된다.
 //   ─ 대쉬 숙련(dashCdManaPoints): 포인트당 -10% → dashCdManaMult(). 돌진 쿨타임·마나소모에 반영된다(ai.js beginDash/endDash).
@@ -67,9 +67,6 @@ export function defaultDashColors() {
   return { red: 1 };
 }
 
-/** 색상 투자용 기본 포인트 풀 — 레벨 제한 없이 듬뿍(자유 배분·재배분 실험용) */
-export const DEFAULT_DASH_POINTS = 30;
-
 /** 색상 키가 유효한지 */
 export function isDashColor(color) {
   return DASH_COLORS.includes(color);
@@ -83,8 +80,6 @@ export function normalizeDashPoints(char) {
     if (!isDashColor(k) || !(char.dashColors[k] > 0)) delete char.dashColors[k];
     else char.dashColors[k] = Math.floor(char.dashColors[k]);
   }
-  if (!Number.isFinite(char.dashPoints)) char.dashPoints = DEFAULT_DASH_POINTS;
-  char.dashPoints = Math.max(0, Math.floor(char.dashPoints));
   if (!Number.isFinite(char.detectPoints)) char.detectPoints = 0;
   char.detectPoints = Math.max(0, Math.floor(char.detectPoints));
   if (!Number.isFinite(char.dashCdManaPoints)) char.dashCdManaPoints = 0;
@@ -93,14 +88,15 @@ export function normalizeDashPoints(char) {
 }
 
 /**
- * 인식범위에 1포인트 투자. 색상과 같은 풀(dashPoints)을 쓰며 레벨 제한 없음.
+ * 인식범위에 1포인트 투자. 스킬트리 SP(char.skillPoints)를 쓴다.
  * @returns {boolean} 성공 여부
  */
 export function investDetect(char) {
   if (!char) return false;
   normalizeDashPoints(char);
-  if (char.dashPoints <= 0) return false;
-  char.dashPoints -= 1;
+  const sp = Math.max(0, Math.floor(Number(char.skillPoints) || 0));
+  if (sp <= 0) return false;
+  char.skillPoints = sp - 1;
   char.detectPoints += 1;
   return true;
 }
@@ -115,33 +111,35 @@ export function dashCdManaMult(points = 0) {
 }
 
 /**
- * 대쉬 숙련(쿨타임·마나소모 감소)에 1포인트 투자. 같은 풀(dashPoints)을 쓰며 레벨 제한 없음.
+ * 대쉬 숙련(쿨타임·마나소모 감소)에 1포인트 투자. 스킬트리 SP(char.skillPoints)를 쓴다.
  * @returns {boolean} 성공 여부
  */
 export function investDashCdMana(char) {
   if (!char) return false;
   normalizeDashPoints(char);
-  if (char.dashPoints <= 0) return false;
-  char.dashPoints -= 1;
+  const sp = Math.max(0, Math.floor(Number(char.skillPoints) || 0));
+  if (sp <= 0) return false;
+  char.skillPoints = sp - 1;
   char.dashCdManaPoints += 1;
   return true;
 }
 
 /**
- * 색상에 1포인트 투자. 레벨 제한 없음 — 풀(dashPoints)만 있으면 가능.
+ * 색상에 1포인트 투자. 스킬트리 SP(char.skillPoints)를 쓴다.
  * @returns {boolean} 성공 여부
  */
 export function investDashColor(char, color) {
   if (!char || !isDashColor(color)) return false;
   normalizeDashPoints(char);
-  if (char.dashPoints <= 0) return false;
-  char.dashPoints -= 1;
+  const sp = Math.max(0, Math.floor(Number(char.skillPoints) || 0));
+  if (sp <= 0) return false;
+  char.skillPoints = sp - 1;
   char.dashColors[color] = (char.dashColors[color] || 0) + 1;
   return true;
 }
 
 /**
- * 투자한 색상·인식범위 포인트를 모두 풀로 되돌리고 배분을 비운다(자유 재배분).
+ * 투자한 색상·인식범위 포인트를 모두 SP로 되돌리고 배분을 비운다(자유 재배분).
  * @returns {number} 되돌린 포인트 수
  */
 export function resetDashColors(char) {
@@ -149,7 +147,7 @@ export function resetDashColors(char) {
   normalizeDashPoints(char);
   const refunded = Object.values(char.dashColors).reduce((a, b) => a + b, 0)
     + char.detectPoints + char.dashCdManaPoints;
-  char.dashPoints += refunded;
+  char.skillPoints = Math.max(0, Math.floor(Number(char.skillPoints) || 0)) + refunded;
   char.dashColors = {};
   char.detectPoints = 0;
   char.dashCdManaPoints = 0;

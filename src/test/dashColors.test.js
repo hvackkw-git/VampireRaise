@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  DASH_COLORS, DASH_COLOR_HEX, defaultDashColors, DEFAULT_DASH_POINTS,
+  DASH_COLORS, DASH_COLOR_HEX, defaultDashColors,
   dashGhostCount, dashColorCycle, dashGhostTrail,
   investDashColor, resetDashColors, normalizeDashPoints,
   BASE_DETECT_RANGE, effectiveDetectRange, revengeAttackMult, dashDistanceMult,
@@ -87,49 +87,50 @@ describe("Dash 잔상 색 로직", () => {
     const state = createInitialState();
     const vamp = state.chars.items.find((c) => c.side === "vampire");
     expect(vamp.dashColors).toEqual({ red: 1 });
-    expect(vamp.dashPoints).toBe(DEFAULT_DASH_POINTS); // 기본 듬뿍
     vamp.dashColors = { red: 2, orange: 1, blue: 1 };
-    vamp.dashPoints = 12;
+    vamp.skillPoints = 12;
     vamp.detectPoints = 3;
     saveState(state, storage);
     const restored = loadState(storage);
     const rv = restored.chars.items.find((c) => c.side === "vampire");
     expect(rv.dashColors).toEqual({ red: 2, orange: 1, blue: 1 });
-    expect(rv.dashPoints).toBe(12);
+    expect(rv.skillPoints).toBe(12);
     expect(rv.detectPoints).toBe(3);
   });
 
   it("색상 투자: 포인트만 있으면 레벨 제한 없이 찍힌다", () => {
-    const char = { dashColors: {}, dashPoints: 3 };
+    const char = { dashColors: {}, skillPoints: 3 };
     expect(investDashColor(char, "orange")).toBe(true);
     expect(investDashColor(char, "orange")).toBe(true);
     expect(investDashColor(char, "blue")).toBe(true);
     expect(char.dashColors).toEqual({ orange: 2, blue: 1 });
-    expect(char.dashPoints).toBe(0);
+    expect(char.skillPoints).toBe(0);
     // 포인트 없으면 실패
     expect(investDashColor(char, "red")).toBe(false);
     expect(char.dashColors.red).toBeUndefined();
     // 잘못된 색은 실패
-    expect(investDashColor({ dashColors: {}, dashPoints: 5 }, "pink")).toBe(false);
+    expect(investDashColor({ dashColors: {}, skillPoints: 5 }, "pink")).toBe(false);
   });
 
   it("색상 초기화: 투자 포인트를 전부 환불하고 배분을 비운다", () => {
-    const char = { dashColors: { red: 3, orange: 2 }, dashPoints: 5 };
+    const char = { dashColors: { red: 3, orange: 2 }, skillPoints: 5 };
     const refunded = resetDashColors(char);
     expect(refunded).toBe(5);
-    expect(char.dashPoints).toBe(10);
+    expect(char.skillPoints).toBe(10);
     expect(char.dashColors).toEqual({});
   });
 
-  it("normalizeDashPoints: 기본 풀은 듬뿍, 잘못된 값 정리", () => {
+  it("normalizeDashPoints: dashColors 잘못된 값 정리, 인식/숙련 포인트 기본값", () => {
     const fresh = {};
     normalizeDashPoints(fresh);
-    expect(fresh.dashPoints).toBe(DEFAULT_DASH_POINTS);
     expect(fresh.dashColors).toEqual({ red: 1 });
-    const dirty = { dashColors: { red: 2, pink: 3, blue: 0 }, dashPoints: -4 };
+    expect(fresh.detectPoints).toBe(0);
+    expect(fresh.dashCdManaPoints).toBe(0);
+    const dirty = { dashColors: { red: 2, pink: 3, blue: 0 }, detectPoints: -4, dashCdManaPoints: -1 };
     normalizeDashPoints(dirty);
     expect(dirty.dashColors).toEqual({ red: 2 });
-    expect(dirty.dashPoints).toBe(0);
+    expect(dirty.detectPoints).toBe(0);
+    expect(dirty.dashCdManaPoints).toBe(0);
   });
 
   it("잔상 개수는 인식 범위에 비례해 늘어난다(향후 인식 범위 성장 반영)", () => {
@@ -159,19 +160,19 @@ describe("Dash 잔상 색 로직", () => {
   });
 
   it("인식범위 투자·초기화: 같은 풀을 쓰고 초기화 시 함께 환불", () => {
-    const char = { dashColors: {}, dashPoints: 3, detectPoints: 0 };
+    const char = { dashColors: {}, skillPoints: 3, detectPoints: 0 };
     expect(investDetect(char)).toBe(true);
     expect(investDetect(char)).toBe(true);
     expect(char.detectPoints).toBe(2);
-    expect(char.dashPoints).toBe(1);
-    investDashColor(char, "orange"); // dashPoints 0
+    expect(char.skillPoints).toBe(1);
+    investDashColor(char, "orange"); // skillPoints 0
     expect(investDetect(char)).toBe(false); // 풀 소진
     // 초기화: 색 1 + 인식 2 = 3 환불
     const refunded = resetDashColors(char);
     expect(refunded).toBe(3);
     expect(char.detectPoints).toBe(0);
     expect(char.dashColors).toEqual({});
-    expect(char.dashPoints).toBe(3);
+    expect(char.skillPoints).toBe(3);
   });
 
   it("빨강=복수 배율: 1p는 ×1.0, 이후 포인트당 +0.1", () => {
@@ -195,16 +196,16 @@ describe("Dash 잔상 색 로직", () => {
   });
 
   it("대쉬 숙련 투자·초기화: 같은 풀을 쓰고 초기화 시 함께 환불", () => {
-    const char = { dashColors: {}, dashPoints: 2, dashCdManaPoints: 0 };
+    const char = { dashColors: {}, skillPoints: 2, dashCdManaPoints: 0 };
     expect(investDashCdMana(char)).toBe(true);
     expect(investDashCdMana(char)).toBe(true);
     expect(char.dashCdManaPoints).toBe(2);
-    expect(char.dashPoints).toBe(0);
+    expect(char.skillPoints).toBe(0);
     expect(investDashCdMana(char)).toBe(false); // 풀 소진
 
     const refunded = resetDashColors(char);
     expect(refunded).toBe(2);
     expect(char.dashCdManaPoints).toBe(0);
-    expect(char.dashPoints).toBe(2);
+    expect(char.skillPoints).toBe(2);
   });
 });
