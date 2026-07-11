@@ -427,12 +427,20 @@ describe("군중 분리(tickSeparation)", () => {
     expect(a.x).toBeLessThan(b.x);     // id 순으로 대칭이 깨져 a가 왼쪽
   });
 
-  it("여러 프레임 뒤 중심 간격이 목표치(약 0.32×2w) 이상으로 벌어진다", () => {
+  it("여러 프레임 뒤 중심 간격이 목표치(약 0.15×2w) 이상으로 벌어진다", () => {
     const a = makeChar({ id: 1, x: 200 });
     const b = makeChar({ id: 2, x: 205 });
     for (let i = 0; i < 60; i++) tickSeparation([a, b], 1 / 60);
     const gap = Math.abs((a.x + a.w / 2) - (b.x + b.w / 2));
-    expect(gap).toBeGreaterThanOrEqual((a.w + b.w) * 0.32 - 0.5);
+    expect(gap).toBeGreaterThanOrEqual((a.w + b.w) * 0.15 - 0.5);
+  });
+
+  it("서로 마주보는(dir 반대) 쌍은 밀지 않는다", () => {
+    const a = makeChar({ id: 1, x: 200, dir: 1 });
+    const b = makeChar({ id: 2, x: 200, dir: -1 });
+    tickSeparation([a, b], 1 / 60);
+    expect(a.x).toBe(200);
+    expect(b.x).toBe(200);
   });
 
   it("서로 다른 편은 밀지 않는다", () => {

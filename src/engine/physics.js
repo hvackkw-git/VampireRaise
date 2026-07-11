@@ -486,8 +486,8 @@ export function defaultMoveDecide(c, ctx, rng = Math.random) {
 // 밀어내 부채꼴로 퍼지게 한다. 걷는(CRAWL) 유닛에만 적용 — 돌진·점프·낙하·교전 물리는
 // 건드리지 않는다.
 const SEPARATION_STATE = "CRAWL";
-const SEPARATION_GAP_FACTOR = 0.32; // 원하는 중심 간격 = (w_a + w_b) × 이 값
-const SEPARATION_PUSH_SPD = 90;     // 프레임당 최대 밀어내기 속도 px/s
+const SEPARATION_GAP_FACTOR = 0.15; // 원하는 중심 간격 = (w_a + w_b) × 이 값
+const SEPARATION_PUSH_SPD = 150;    // 프레임당 최대 밀어내기 속도 px/s
 
 export function tickSeparation(chars, simDt) {
   const walkers = chars.filter((c) => !c.dead && c.state === SEPARATION_STATE);
@@ -497,6 +497,9 @@ export function tickSeparation(chars, simDt) {
     for (let j = i + 1; j < walkers.length; j++) {
       const b = walkers[j];
       if (b.side !== a.side) continue;
+      // 같은 방향을 보고 걷는(줄줄이 따라가는) 쌍만 분리한다. 마주보는(dir 반대)
+      // 쌍까지 밀면 서로 힘겨루기하듯 밀치락달치락하므로 제외한다.
+      if (a.dir !== b.dir) continue;
       const bcy = b.y + b.h / 2;
       // 세로로 같은 줄(발판 높이)일 때만 — 위아래로 겹친 건 밀지 않는다.
       if (Math.abs(acy - bcy) > Math.min(a.h, b.h) * 0.5) continue;
