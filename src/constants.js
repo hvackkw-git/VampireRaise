@@ -62,8 +62,7 @@ export function spawnXInZone(zone, size, rng = Math.random) {
 export const CHAR_SPRITES = {
   vampire: { src: "assets/shrimp_variants/shrimp-4frame-cherry_red.png", size: 32, frames: 8, topPad: 18 },
   human:   { src: "assets/shrimp_variants/shrimp-4frame-blue_velvet.png", size: 32, frames: 8, topPad: 18 },
-  // 인체형 좀비 더미 (tools/generate_zombie_dummy.py) — 몸통 하단 18px(y14~31), 폭 ≤20px
-  slave:   { src: "assets/chars/zombie_walk.png", size: 32, frames: 8, topPad: 14 },
+  slave:   { src: "assets/shrimp_variants/shrimp-4frame-black_king.png", size: 32, frames: 8, topPad: 18 },
 };
 
 // ── 이동 물리 (Shrimprium 새우 물리 이식값) ──
