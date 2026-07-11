@@ -26,6 +26,9 @@ import { createDecorateMode } from "./decorate/decorateMode.js";
 import { initInfoPanel, renderInfoPanel, renderSquadPanel } from "./ui/infoPanel.js";
 import { initSkillTreePanel } from "./ui/skillTreePanel.js";
 import { initHud } from "./ui/hud.js";
+import { applyDocumentTranslations, getLocale, setLocale, t } from "./i18n/index.js";
+
+applyDocumentTranslations();
 
 const state = loadState() ?? createInitialState();
 const ui = {
@@ -72,13 +75,25 @@ preloadStatefulBlockSprites();
 
 const btnDetectRanges = document.getElementById("btnDetectRanges");
 const btnAllVampireLevelUp = document.getElementById("btnAllVampireLevelUp");
+const btnLanguage = document.getElementById("btnLanguage");
+
+function syncLocaleControls() {
+  const korean = getLocale() === "ko";
+  btnLanguage.textContent = korean ? "EN" : "KO";
+  const languageLabel = t(korean ? "controls.switchEnglish" : "controls.switchKorean");
+  btnLanguage.title = languageLabel;
+  btnLanguage.setAttribute("aria-label", languageLabel);
+  const rangeLabel = t(ui.showDetectRanges ? "controls.hideRanges" : "controls.showRanges");
+  btnDetectRanges.title = rangeLabel;
+  btnDetectRanges.setAttribute("aria-label", rangeLabel);
+}
 
 btnDetectRanges.addEventListener("click", () => {
   ui.showDetectRanges = !ui.showDetectRanges;
   setDetectRangesVisible(ui.showDetectRanges);
   btnDetectRanges.classList.toggle("on", ui.showDetectRanges);
   btnDetectRanges.setAttribute("aria-pressed", String(ui.showDetectRanges));
-  const label = ui.showDetectRanges ? "인지범위 숨기기" : "인지범위 보이기";
+  const label = t(ui.showDetectRanges ? "controls.hideRanges" : "controls.showRanges");
   btnDetectRanges.setAttribute("aria-label", label);
   btnDetectRanges.title = label;
 });
@@ -91,12 +106,12 @@ btnAllVampireLevelUp.addEventListener("click", () => {
     changed++;
   }
   if (changed === 0) {
-    showToast("모든 빨간 새우가 최고 레벨입니다");
+    showToast(t("events.allMaxLevel"));
     return;
   }
   saveState(state);
   updatePanel();
-  showToast(`빨간 새우 ${changed}마리 LV +1`);
+  showToast(t("events.levelAll", { count: changed }));
 });
 
 let hud = null;
@@ -131,7 +146,7 @@ hud = initHud(state, {
       decorate.exit();
     } else {
       if (state.wave.active) {
-        showToast("꾸미기는 웨이브 종료 후에만 가능합니다");
+        showToast(t("hud.decorateAfterWave"));
         return;
       }
       state.wave.auto = false;
@@ -156,6 +171,16 @@ hud = initHud(state, {
   },
   isDecorating: () => decorate.active,
 });
+
+btnLanguage.addEventListener("click", () => {
+  setLocale(getLocale() === "en" ? "ko" : "en");
+  applyDocumentTranslations();
+  syncLocaleControls();
+  decorate.refreshLocale();
+  hud.render();
+  updatePanel();
+});
+syncLocaleControls();
 
 updatePanel(); // 첫 페인트 — 이후는 4Hz 갱신
 
@@ -193,7 +218,7 @@ function tickRecall(gameClock, rng = Math.random) {
   c.vx = 0; c.vy = 0;
   c._platformId = null;
   c.state = "FALL";
-  spawnFloatText(recall.x, recall.y - 10, "리콜!", "fx-infect");
+  spawnFloatText(recall.x, recall.y - 10, t("events.recall"), "fx-infect");
 }
 
 // ── 메인 루프 ──
@@ -239,16 +264,16 @@ function frame(nowMs) {
   renderCombatEvents([...dashEvents, ...projectileEvents, ...combatEvents]);
   const waveEvents = tickWaves(state, simDt, Math.random, signals.powered);
   for (const ev of waveEvents) {
-    if (ev.type === "clear") showToast(`✅ 웨이브 클리어! +🩸 ${ev.reward}`);
-    else if (ev.type === "defeat") showToast("💀 전멸… 웨이브 1부터 다시 시작합니다");
-    else if (ev.type === "autostart") showToast(`🌊 웨이브 ${ev.wave} 시작!`);
-    else if (ev.type === "acctlevel") showToast(`🌟 계정 레벨 ${ev.level} 달성!`);
-    else if (ev.type === "routeblocked") showToast("자동 웨이브 중지: Holy Shrimp 이동 경로가 막혔습니다");
+    if (ev.type === "clear") showToast(t("events.waveClear", { reward: ev.reward }));
+    else if (ev.type === "defeat") showToast(t("events.defeat"));
+    else if (ev.type === "autostart") showToast(t("hud.waveStart", { wave: ev.wave }));
+    else if (ev.type === "acctlevel") showToast(t("events.accountLevel", { level: ev.level }));
+    else if (ev.type === "routeblocked") showToast(t("events.routeBlocked"));
     else if (ev.type === "invade") {
       spawnFloatText(VAMPIRE_SPAWN_ZONE.x + VAMPIRE_SPAWN_ZONE.w / 2 - 6,
         VAMPIRE_SPAWN_ZONE.y - 8, `-1`, "fx-infect");
     } else if (ev.type === "gameover") {
-      showToast("☠️ 베이스 함락! 게임오버 — 웨이브 1부터 다시 시작합니다");
+      showToast(t("events.gameOver"));
     }
   }
   setCoreCounter(state.core.hp);

@@ -5,6 +5,7 @@ import { summonCost } from "../constants.js";
 import { startWave, humansAlive } from "../game/waves.js";
 import { createCharacter, resetState } from "../state/gameState.js";
 import { showToast } from "./tankView.js";
+import { t } from "../i18n/index.js";
 
 export function initHud(state, { onDecorate, onReset, getBlockPowered, isDecorating }) {
   const elWave = document.getElementById("hudWave");
@@ -20,16 +21,16 @@ export function initHud(state, { onDecorate, onReset, getBlockPowered, isDecorat
     state.chars.items.filter((c) => c.side === "vampire").length;
 
   const showStartFailure = () => {
-    if (state.wave.lastStartError === "noPath") showToast("아래까지 이어지는 Holy Shrimp 이동 경로가 없습니다");
+    if (state.wave.lastStartError === "noPath") showToast(t("hud.noRoute"));
   };
 
   const tryStartWave = () => {
     if (isDecorating?.()) {
-      showToast("꾸미기를 완료한 뒤 웨이브를 시작하세요");
+      showToast(t("hud.finishDecorating"));
       return false;
     }
     const started = startWave(state, getBlockPowered?.());
-    if (started) showToast(`🌊 웨이브 ${state.wave.current} 시작!`);
+    if (started) showToast(t("hud.waveStart", { wave: state.wave.current }));
     else showStartFailure();
     return started;
   };
@@ -38,7 +39,7 @@ export function initHud(state, { onDecorate, onReset, getBlockPowered, isDecorat
 
   btnAuto.addEventListener("click", () => {
     if (isDecorating?.()) {
-      showToast("꾸미기를 완료한 뒤 자동 웨이브를 켜세요");
+      showToast(t("hud.finishDecoratingAuto"));
       return;
     }
     state.wave.auto = !state.wave.auto;
@@ -51,18 +52,18 @@ export function initHud(state, { onDecorate, onReset, getBlockPowered, isDecorat
   btnSummon.addEventListener("click", () => {
     const cost = summonCost(vampireCount());
     if (state.blood < cost) {
-      showToast(`피가 부족합니다 (🩸 ${cost} 필요)`);
+      showToast(t("hud.notEnoughBlood", { cost }));
       return;
     }
     state.blood -= cost;
     // Vamp Shrimp는 상단 낙하가 아니라 맨 아래(바닥)에서 스폰 — createCharacter 기본값이 바닥·CRAWL
     createCharacter(state, "vampire");
-    showToast("🦐 새 Vamp Shrimp가 합류했습니다");
+    showToast(t("hud.vampJoined"));
   });
 
   btnDecorate.addEventListener("click", () => {
     if (state.wave.active) {
-      showToast("꾸미기는 웨이브 종료 후에만 가능합니다");
+      showToast(t("hud.decorateAfterWave"));
       return;
     }
     onDecorate?.();
@@ -75,14 +76,14 @@ export function initHud(state, { onDecorate, onReset, getBlockPowered, isDecorat
     const now = performance.now();
     if (now > resetArmedUntil) {
       resetArmedUntil = now + 2500;
-      showToast("한 번 더 누르면 처음부터 재시작합니다");
+      showToast(t("hud.resetConfirm"));
       return;
     }
     resetArmedUntil = 0;
     resetState(state);
     onReset?.();
     render();
-    showToast("🔄 처음부터 재시작!");
+    showToast(t("hud.resetDone"));
   });
 
   /** 저빈도(4Hz) 갱신 */

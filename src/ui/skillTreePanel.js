@@ -9,6 +9,10 @@ import {
 import {
   investZombieHp, investZombieTrait, zombieHpPoints, ZOMBIE_TRAIT_COST,
 } from "../skills/zombieSkills.js";
+import { t } from "../i18n/index.js";
+
+const skillName = (skill) => t(skill.nameKey, skill.nameVars ?? {});
+const skillEffect = (skill) => t((skill.dash ?? skill.zombie)?.effectKey ?? "");
 
 /** dash 스킬의 현재 투자 포인트 */
 function dashInvested(char, dash) {
@@ -21,13 +25,13 @@ function dashInvested(char, dash) {
 /** dash 스킬의 현재 효과값 문자열(구현된 것만 수치, 나머지는 빈 문자열) */
 function dashEffectValue(char, dash) {
   if (!dash) return "";
-  if (dash.key === "red") return ` · 현재 ×${revengeAttackMult(char.dashColors).toFixed(1)}`;
-  if (dash.key === "orange") return ` · 현재 ×${dashDistanceMult(char.dashColors).toFixed(1)}`;
+  if (dash.key === "red") return ` · ${t("skillTree.current")} ×${revengeAttackMult(char.dashColors).toFixed(1)}`;
+  if (dash.key === "orange") return ` · ${t("skillTree.current")} ×${dashDistanceMult(char.dashColors).toFixed(1)}`;
   if (dash.kind === "detect") {
-    return ` · 현재 ×${detectRangeMult(char.detectPoints).toFixed(1)} (${Math.round(effectiveDetectRange(char))}px)`;
+    return ` · ${t("skillTree.current")} ×${detectRangeMult(char.detectPoints).toFixed(1)} (${Math.round(effectiveDetectRange(char))}px)`;
   }
   if (dash.kind === "passive") {
-    return ` · 현재 ×${dashCdManaMult(char.dashCdManaPoints).toFixed(1)}`;
+    return ` · ${t("skillTree.current")} ×${dashCdManaMult(char.dashCdManaPoints).toFixed(1)}`;
   }
   return "";
 }
@@ -105,10 +109,10 @@ export function initSkillTreePanel({ getCharacter, getCharacters, onChange, onOp
     if (panel.classList.contains("hidden")) return;
     const char = getCharacter?.();
     if (!char) {
-      owner.textContent = "선택된 새우 없음";
+      owner.textContent = t("skillTree.noShrimp");
       level.textContent = "—";
       points.textContent = "0";
-      detail.textContent = "스킬 트리 사용 불가";
+      detail.textContent = t("skillTree.unavailable");
       if (dashGhostN) dashGhostN.textContent = "0";
       if (dashPointsLeft) dashPointsLeft.textContent = "0";
       if (dashResetBtn) dashResetBtn.disabled = true;
@@ -119,7 +123,8 @@ export function initSkillTreePanel({ getCharacter, getCharacters, onChange, onOp
 
     normalizeSkillProgress(char);
     normalizeDashPoints(char);
-    const order = Number.isFinite(char.vampireOrder) ? `${char.vampireOrder}번 새우` : "새우";
+    const order = Number.isFinite(char.vampireOrder)
+      ? t("skillTree.shrimpNumber", { number: char.vampireOrder }) : t("skillTree.shrimp");
     owner.textContent = order;
     level.textContent = String(char.level);
     points.textContent = String(char.skillPoints);
@@ -138,7 +143,7 @@ export function initSkillTreePanel({ getCharacter, getCharacters, onChange, onOp
         if (countEl) countEl.textContent = String(cur);
         button.classList.toggle("invested", cur > 0);
         button.disabled = noPoints; // 레벨 제한 없음 — 남은 포인트가 없을 때만 비활성
-        button.title = `${skill.name} · ${cur}p · ${skill.dash.effect}`;
+        button.title = `${skillName(skill)} · ${cur}p · ${skillEffect(skill)}`;
         button.setAttribute("aria-label", button.title);
       } else if (skill.zombie) {
         const hpSkill = skill.zombie.key === "zombie-hp";
@@ -154,27 +159,27 @@ export function initSkillTreePanel({ getCharacter, getCharacters, onChange, onOp
         } else button.disabled = false;
         button.classList.toggle("invested", cur > 0);
         button.classList.toggle("locked", trait && !!char.zombieTrait && !learnedTrait);
-        const cost = trait ? ` · 비용 ${ZOMBIE_TRAIT_COST}SP · 2~4 중 택1` : "";
-        button.title = `${skill.name} · ${cur}p${cost} · ${skill.zombie.effect}`;
+        const cost = trait ? ` · ${t("skillTree.choiceCost", { cost: ZOMBIE_TRAIT_COST })}` : "";
+        button.title = `${skillName(skill)} · ${cur}p${cost} · ${skillEffect(skill)}`;
         button.setAttribute("aria-label", button.title);
       } else {
         button.disabled = true;
-        button.title = "빈 슬롯";
+        button.title = t("skillTree.emptySlot");
       }
     }
 
     const selected = SKILL_BY_ID.get(selectedSkillId) ?? SKILL_TREE[0];
     if (selected.dash) {
       const cur = dashInvested(char, selected.dash);
-      detail.textContent = `${selected.name} · ${cur}p${dashEffectValue(char, selected.dash)} — ${selected.dash.effect}`;
+      detail.textContent = `${skillName(selected)} · ${cur}p${dashEffectValue(char, selected.dash)} — ${skillEffect(selected)}`;
     } else if (selected.zombie) {
       const hpSkill = selected.zombie.key === "zombie-hp";
       const learned = selected.zombie.trait && char.zombieTrait === selected.zombie.key;
       const cur = hpSkill ? zombieHpPoints(char) : learned ? 1 : 0;
-      const cost = selected.zombie.trait ? ` · ${ZOMBIE_TRAIT_COST}SP · 택1` : "";
-      detail.textContent = `${selected.name} · ${cur}p${cost} — ${selected.zombie.effect}`;
+      const cost = selected.zombie.trait ? ` · ${t("skillTree.choice", { cost: ZOMBIE_TRAIT_COST })}` : "";
+      detail.textContent = `${skillName(selected)} · ${cur}p${cost} — ${skillEffect(selected)}`;
     } else {
-      detail.textContent = "빈 슬롯";
+      detail.textContent = t("skillTree.emptySlot");
     }
   }
 

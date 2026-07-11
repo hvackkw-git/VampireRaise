@@ -11,31 +11,31 @@ const NUM_ROWS = ROW_Y.length;
 
 /** 왼쪽 열(col0)에 위→아래로 채울 Dash 스킬 정의. kind: color=잔상 색, passive=쿨타임/마나 숙련 */
 export const DASH_SKILL_DEFS = Object.freeze([
-  { key: "red",    kind: "color",   name: "빨강 · 복수",        effect: "피격 시 다음 공격력 ×1.1씩 (구현됨)" },
-  { key: "orange", kind: "color",   name: "주황 · 거리",        effect: "돌진 사거리 배율 +0.1씩 (구현됨)" },
-  { key: "yellow", kind: "color",   name: "노랑 · 경로 데미지", effect: "경로상 적 피해 (미구현)" },
-  { key: "green",  kind: "color",   name: "초록 · 연타",        effect: "연타 확률 (미구현)" },
-  { key: "blue",   kind: "color",   name: "파랑 · 폭발",        effect: "도착 후 폭발 (미구현)" },
-  { key: "purple", kind: "color",   name: "보라 · 실드",        effect: "도착 후 실드 (미구현)" },
-  { key: "white",  kind: "color",   name: "하양 · 스턴",        effect: "도착 후 스턴 (미구현)" },
-  { key: "cdmana", kind: "passive", name: "대쉬 숙련",          effect: "돌진 쿨타임 -10%, 마나소모 -10%씩 (구현됨)" },
+  { key: "red", kind: "color", nameKey: "skills.redName", effectKey: "skills.redEffect" },
+  { key: "orange", kind: "color", nameKey: "skills.orangeName", effectKey: "skills.orangeEffect" },
+  { key: "yellow", kind: "color", nameKey: "skills.yellowName", effectKey: "skills.yellowEffect" },
+  { key: "green", kind: "color", nameKey: "skills.greenName", effectKey: "skills.greenEffect" },
+  { key: "blue", kind: "color", nameKey: "skills.blueName", effectKey: "skills.blueEffect" },
+  { key: "purple", kind: "color", nameKey: "skills.purpleName", effectKey: "skills.purpleEffect" },
+  { key: "white", kind: "color", nameKey: "skills.whiteName", effectKey: "skills.whiteEffect" },
+  { key: "cdmana", kind: "passive", nameKey: "skills.cdmanaName", effectKey: "skills.cdmanaEffect" },
 ]);
 
 /** 우상단에 별도 배치하는 인식범위 패시브 */
-export const DETECT_SKILL_DEF = Object.freeze(
-  { key: "detect", kind: "detect", name: "인식범위", effect: "인식 범위 ×1.1씩 (구현됨)" },
-);
+export const DETECT_SKILL_DEF = Object.freeze({
+  key: "detect", kind: "detect", nameKey: "skills.detectName", effectKey: "skills.detectEffect",
+});
 
 /** 두 번째 열(col1)에 위→아래로 채울 Jombie Shrimp 스킬 정의. */
 export const ZOMBIE_SKILL_DEFS = Object.freeze([
-  { key: "zombie-hp",       name: "Jombie Shrimp · 체력", effect: "포인트당 소유 Jombie Shrimp 체력 +1 (구현됨)" },
-  { key: "zombie-yellow-revive", name: "노란 릴리 · 재생", effect: "막타로 만든 Jombie Shrimp가 노란 릴리와 부활 1회 획득", trait: true, cost: 5, implemented: true },
-  { key: "zombie-red-poison", name: "붉은 릴리 · 맹독", effect: "막타 Jombie Shrimp가 사망 시 최대 5중첩 독 폭발", trait: true, cost: 5, implemented: true },
-  { key: "zombie-black",    name: "검은 릴리",       effect: "선택형 Jombie Shrimp 특성 (준비 중)", trait: true, cost: 5, implemented: false },
-  { key: "zombie-move",     name: "Jombie Shrimp · 기동", effect: "Jombie Shrimp 이동/추적 능력 강화 (준비 중)" },
-  { key: "zombie-swarm",    name: "Jombie Shrimp · 군집", effect: "Jombie Shrimp가 함께 몰려드는 능력 (준비 중)" },
-  { key: "zombie-infect",   name: "Jombie Shrimp · 감염", effect: "Jombie Shrimp가 처치에 기여하는 효과 (준비 중)" },
-  { key: "zombie-mastery",  name: "Jombie Shrimp 숙련", effect: "Jombie Shrimp 계열 종합 강화 (준비 중)" },
+  { key: "zombie-hp", nameKey: "skills.zombieHpName", effectKey: "skills.zombieHpEffect" },
+  { key: "zombie-yellow-revive", nameKey: "skills.zombieReviveName", effectKey: "skills.zombieReviveEffect", trait: true, cost: 5, implemented: true },
+  { key: "zombie-red-poison", nameKey: "skills.zombiePoisonName", effectKey: "skills.zombiePoisonEffect", trait: true, cost: 5, implemented: true },
+  { key: "zombie-black", nameKey: "skills.zombieBlackName", effectKey: "skills.zombieBlackEffect", trait: true, cost: 5, implemented: false },
+  { key: "zombie-move", nameKey: "skills.zombieMoveName", effectKey: "skills.zombieMoveEffect" },
+  { key: "zombie-swarm", nameKey: "skills.zombieSwarmName", effectKey: "skills.zombieSwarmEffect" },
+  { key: "zombie-infect", nameKey: "skills.zombieInfectName", effectKey: "skills.zombieInfectEffect" },
+  { key: "zombie-mastery", nameKey: "skills.zombieMasteryName", effectKey: "skills.zombieMasteryEffect" },
 ]);
 
 const dashByIndex = new Map();
@@ -53,7 +53,8 @@ export const SKILL_TREE = Object.freeze(
     const zombie = zombieByIndex.get(index) ?? null;
     return Object.freeze({
       id: `skill-${String(index + 1).padStart(2, "0")}`,
-      name: dash ? dash.name : zombie ? zombie.name : `빈 슬롯 ${String(index + 1).padStart(2, "0")}`,
+      nameKey: dash?.nameKey ?? zombie?.nameKey ?? "skills.emptyName",
+      nameVars: dash || zombie ? null : { number: String(index + 1).padStart(2, "0") },
       dash, // { key, kind, name, effect } | null
       zombie, // { key, name, effect } | null
       requiredLevel: 1,          // 레벨 제한 없음

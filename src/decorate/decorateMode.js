@@ -14,10 +14,11 @@ import {
 } from "./placementRules.js";
 import { TANK_W, TANK_H } from "../constants.js";
 import { toTankLocal, showToast } from "../ui/tankView.js";
+import { blockName, t } from "../i18n/index.js";
 
 const FAIL_MSG = {
-  noPairSpace: "화이트홀을 놓을 공간이 없습니다",
-  recallExists: "리콜 블록은 수조당 1개만 놓을 수 있습니다",
+  noPairSpace: "decorate.noPairSpace",
+  recallExists: "decorate.recallExists",
 };
 
 export function createDecorateMode(state, ui, { onExit } = {}) {
@@ -83,7 +84,7 @@ export function createDecorateMode(state, ui, { onExit } = {}) {
       const btn = document.createElement("button");
       btn.className = "palette-item";
       btn.dataset.blockType = type;
-      btn.title = type;
+      btn.title = blockName(type);
       const img = document.createElement("img");
       img.src = getPlatformBlockSpritePath(type, false, 0);
       img.draggable = false;
@@ -127,17 +128,19 @@ export function createDecorateMode(state, ui, { onExit } = {}) {
     btnSensorMinus.classList.toggle("hidden", !sensorCfg);
     btnSensorPlus.classList.toggle("hidden", !sensorCfg);
     if (sel) {
-      let label = sel.blockType;
+      let label = blockName(sel.blockType);
       if (sensorCfg) {
         const ss = sel.sensorState ?? { op: sensorCfg.defOp, threshold: sensorCfg.defThreshold };
         label = `${sensorCfg.icon} ${ss.op === "lte" ? "≤" : "≥"} ${ss.threshold}${sensorCfg.unit}`;
         btnSensorOp.textContent = ss.op === "lte" ? "≤" : "≥";
       }
-      if (sel.transparentWhenInactive) label += " (투명)";
+      if (sel.transparentWhenInactive) label += ` (${t("decorate.transparent")})`;
       selInfo.textContent = label;
       btnStealth.classList.toggle("on", !!sel.transparentWhenInactive);
     } else {
-      selInfo.textContent = selectedPaletteType ? `배치: ${selectedPaletteType}` : "블록을 탭해 선택하거나 팔레트에서 고르세요";
+      selInfo.textContent = selectedPaletteType
+        ? t("decorate.placing", { block: blockName(selectedPaletteType) })
+        : t("decorate.selectHint");
     }
     updateOverlayVisibility();
   }
@@ -161,7 +164,7 @@ export function createDecorateMode(state, ui, { onExit } = {}) {
       lastPaintCell = point;
     } else if (res.reason !== "range") {
       flashBadCell(point);
-      if (FAIL_MSG[res.reason]) showToast(FAIL_MSG[res.reason]);
+      if (FAIL_MSG[res.reason]) showToast(t(FAIL_MSG[res.reason]));
       lastPaintCell = point; // 같은 칸 반복 실패 플래시 방지
     }
   }
@@ -309,6 +312,10 @@ export function createDecorateMode(state, ui, { onExit } = {}) {
       onExit?.();
     },
     get active() { return ui.decorateMode; },
+    refreshLocale() {
+      buildPalette();
+      syncBar();
+    },
   };
   return api;
 }

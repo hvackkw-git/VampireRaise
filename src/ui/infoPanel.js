@@ -6,13 +6,14 @@
 // 얼굴 그리드(2행6열)를 대신 보여준다 (핫키는 그대로 유지). 얼굴을 탭하면 그 캐릭터가 선택된다.
 
 import { expToNext, accountExpToNext } from "../constants.js";
+import { getLocale, t } from "../i18n/index.js";
 
 const SIDE_ICON = { vampire: "🦐", human: "🦐", slave: "🦐" };
-const SIDE_NAME = { vampire: "Vamp Shrimp", human: "Holy Shrimp", slave: "Jombie Shrimp" };
+const SIDE_NAME_KEY = { vampire: "info.vampShrimp", human: "info.holyShrimp", slave: "info.jombieShrimp" };
 
 /** 스킬 도감 — 장착 스킬 슬롯에 표시할 이름·스프라이트 */
 const SKILL_BOOK = {
-  dash: { name: "혈귀 돌진", icon: "assets/skills/skill_dash.png" },
+  dash: { nameKey: "info.dash", icon: "assets/skills/skill_dash.png" },
 };
 const SKILL_SLOT_COUNT = 4;  // 2×2
 const FACE_SLOT_COUNT = 12;  // 2×6
@@ -81,20 +82,21 @@ function updateLevelBar(account) {
 
 function renderSkills(char) {
   const equipped = (char?.skills ?? []).filter((s) => SKILL_BOOK[s]);
-  const key = char ? `${char.id}:${equipped.join(",")}` : "none";
+  const key = `${getLocale()}:${char ? `${char.id}:${equipped.join(",")}` : "none"}`;
   if (key === lastSkillKey) return;
   lastSkillKey = key;
   els.skillSlots.forEach((slot, i) => {
     const skill = SKILL_BOOK[equipped[i]];
+    const name = skill ? t(skill.nameKey) : "";
     slot.classList.toggle("locked", !skill);
-    slot.title = skill ? skill.name : "빈 슬롯";
+    slot.title = skill ? name : t("info.emptySlot");
     slot.innerHTML = skill
-      ? `<img src="${skill.icon}" alt="${skill.name}" draggable="false">`
+      ? `<img src="${skill.icon}" alt="${name}" draggable="false">`
       : "";
   });
   els.skillName.textContent = equipped.length
-    ? equipped.map((s) => SKILL_BOOK[s].name).join(" · ")
-    : "장착 스킬 없음";
+    ? equipped.map((s) => t(SKILL_BOOK[s].nameKey)).join(" · ")
+    : t("info.noEquippedSkills");
 }
 
 /**
@@ -107,7 +109,7 @@ export function renderInfoPanel(char, account = null) {
   els.panel.classList.remove("squad-mode");
   els.panel.classList.toggle("no-char", !char);
   if (!char) {
-    els.statName.textContent = "— Vamp Shrimp 없음 —";
+    els.statName.textContent = t("info.noVampShrimp");
     setBar(els.hpFill, els.hpNum, 0, 0);
     setBar(els.mpFill, els.mpNum, 0, 0);
     setBar(els.expFill, els.expNum, 0, 0);
@@ -115,9 +117,9 @@ export function renderInfoPanel(char, account = null) {
     renderSkills(null);
     return;
   }
-  const order = Number.isFinite(char.vampireOrder) ? `${char.vampireOrder}번 ` : "";
+  const order = Number.isFinite(char.vampireOrder) ? t("info.order", { number: char.vampireOrder }) : "";
   els.statName.textContent =
-    `${SIDE_ICON[char.side] ?? ""} ${order}${SIDE_NAME[char.side] ?? "Shrimp"} Lv.${char.level}`;
+    `${SIDE_ICON[char.side] ?? ""} ${order}${t(SIDE_NAME_KEY[char.side] ?? "info.vampShrimp")} Lv.${char.level}`;
   setBar(els.hpFill, els.hpNum, char.hp, char.maxHp);
   setBar(els.mpFill, els.mpNum, char.mp ?? 0, char.maxMp ?? 0);
   setBar(els.expFill, els.expNum, char.exp, expToNext(char.level));
@@ -151,7 +153,7 @@ export function renderSquadPanel(vampires, account = null) {
     slot.disabled = !v;
     if (v) {
       slot.innerHTML = `${SIDE_ICON.vampire}<small>${v.vampireOrder ?? i + 1}</small>`;
-      slot.title = `${v.vampireOrder ?? i + 1}번 Vamp Shrimp Lv.${v.level}`;
+      slot.title = `${t("info.numberedVamp", { number: v.vampireOrder ?? i + 1 })} Lv.${v.level}`;
       slot.onclick = () => onSelectVampireCb?.(v.id);
     } else {
       slot.innerHTML = "";

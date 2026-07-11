@@ -9,6 +9,7 @@ import {
   TANK_W, TANK_H, PANEL_H, CHAR_SPRITES, HUMAN_PROJECTILE_RADIUS,
   HUMAN_SPAWN_ZONE, VAMPIRE_SPAWN_ZONE,
 } from "../constants.js";
+import { t } from "../i18n/index.js";
 import { DASH_COLOR_HEX, effectiveDetectRange } from "../skills/dashColors.js";
 import { auraTierForLevel, auraStyleForTier } from "../skills/shrimpAura.js";
 
@@ -457,7 +458,7 @@ export function renderCombatEvents(events) {
       spawnFloatText(ev.char.x, v.top - 12, "LEVEL UP!", "fx-levelup");
     } else if (ev.type === "infect") {
       const v = visualBounds(ev.char);
-      spawnFloatText(ev.char.x - 2, v.top - 12, "전염!", "fx-infect");
+      spawnFloatText(ev.char.x - 2, v.top - 12, t("events.infect"), "fx-infect");
     } else if (ev.type === "dashZap") {
       const v = ev.target ? visualBounds(ev.target) : { x: ev.x, y: ev.y };
       spawnDashFx(v.x, v.y, "fx-zap", "⚡");
@@ -474,17 +475,17 @@ export function renderCombatEvents(events) {
       spawnFloatText(ev.target.x, v.top - 16, "STUN!", "fx-stun");
     } else if (ev.type === "multiHit") {
       const v = visualBounds(ev.target);
-      spawnFloatText(v.x - 8, v.top - 18, "연타!", "fx-multihit");
+      spawnFloatText(v.x - 8, v.top - 18, t("events.multiHit"), "fx-multihit");
     } else if (ev.type === "shieldBlock") {
       const v = visualBounds(ev.target);
       spawnFloatText(v.x - 6, v.top - 8, `🛡${ev.absorbed}`, "fx-shieldblock");
     } else if (ev.type === "zombieRevive") {
       const v = visualBounds(ev.char);
-      spawnFloatText(ev.char.x, v.top - 14, "부활!", "fx-infect");
+      spawnFloatText(ev.char.x, v.top - 14, t("events.revive"), "fx-infect");
     } else if (ev.type === "zombiePoisonExplosion") {
       const v = visualBounds(ev.char);
       spawnDashFx(v.x, v.y, "fx-poisonburst", "✦");
-      spawnFloatText(ev.char.x, v.top - 14, "독!", "fx-poison");
+      spawnFloatText(ev.char.x, v.top - 14, t("events.poison"), "fx-poison");
     } else if (ev.type === "poisonTick") {
       const v = visualBounds(ev.target);
       spawnFloatText(v.x - 6, v.top - 8, `-${ev.dmg.toFixed(1)}`, "fx-poison");
