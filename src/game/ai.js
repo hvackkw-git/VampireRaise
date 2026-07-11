@@ -29,6 +29,7 @@ import { startJump, NON_PLATFORM_BLOCK_TYPES } from "../engine/physics.js";
 import { isLogicLayerBlock, getSpikeDir, PLATFORM_W, PLATFORM_H } from "../platform/platformBlockRenderer.js";
 import { findNearestEnemy, aliveChars } from "./combat.js";
 import { createHumanDescentNavigator } from "./descentNavigation.js";
+import { dashGhostColorSequence } from "../skills/dashColors.js";
 
 /** 감지·추적이 동작하는 상태 (지상 행동 중일 때만 주변을 살핀다) */
 const AWARE_STATES = new Set(["CRAWL"]);
@@ -79,6 +80,11 @@ function beginDash(c, found) {
   c._platformId = null;
   c._jumpApexY = null; // 점프 중 돌진 진입 시 잔여 점프 상태 정리
   c._dropThroughId = null; // 하강(드롭스루) 중 돌진 진입 시 잔여 드롭 상태 정리
+  // 잔상 색: 이번 돌진의 색 시퀀스를 확정하고, 진행도 0에서 시작
+  const cx = c.x + c.w / 2, cy = c.y + c.h / 2;
+  c._dashDist0 = Math.max(1, Math.hypot((found.goal?.x ?? cx) - cx, (found.goal?.y ?? cy) - cy));
+  c._dashProgress = 0;
+  c._dashGhostSeq = dashGhostColorSequence(c.dashColors ?? { red: 1 });
 }
 
 /**
@@ -465,6 +471,9 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null) 
       const cx = c.x + c.w / 2, cy = c.y + c.h / 2;
       const goal = c._dashGoal ?? centerOf(t);
       const tx = goal.x, ty = goal.y;
+      // 잔상 색 매핑용 진행도: 0(출발)→1(도착/새우 위치)
+      c._dashProgress = Math.max(0, Math.min(1,
+        1 - Math.hypot(tx - cx, ty - cy) / (c._dashDist0 || 1)));
       const arriveDist = goal.platformId != null ? 4 : DASH_ARRIVE_DIST;
       if (Math.hypot(tx - cx, ty - cy) <= arriveDist) {
         endDash(c, state.platforms.items, { arrived: true, blockPowered });

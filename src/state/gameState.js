@@ -5,6 +5,7 @@ import {
   TANK_W, FLOOR_Y, CHAR_SIZE, CHAR_SPRITES, VAMPIRE_BASE, SLAVE_BASE, HUMAN_BASE_MP,
   INITIAL_VAMPIRE_COUNT, VAMPIRE_SPAWN_ZONE, spawnXInZone, BASE_CORE_HP,
 } from "../constants.js";
+import { defaultDashColors } from "../skills/dashColors.js";
 
 export const SAVE_KEY = "vampireraise.save.v1";
 
@@ -65,6 +66,12 @@ export function createCharacter(state, side, opts = {}) {
     learnedSkills: side === "vampire" && Array.isArray(opts.learnedSkills)
       ? [...opts.learnedSkills]
       : [],
+    // 돌진 잔상 색상 포인트(빨주노초파보하). 기본은 복수(빨강) 1포인트 → 처음엔 전부 빨강
+    dashColors: side === "vampire"
+      ? (opts.dashColors && typeof opts.dashColors === "object"
+          ? { ...opts.dashColors }
+          : defaultDashColors())
+      : null,
     projectileSkill: opts.projectileSkill ?? null, // 인간 투사체 성장 훅(count/homing/damage/cooldown/range/speed)
     ownerVampireId: opts.ownerVampireId ?? null, // 노예 소유 뱀파이어 id
     vampireOrder: side === "vampire" ? (opts.vampireOrder ?? nextVampireOrder(state)) : null,
@@ -124,6 +131,7 @@ export function serialize(state) {
           ownerVampireId: c.ownerVampireId, vampireOrder: c.vampireOrder,
           job: c.job, skills: c.skills,
           skillPoints: c.skillPoints, learnedSkills: c.learnedSkills,
+          dashColors: c.dashColors,
           dead: c.dead,
         })),
     },
@@ -184,6 +192,7 @@ export function loadState(storage = globalThis.localStorage) {
       ownerVampireId: rec.ownerVampireId, vampireOrder: rec.vampireOrder,
       skillPoints: rec.skillPoints ?? Math.max(0, (Number(rec.level) || 1) - 1),
       learnedSkills: rec.learnedSkills,
+      dashColors: rec.dashColors,
     });
     c.id = rec.id;
     c.dir = rec.dir === -1 ? -1 : 1;

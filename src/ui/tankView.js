@@ -9,6 +9,7 @@ import {
   TANK_W, TANK_H, PANEL_H, CHAR_SPRITES, DETECT_RANGE, HUMAN_PROJECTILE_RADIUS,
   HUMAN_SPAWN_ZONE, VAMPIRE_SPAWN_ZONE,
 } from "../constants.js";
+import { DASH_COLOR_HEX, ghostColorAtProgress } from "../skills/dashColors.js";
 
 const blockEls = new Map(); // platId → { el, img, lastSrc, lastRot }
 const charEls = new Map();  // charId → { el, sprite, hpFill, lastSide }
@@ -236,10 +237,12 @@ export function renderChars(state, nowMs, ui) {
       ui.panelCharId === c.id && ui.selectedCharId !== c.id);
     entry.el.classList.toggle("selected", ui.selectedCharId === c.id);
     entry.hpFill.style.width = `${Math.max(0, Math.min(100, (c.hp / c.maxHp) * 100))}%`;
-    // 돌진 잔상: 45ms 간격으로 현재 모습의 고스트를 남긴다
+    // 돌진 잔상: 45ms 간격으로 현재 모습의 고스트를 남긴다.
+    // 색은 이번 돌진의 색 시퀀스를 진행도(0→1)로 인덱싱 — 새우 근처(진행도 1) = 팔레트 앞 색(빨강).
     if (c.state === "DASH" && nowMs - (entry.lastGhostAt ?? 0) > 45) {
       entry.lastGhostAt = nowMs;
-      spawnDashGhost(c, entry);
+      const colorKey = ghostColorAtProgress(c._dashGhostSeq, c._dashProgress ?? 1);
+      spawnDashGhost(c, entry, DASH_COLOR_HEX[colorKey] ?? DASH_COLOR_HEX.red);
     }
   }
   for (const [id, entry] of charEls) {
@@ -247,15 +250,27 @@ export function renderChars(state, nowMs, ui) {
   }
 }
 
-/** 돌진 잔상: 현재 스프라이트 모습 그대로 두고 페이드아웃 */
-function spawnDashGhost(c, entry) {
+/**
+ * 돌진 잔상: 현재 스프라이트 실루엣을 지정 색으로 칠해 페이드아웃.
+ * background-image 대신 CSS mask(스프라이트 프레임) + background-color로 임의 색을 낸다.
+ */
+function spawnDashGhost(c, entry, color) {
   const g = document.createElement("div");
   g.className = "char-ghost";
   g.style.width = `${c.w}px`;
   g.style.height = `${c.h}px`;
-  g.style.backgroundImage = entry.sprite.style.backgroundImage;
-  g.style.backgroundSize = entry.sprite.style.backgroundSize;
-  g.style.backgroundPosition = entry.sprite.style.backgroundPosition;
+  const img = entry.sprite.style.backgroundImage;
+  const size = entry.sprite.style.backgroundSize;
+  const pos = entry.sprite.style.backgroundPosition;
+  g.style.backgroundColor = color;
+  g.style.webkitMaskImage = img;
+  g.style.maskImage = img;
+  g.style.webkitMaskSize = size;
+  g.style.maskSize = size;
+  g.style.webkitMaskPosition = pos;
+  g.style.maskPosition = pos;
+  g.style.webkitMaskRepeat = "no-repeat";
+  g.style.maskRepeat = "no-repeat";
   g.style.transform = entry.sprite.style.transform;
   g.style.left = `${c.x}px`;
   g.style.top = `${c.y}px`;
