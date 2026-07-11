@@ -9,6 +9,7 @@ import {
   TANK_W, TANK_H, PANEL_H, CHAR_SPRITES, DETECT_RANGE, HUMAN_PROJECTILE_RADIUS,
   HUMAN_SPAWN_ZONE, VAMPIRE_SPAWN_ZONE,
 } from "../constants.js";
+import { LAYER_MASK, getEquippedLayers } from "../skills/skillPatterns.js";
 
 const blockEls = new Map(); // platId → { el, img, lastSrc, lastRot }
 const charEls = new Map();  // charId → { el, sprite, hpFill, lastSide }
@@ -190,15 +191,28 @@ export function renderChars(state, nowMs, ui) {
       detect.className = "char-detect";
       const sprite = document.createElement("div");
       sprite.className = "char-sprite";
+      // 스킬 패턴 오버레이 컨테이너 (스페클/릴리/백라인) — 몸통과 프레임·좌우반전 동기화.
+      const patterns = document.createElement("div");
+      patterns.className = "char-patterns";
+      const patternEls = {};
+      for (const layer of ["backline", "rili", "speckle"]) {
+        const p = document.createElement("div");
+        p.className = `char-pattern char-pattern-${layer}`;
+        p.style.webkitMaskImage = `url('${LAYER_MASK[layer]}')`;
+        p.style.maskImage = `url('${LAYER_MASK[layer]}')`;
+        patterns.appendChild(p);
+        patternEls[layer] = p;
+      }
       const hpbar = document.createElement("div");
       hpbar.className = "char-hpbar";
       const hpFill = document.createElement("i");
       hpbar.appendChild(hpFill);
       el.appendChild(detect);
       el.appendChild(sprite);
+      el.appendChild(patterns);
       el.appendChild(hpbar);
       layerChars.appendChild(el);
-      entry = { el, detect, sprite, hpFill, lastSide: null, lastFrame: -1 };
+      entry = { el, detect, sprite, patterns, patternEls, hpFill, lastSide: null, lastFrame: -1, lastEquipKey: null };
       charEls.set(c.id, entry);
     }
     const cfg = CHAR_SPRITES[c.side];
@@ -210,6 +224,14 @@ export function renderChars(state, nowMs, ui) {
       entry.el.className = `char side-${c.side}`;
       entry.lastSide = c.side;
       entry.lastFrame = -1;
+      // 패턴 마스크 시트도 몸통 스프라이트와 동일 규격(가로 frames칸)으로 맞춘다.
+      const maskSize = `${cfg.size * cfg.frames}px ${cfg.size}px`;
+      for (const layer of ["backline", "rili", "speckle"]) {
+        const p = entry.patternEls[layer];
+        p.style.webkitMaskSize = maskSize;
+        p.style.maskSize = maskSize;
+      }
+      entry.lastEquipKey = null; // 진영 변경 시 장착 색 재적용 강제
       // 감지 원: 캐릭터 중심 기준 반경 (진영별, 노예는 작음)
       const r = DETECT_RANGE[c.side] ?? 0;
       entry.detect.style.width = `${r * 2}px`;
@@ -223,13 +245,43 @@ export function renderChars(state, nowMs, ui) {
     const fast = c.state === "FIGHT" || c.state === "DASH";
     const frame = moving ? Math.floor(nowMs / (fast ? 60 : 90)) % cfg.frames : 0;
     if (entry.lastFrame !== frame) {
-      entry.sprite.style.backgroundPosition = `${-frame * cfg.size}px 0`;
+      const pos = `${-frame * cfg.size}px 0`;
+      entry.sprite.style.backgroundPosition = pos;
+      for (const layer of ["backline", "rili", "speckle"]) {
+        const p = entry.patternEls[layer];
+        p.style.webkitMaskPosition = pos;
+        p.style.maskPosition = pos;
+      }
       entry.lastFrame = frame;
+    }
+    // 장착 스킬 색을 각 패턴 레이어/오러 glow에 반영 (장착이 바뀔 때만).
+    const equipKey = c.equipped
+      ? `${c.equipped.passive}|${c.equipped.active}|${c.equipped.movement}|${c.equipped.aura}`
+      : "";
+    if (entry.lastEquipKey !== equipKey) {
+      const layers = getEquippedLayers(c);
+      for (const [layer, key] of [["speckle", "speckle"], ["rili", "rili"], ["backline", "backline"]]) {
+        const p = entry.patternEls[layer];
+        if (layers[key]) {
+          p.style.backgroundColor = layers[key];
+          p.style.display = "";
+        } else {
+          p.style.display = "none";
+        }
+      }
+      if (layers.glow) {
+        entry.el.style.setProperty("--aura-glow", layers.glow);
+        entry.el.classList.add("has-aura");
+      } else {
+        entry.el.classList.remove("has-aura");
+      }
+      entry.lastEquipKey = equipKey;
     }
     entry.el.style.left = `${c.x}px`;
     entry.el.style.top = `${c.y}px`;
     // 스프라이트 기본 방향: 왼쪽 → 오른쪽 이동 시 좌우 반전
     entry.sprite.style.transform = c.dir > 0 ? "scaleX(-1)" : "";
+    entry.patterns.style.transform = c.dir > 0 ? "scaleX(-1)" : "";
     entry.el.classList.toggle("stunned", c.state === "STUN");
     // 패널이 자동으로 비추는 캐릭터는 은은한 표시, 직접 탭한 선택은 금색 표시
     entry.el.classList.toggle("focused",
