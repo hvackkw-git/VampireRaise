@@ -67,7 +67,6 @@ export function createCharacter(state, side, opts = {}) {
     learnedSkills: side === "vampire" && Array.isArray(opts.learnedSkills)
       ? [...opts.learnedSkills]
       : [],
-    // 4슬롯 스킬 장착(패시브·액티브·이동·오라) → 색상별 패턴 오버레이.
     equipped: opts.equipped
       ? { ...emptyEquip(), ...opts.equipped }
       : demoEquip(side),

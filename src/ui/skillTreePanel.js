@@ -2,8 +2,7 @@ import {
   SKILL_BY_ID, SKILL_TREE, learnSkill, normalizeSkillProgress, skillStatus,
 } from "../skills/skillTree.js";
 import {
-  SKILL_CATEGORIES, CATEGORY_LABEL, SKILL_CATALOG, PATTERN_COLORS,
-  skillsInCategory, equipSkill,
+  SKILL_CATEGORIES, CATEGORY_LABEL, COLOR_LABEL, COLOR_KEYS, PATTERN_COLORS, equipColor,
 } from "../skills/skillPatterns.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -32,7 +31,7 @@ export function initSkillTreePanel({ getCharacter, onChange, onOpenChange } = {}
   const lineEls = [];
   let selectedSkillId = SKILL_TREE[0].id;
 
-  // ── 장착 슬롯: 클릭하면 해당 카테고리의 스킬을 순환(비움→…→비움)한다. ──
+  // 장착 슬롯: 클릭하면 14색을 순환(비움 포함)해 그 레이어 색을 정한다.
   for (const category of SKILL_CATEGORIES) {
     const button = document.createElement("button");
     button.type = "button";
@@ -54,23 +53,23 @@ export function initSkillTreePanel({ getCharacter, onChange, onOpenChange } = {}
   function cycleSlot(category) {
     const char = getCharacter?.();
     if (!char) return;
-    const options = [null, ...skillsInCategory(char.side, category)]; // 비움 포함 순환
+    const options = [null, ...COLOR_KEYS];
     const current = char.equipped?.[category] ?? null;
     const idx = options.indexOf(current);
     const next = options[(idx + 1) % options.length];
-    if (equipSkill(char, category, next)) onChange?.(char);
+    if (equipColor(char, category, next)) onChange?.(char);
     render();
   }
 
   function renderSlots(char) {
     for (const category of SKILL_CATEGORIES) {
       const { button, name, chip } = slotEls.get(category);
-      const skillId = char?.equipped?.[category] ?? null;
-      const skill = SKILL_CATALOG[skillId];
+      const colorKey = char?.equipped?.[category] ?? null;
+      const known = colorKey && colorKey in PATTERN_COLORS;
       button.disabled = !char;
-      button.classList.toggle("filled", !!skill);
-      name.textContent = skill ? skill.name : "비어있음";
-      chip.style.background = skill ? PATTERN_COLORS[skill.colorKey] : "transparent";
+      button.classList.toggle("filled", !!known);
+      name.textContent = known ? COLOR_LABEL[colorKey] : "비어있음";
+      chip.style.background = known ? PATTERN_COLORS[colorKey] : "transparent";
     }
   }
 
