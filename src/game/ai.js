@@ -101,9 +101,8 @@ function beginDash(c, found) {
   // (점프 돌진의 좌표보정 leg까지 포함한 c._dashRoute 전체 길이 — 예산 판정용 route.dist와 다르다)
   // 타임아웃은 이 시간에 비례시킨다. 예전엔 DASH_MAX_S(1.5s) 고정이라 인식범위·주황 투자로
   // 예산이 390px(260px/s × 1.5s)를 넘는 긴 돌진이 중간에 타임아웃 → 그 자리에서 뚝 떨어졌다.
-  c._dashDurS = Math.max(0.05, dashPathLength(c._dashRoute) / DASH_SPD);
-  c._dashElapsedS = 0;
-  c._dashTimeLeft = Math.max(DASH_MAX_S, c._dashDurS * 1.5 + 0.3);
+  const durS = dashPathLength(c._dashRoute) / DASH_SPD;
+  c._dashTimeLeft = Math.max(DASH_MAX_S, durS * 1.5 + 0.3);
   c._platformId = null;
   c._jumpApexY = null; // 점프 중 돌진 진입 시 잔여 점프 상태 정리
   c._dropThroughId = null; // 하강(드롭스루) 중 돌진 진입 시 잔여 드롭 상태 정리
@@ -492,7 +491,6 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null, 
     if (c.state === "DASH") {
       const t = byId.get(c._dashTargetId);
       c._dashTimeLeft = (c._dashTimeLeft ?? 0) - simDt;
-      c._dashElapsedS = (c._dashElapsedS ?? 0) + simDt; // 잔상 색 진행률용 경과 시간
       // 목표 지점(goal)은 돌진 시작 시 고정. 대상이 죽거나 사라져도 그 지점까지 마저 날아가 착지한다
       // (자기 경로/폭발 피해로 대상이 먼저 죽어도 도중에 뚝 떨어지지 않게 한다).
       const goal = c._dashGoal ?? (t ? centerOf(t) : null);

@@ -236,17 +236,14 @@ export function dashColorCycle(points = {}) {
 }
 
 /**
- * 잔상 트레일 = dashColorCycle을 돌진 전체(잔상 count개)에 한 번 순서대로 펼친 것.
- * k번째 잔상 = cycle[floor(k / count × len)] — 짧은 돌진이든 긴 돌진이든 투자한 모든 색이
- * 빨→…→하 순서로 비율대로 나온다. 런타임(tankView)은 45ms마다 돌진 진행률
- * (경과 ÷ 예상 비행시간)로 같은 인덱스를 계산해 칠한다. 아래는 그 결과를 미리 펼친 것(문서·테스트용).
+ * 잔상 트레일 = dashColorCycle을 스폰 순서대로 반복(k번째 잔상 = cycle[k % len]).
+ * 예) 빨6 노3 → 사이클 [빨,빨,노] → 빨빨노빨빨노…. 런타임(tankView)은 45ms마다
+ * 이 인덱스를 하나씩 올려 칠한다. 아래는 그 결과를 미리 펼친 것(문서·테스트용).
  * @param {{[color:string]: number}} points
  * @param {number} count 펼칠 잔상 개수
  * @returns {string[]}
  */
 export function dashGhostTrail(points = {}, count = 0) {
   const cycle = dashColorCycle(points);
-  const n = Math.max(0, count);
-  return Array.from({ length: n }, (_, i) =>
-    cycle[Math.min(cycle.length - 1, Math.floor((i / n) * cycle.length))]);
+  return Array.from({ length: Math.max(0, count) }, (_, i) => cycle[i % cycle.length]);
 }
