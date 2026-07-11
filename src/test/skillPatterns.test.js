@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
-  SLOT_LAYER, LAYER_SPRITE_PREFIX, PATTERN_COLORS, SKILL_CATALOG,
-  emptyEquip, getEquippedLayers, bakedPatternPath,
+  SLOT_LAYER, LAYER_SPRITE_PREFIX, PATTERN_COLORS, SKILL_CATALOG, SKILL_CATEGORIES,
+  emptyEquip, getEquippedLayers, bakedPatternPath, skillsInCategory, equipSkill,
 } from "../skills/skillPatterns.js";
 import { createCharacter, createInitialState, serialize, loadState } from "../state/gameState.js";
 
@@ -64,6 +64,32 @@ describe("skillPatterns", () => {
   it("알 수 없는 스킬 id는 무시된다", () => {
     const char = { equipped: { ...emptyEquip(), passive: "nope" } };
     expect(getEquippedLayers(char).speckle).toBeNull();
+  });
+});
+
+describe("장착 슬롯 조작", () => {
+  it("skillsInCategory는 해당 카테고리 스킬만 반환한다", () => {
+    for (const category of SKILL_CATEGORIES) {
+      const ids = skillsInCategory(category);
+      expect(ids.length).toBeGreaterThan(0);
+      for (const id of ids) expect(SKILL_CATALOG[id].category).toBe(category);
+    }
+  });
+
+  it("equipSkill은 슬롯에 스킬을 끼우고 변경 여부를 반환한다", () => {
+    const char = { equipped: emptyEquip() };
+    expect(equipSkill(char, "passive", "ironScale")).toBe(true);
+    expect(char.equipped.passive).toBe("ironScale");
+    expect(equipSkill(char, "passive", "ironScale")).toBe(false); // 동일 → 변경 없음
+  });
+
+  it("카테고리가 맞지 않는 스킬이나 null은 슬롯을 비운다", () => {
+    const char = { equipped: { ...emptyEquip(), active: "frenzy" } };
+    expect(equipSkill(char, "active", "dash")).toBe(true); // dash는 movement → 비움
+    expect(char.equipped.active).toBeNull();
+    char.equipped.active = "frenzy";
+    expect(equipSkill(char, "active", null)).toBe(true);
+    expect(char.equipped.active).toBeNull();
   });
 });
 

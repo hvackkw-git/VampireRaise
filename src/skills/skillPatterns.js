@@ -16,6 +16,17 @@ export const SLOT_LAYER = Object.freeze({
   aura: "glow",
 });
 
+/** 슬롯 카테고리 순서 (UI 표시용) */
+export const SKILL_CATEGORIES = Object.freeze(["passive", "active", "movement", "aura"]);
+
+/** 카테고리 한글 라벨 */
+export const CATEGORY_LABEL = Object.freeze({
+  passive: "패시브",
+  active: "액티브",
+  movement: "이동기",
+  aura: "오러",
+});
+
 /** 레이어 키 → 색상별로 구운 스프라이트 파일명 접두사 */
 export const LAYER_SPRITE_PREFIX = Object.freeze({
   speckle: "SPECKLE",
@@ -90,6 +101,27 @@ export const SKILL_CATALOG = Object.freeze({
 /** 빈 장착 슬롯 (스킬 id 또는 null) */
 export function emptyEquip() {
   return { passive: null, active: null, movement: null, aura: null };
+}
+
+/** 해당 카테고리에 속한 스킬 id 목록 */
+export function skillsInCategory(category) {
+  return Object.values(SKILL_CATALOG)
+    .filter((s) => s.category === category)
+    .map((s) => s.id);
+}
+
+/**
+ * 슬롯에 스킬을 장착한다. skillId가 null이거나 카테고리가 맞지 않으면 슬롯을 비운다.
+ * @returns {boolean} 실제로 값이 바뀌었으면 true
+ */
+export function equipSkill(char, category, skillId) {
+  if (!char || !(category in SLOT_LAYER)) return false;
+  if (!char.equipped) char.equipped = emptyEquip();
+  const skill = SKILL_CATALOG[skillId];
+  const next = skill && skill.category === category ? skillId : null;
+  if (char.equipped[category] === next) return false;
+  char.equipped[category] = next;
+  return true;
 }
 
 /**
