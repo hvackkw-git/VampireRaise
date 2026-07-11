@@ -6,10 +6,10 @@ import {
   RGB_BLOCK_TINTS, CONVEYOR_ANIM_FRAMES, HOLE_ANIM_FRAMES,
 } from "../platform/platformBlockRenderer.js";
 import {
-  TANK_W, TANK_H, PANEL_H, CHAR_SPRITES, DETECT_RANGE, HUMAN_PROJECTILE_RADIUS,
+  TANK_W, TANK_H, PANEL_H, CHAR_SPRITES, HUMAN_PROJECTILE_RADIUS,
   HUMAN_SPAWN_ZONE, VAMPIRE_SPAWN_ZONE,
 } from "../constants.js";
-import { DASH_COLOR_HEX, ghostColorAtProgress } from "../skills/dashColors.js";
+import { DASH_COLOR_HEX, ghostColorAtProgress, effectiveDetectRange } from "../skills/dashColors.js";
 
 const blockEls = new Map(); // platId → { el, img, lastSrc, lastRot }
 const charEls = new Map();  // charId → { el, sprite, hpFill, lastSide }
@@ -211,8 +211,12 @@ export function renderChars(state, nowMs, ui) {
       entry.el.className = `char side-${c.side}`;
       entry.lastSide = c.side;
       entry.lastFrame = -1;
-      // 감지 원: 캐릭터 중심 기준 반경 (진영별, 노예는 작음)
-      const r = DETECT_RANGE[c.side] ?? 0;
+      entry.lastDetectR = -1; // 진영 바뀌면 감지 원 갱신 강제
+    }
+    // 감지 원: 캐릭터 중심 기준 반경. 뱀파이어는 인식범위 스킬로 커지므로 변할 때마다 갱신.
+    const r = effectiveDetectRange(c);
+    if (entry.lastDetectR !== r) {
+      entry.lastDetectR = r;
       entry.detect.style.width = `${r * 2}px`;
       entry.detect.style.height = `${r * 2}px`;
       entry.detect.style.left = `${cfg.size / 2 - r}px`;

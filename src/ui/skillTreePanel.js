@@ -4,7 +4,7 @@ import {
 import {
   DASH_COLORS, DASH_COLOR_HEX, dashGhostCount, investDashColor,
   normalizeDashPoints, resetDashColors, effectiveDetectRange,
-  revengeAttackMult, dashDistanceMult,
+  revengeAttackMult, dashDistanceMult, detectRangeMult, investDetect,
 } from "../skills/dashColors.js";
 
 const DASH_COLOR_LABEL = {
@@ -36,6 +36,8 @@ export function initSkillTreePanel({ getCharacter, onChange, onOpenChange } = {}
   const dashGhostN = document.getElementById("dashGhostN");
   const dashPointsLeft = document.getElementById("dashPointsLeft");
   const dashResetBtn = document.getElementById("btnDashReset");
+  const dashDetectInfo = document.getElementById("dashDetectInfo");
+  const detectPlusBtn = document.getElementById("btnDetectPlus");
   const dashCountEls = new Map(); // color → 개수 표시 span
   const dashLabelEls = new Map(); // color → 라벨 span(효과값 갱신용)
   const nodeEls = new Map();
@@ -69,6 +71,10 @@ export function initSkillTreePanel({ getCharacter, onChange, onOpenChange } = {}
     dashCountEls.set(color, count);
     dashLabelEls.set(color, label);
   }
+  detectPlusBtn?.addEventListener("click", () => {
+    const char = getCharacter?.();
+    if (investDetect(char)) { onChange?.(char); render(); }
+  });
   dashResetBtn?.addEventListener("click", () => {
     const char = getCharacter?.();
     if (char && resetDashColors(char) >= 0) { onChange?.(char); render(); }
@@ -108,15 +114,22 @@ export function initSkillTreePanel({ getCharacter, onChange, onOpenChange } = {}
   function renderDashColors(char) {
     const disabled = !char;
     if (dashResetBtn) dashResetBtn.disabled = disabled;
+    if (detectPlusBtn) detectPlusBtn.disabled = disabled;
     if (disabled) {
       if (dashGhostN) dashGhostN.textContent = "0";
       if (dashPointsLeft) dashPointsLeft.textContent = "0";
+      if (dashDetectInfo) dashDetectInfo.textContent = "×1.0";
       for (const el of dashCountEls.values()) el.textContent = "0";
       for (const row of dashRows?.children ?? []) row.querySelector(".dash-alloc-plus")?.setAttribute("disabled", "");
       return;
     }
     normalizeDashPoints(char);
     const noPoints = char.dashPoints <= 0;
+    // 인식범위: 현재 배율 + 실제 반경(px). 포인트가 없을 때만 + 비활성(레벨 제한 없음)
+    if (dashDetectInfo) {
+      dashDetectInfo.textContent = `×${detectRangeMult(char.detectPoints).toFixed(1)} · ${Math.round(effectiveDetectRange(char))}px`;
+    }
+    if (detectPlusBtn) detectPlusBtn.disabled = noPoints;
     if (dashGhostN) dashGhostN.textContent = String(dashGhostCount(char.dashColors, effectiveDetectRange(char)));
     if (dashPointsLeft) dashPointsLeft.textContent = String(char.dashPoints);
     for (const color of DASH_COLORS) {

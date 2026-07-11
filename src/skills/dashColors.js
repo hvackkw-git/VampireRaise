@@ -8,9 +8,23 @@ import { DETECT_RANGE, DASH_ROUTE_MULT } from "../constants.js";
 /** 잔상 개수 스케일 기준이 되는 뱀파이어 기본 인식 범위 */
 export const BASE_DETECT_RANGE = DETECT_RANGE.vampire;
 
-/** 캐릭터의 실효 인식 범위 — 향후 성장으로 c.detectRange를 올리면 그대로 반영된다 */
+/**
+ * 인식범위 스킬 배율 — 포인트당 +0.1 (0p=×1.0, 1p=×1.1, 2p=×1.2 …).
+ * @param {number} detectPoints
+ */
+export function detectRangeMult(detectPoints = 0) {
+  return 1 + 0.1 * Math.max(0, Number(detectPoints) || 0);
+}
+
+/**
+ * 캐릭터의 실효 인식 범위(px). 뱀파이어는 인식범위 스킬(detectPoints)로 실제로 커진다.
+ * c.detectRange를 직접 지정하면 그 값을 우선한다(테스트·특수 케이스용).
+ */
 export function effectiveDetectRange(char) {
-  return Number.isFinite(char?.detectRange) ? char.detectRange : BASE_DETECT_RANGE;
+  if (Number.isFinite(char?.detectRange)) return char.detectRange;
+  const base = DETECT_RANGE[char?.side] ?? BASE_DETECT_RANGE;
+  const pts = char?.side === "vampire" ? (char?.detectPoints || 0) : 0;
+  return base * detectRangeMult(pts);
 }
 //
 // ── Dash 색상 스킬 효과 카탈로그 (설계 노트 IMG_7727) ──
@@ -28,6 +42,8 @@ export function effectiveDetectRange(char) {
 //   └───┴──────┴─────────────────────┴──────────────────────┴───────────────┘
 //   빨강=revengeAttackMult(), 주황=dashDistanceMult(). 나머지 색 헬퍼는 이 자리에 이어 추가.
 //   포인트 출처: 현재는 char.dashColors 맵(독립). 향후 스킬트리 노드 습득 → dashColors 반영 배선 필요.
+//   ─ 색 외 스킬 ─ 인식범위(detectPoints): 포인트당 ×1.1 → detectRangeMult()/effectiveDetectRange().
+//     실제 감지·돌진 예산·잔상 개수·감지 원 시각에 모두 반영된다.
 
 /** 팔레트 순서 — 잔상 정렬·무지개 기준 */
 export const DASH_COLORS = Object.freeze([
@@ -68,7 +84,22 @@ export function normalizeDashPoints(char) {
   }
   if (!Number.isFinite(char.dashPoints)) char.dashPoints = DEFAULT_DASH_POINTS;
   char.dashPoints = Math.max(0, Math.floor(char.dashPoints));
+  if (!Number.isFinite(char.detectPoints)) char.detectPoints = 0;
+  char.detectPoints = Math.max(0, Math.floor(char.detectPoints));
   return char;
+}
+
+/**
+ * 인식범위에 1포인트 투자. 색상과 같은 풀(dashPoints)을 쓰며 레벨 제한 없음.
+ * @returns {boolean} 성공 여부
+ */
+export function investDetect(char) {
+  if (!char) return false;
+  normalizeDashPoints(char);
+  if (char.dashPoints <= 0) return false;
+  char.dashPoints -= 1;
+  char.detectPoints += 1;
+  return true;
 }
 
 /**
@@ -85,15 +116,16 @@ export function investDashColor(char, color) {
 }
 
 /**
- * 투자한 색상 포인트를 모두 풀로 되돌리고 색 배분을 비운다(자유 재배분).
+ * 투자한 색상·인식범위 포인트를 모두 풀로 되돌리고 배분을 비운다(자유 재배분).
  * @returns {number} 되돌린 포인트 수
  */
 export function resetDashColors(char) {
   if (!char) return 0;
   normalizeDashPoints(char);
-  const refunded = Object.values(char.dashColors).reduce((a, b) => a + b, 0);
+  const refunded = Object.values(char.dashColors).reduce((a, b) => a + b, 0) + char.detectPoints;
   char.dashPoints += refunded;
   char.dashColors = {};
+  char.detectPoints = 0;
   return refunded;
 }
 

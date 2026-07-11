@@ -4,6 +4,7 @@ import {
   dashGhostCount, allocateGhostSlots, dashGhostColorSequence, ghostColorAtProgress,
   investDashColor, resetDashColors, normalizeDashPoints,
   BASE_DETECT_RANGE, effectiveDetectRange, revengeAttackMult, dashDistanceMult,
+  detectRangeMult, investDetect,
 } from "../skills/dashColors.js";
 import { createInitialState, saveState, loadState } from "../state/gameState.js";
 
@@ -116,11 +117,13 @@ describe("Dash 잔상 색 로직", () => {
     expect(vamp.dashPoints).toBe(DEFAULT_DASH_POINTS); // 기본 듬뿍
     vamp.dashColors = { red: 2, orange: 1, blue: 1 };
     vamp.dashPoints = 12;
+    vamp.detectPoints = 3;
     saveState(state, storage);
     const restored = loadState(storage);
     const rv = restored.chars.items.find((c) => c.side === "vampire");
     expect(rv.dashColors).toEqual({ red: 2, orange: 1, blue: 1 });
     expect(rv.dashPoints).toBe(12);
+    expect(rv.detectPoints).toBe(3);
   });
 
   it("색상 투자: 포인트만 있으면 레벨 제한 없이 찍힌다", () => {
@@ -166,6 +169,36 @@ describe("Dash 잔상 색 로직", () => {
     // effectiveDetectRange: c.detectRange 있으면 그것, 없으면 기본값
     expect(effectiveDetectRange({ detectRange: 150 })).toBe(150);
     expect(effectiveDetectRange({})).toBe(BASE_DETECT_RANGE);
+  });
+
+  it("인식범위 스킬: 포인트당 ×1.1로 실제 범위가 커지고 잔상도 늘어난다", () => {
+    expect(detectRangeMult(0)).toBeCloseTo(1.0);
+    expect(detectRangeMult(1)).toBeCloseTo(1.1);
+    expect(detectRangeMult(2)).toBeCloseTo(1.2);
+    // 뱀파이어는 detectPoints로 실효 범위가 실제로 증가
+    const v0 = { side: "vampire", detectPoints: 0 };
+    const v2 = { side: "vampire", detectPoints: 2 };
+    expect(effectiveDetectRange(v0)).toBeCloseTo(BASE_DETECT_RANGE);
+    expect(effectiveDetectRange(v2)).toBeCloseTo(BASE_DETECT_RANGE * 1.2);
+    // 인식 범위가 커지면 잔상 개수도 증가
+    expect(dashGhostCount({ red: 1 }, effectiveDetectRange(v2)))
+      .toBeGreaterThan(dashGhostCount({ red: 1 }, effectiveDetectRange(v0)));
+  });
+
+  it("인식범위 투자·초기화: 같은 풀을 쓰고 초기화 시 함께 환불", () => {
+    const char = { dashColors: {}, dashPoints: 3, detectPoints: 0 };
+    expect(investDetect(char)).toBe(true);
+    expect(investDetect(char)).toBe(true);
+    expect(char.detectPoints).toBe(2);
+    expect(char.dashPoints).toBe(1);
+    investDashColor(char, "orange"); // dashPoints 0
+    expect(investDetect(char)).toBe(false); // 풀 소진
+    // 초기화: 색 1 + 인식 2 = 3 환불
+    const refunded = resetDashColors(char);
+    expect(refunded).toBe(3);
+    expect(char.detectPoints).toBe(0);
+    expect(char.dashColors).toEqual({});
+    expect(char.dashPoints).toBe(3);
   });
 
   it("빨강=복수 배율: 1p는 ×1.0, 이후 포인트당 +0.1", () => {

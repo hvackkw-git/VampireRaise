@@ -76,6 +76,8 @@ export function createCharacter(state, side, opts = {}) {
     dashPoints: side === "vampire"
       ? Math.max(0, Number(opts.dashPoints ?? DEFAULT_DASH_POINTS) || 0)
       : 0,
+    // 인식범위 스킬 포인트 — 위 풀에서 투자. 포인트당 인식 범위 ×1.1씩 실제로 커진다.
+    detectPoints: side === "vampire" ? Math.max(0, Number(opts.detectPoints ?? 0) || 0) : 0,
     projectileSkill: opts.projectileSkill ?? null, // 인간 투사체 성장 훅(count/homing/damage/cooldown/range/speed)
     ownerVampireId: opts.ownerVampireId ?? null, // 노예 소유 뱀파이어 id
     vampireOrder: side === "vampire" ? (opts.vampireOrder ?? nextVampireOrder(state)) : null,
@@ -135,7 +137,7 @@ export function serialize(state) {
           ownerVampireId: c.ownerVampireId, vampireOrder: c.vampireOrder,
           job: c.job, skills: c.skills,
           skillPoints: c.skillPoints, learnedSkills: c.learnedSkills,
-          dashColors: c.dashColors, dashPoints: c.dashPoints,
+          dashColors: c.dashColors, dashPoints: c.dashPoints, detectPoints: c.detectPoints,
           dead: c.dead,
         })),
     },
@@ -198,6 +200,7 @@ export function loadState(storage = globalThis.localStorage) {
       learnedSkills: rec.learnedSkills,
       dashColors: rec.dashColors,
       dashPoints: rec.dashPoints,
+      detectPoints: rec.detectPoints,
     });
     c.id = rec.id;
     c.dir = rec.dir === -1 ? -1 : 1;

@@ -792,6 +792,18 @@ button { font-family: inherit; color: inherit; }
   cursor: pointer;
 }
 .dash-alloc-plus:disabled { opacity: 0.35; cursor: default; }
+.dash-alloc-detect {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+  padding-top: 5px;
+  border-top: 1px solid #2b343a;
+}
+.dash-alloc-detect .dash-alloc-count {
+  color: #8fd0e0;
+  font-size: 9px;
+}
 
 /* ── 토스트 ── */
 #toast-layer {

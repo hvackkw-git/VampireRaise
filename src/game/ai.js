@@ -355,7 +355,7 @@ function updateRangedBrace(c, chars) {
 }
 
 function isInDetectRange(c, enemy) {
-  const range = DETECT_RANGE[c.side] ?? 0;
+  const range = effectiveDetectRange(c);
   const a = centerOf(c);
   const b = centerOf(enemy);
   return Math.hypot(b.x - a.x, b.y - a.y) <= range;
@@ -366,7 +366,7 @@ function dashGoalForEnemy(c, enemy, platforms, blockPowered = null) {
 }
 
 function findDashRouteToTarget(c, enemy, platforms, routeMult, blockPowered = null) {
-  const detectRange = DETECT_RANGE[c.side] ?? 0;
+  const detectRange = effectiveDetectRange(c);
   const budget = detectRange * routeMult;
   const goal = dashGoalForEnemy(c, enemy, platforms, blockPowered);
   if (!goal) return null;
@@ -376,7 +376,7 @@ function findDashRouteToTarget(c, enemy, platforms, routeMult, blockPowered = nu
 }
 
 function firstWalkableDashRoutePoint(c, enemy, platforms, blockPowered = null) {
-  const detectRange = DETECT_RANGE[c.side] ?? 0;
+  const detectRange = effectiveDetectRange(c);
   const budget = detectRange * dashRouteMultiplier(c);
   const goal = dashGoalForEnemy(c, enemy, platforms, blockPowered);
   if (!goal) return null;
@@ -425,7 +425,7 @@ function jumpDashStartCenter(c, platforms, blockPowered = null) {
  * 보정 시작 위치→목표 경로 길이(route.dist)로 한다.
  */
 function findJumpDashRouteToTarget(c, enemy, platforms, routeMult, blockPowered = null) {
-  const detectRange = DETECT_RANGE[c.side] ?? 0;
+  const detectRange = effectiveDetectRange(c);
   const budget = detectRange * routeMult;
   const goal = dashGoalForEnemy(c, enemy, platforms, blockPowered);
   if (!goal) return null;
@@ -586,7 +586,7 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null) 
     if (c._pingCd <= 0) {
       c._pingCd = PING_REFRESH_S;
       const found = findNearestEnemy(c, chars);
-      if (found && found.dist <= (DETECT_RANGE[c.side] ?? 0)) {
+      if (found && found.dist <= effectiveDetectRange(c)) {
         const pingPoint = c.side === "vampire"
           ? (firstWalkableDashRoutePoint(c, found.char, state.platforms.items, blockPowered)
             ?? nearestPlatformStandPointTo(found.char, state.platforms.items, c.h, blockPowered, c))
