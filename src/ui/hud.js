@@ -1,9 +1,9 @@
 // src/ui/hud.js
-// 수조 내 오버레이 HUD: 좌상단 상태 칩 + 우상단 핫키(웨이브·자동·소환·꾸미기).
+// 수조 내 오버레이 HUD: 좌상단 상태 칩 + 우상단 핫키(웨이브·자동·재시작·꾸미기).
 
-import { summonCost } from "../constants.js";
-import { startWave, humansAlive } from "../game/waves.js";
-import { createCharacter, resetState } from "../state/gameState.js";
+import { rebirthWaveRequirement, REBIRTH_MAX_VAMPIRES } from "../constants.js";
+import { startWave, humansAlive, vampireCount, canRebirth, rebirth } from "../game/waves.js";
+import { resetState } from "../state/gameState.js";
 import { showToast } from "./tankView.js";
 import { t } from "../i18n/index.js";
 
@@ -13,12 +13,9 @@ export function initHud(state, { onDecorate, onReset, getBlockPowered, isDecorat
   const elBlood = document.getElementById("hudBlood");
   const btnWave = document.getElementById("btnWave");
   const btnAuto = document.getElementById("btnAuto");
-  const btnSummon = document.getElementById("btnSummon");
+  const btnRebirth = document.getElementById("btnRebirth");
   const btnDecorate = document.getElementById("btnDecorate");
-  const elSummonCost = document.getElementById("summonCost");
-
-  const vampireCount = () =>
-    state.chars.items.filter((c) => c.side === "vampire").length;
+  const elRebirthReq = document.getElementById("rebirthReq");
 
   const showStartFailure = () => {
     if (state.wave.lastStartError === "noPath") showToast(t("hud.noRoute"));
@@ -49,16 +46,22 @@ export function initHud(state, { onDecorate, onReset, getBlockPowered, isDecorat
     }
   });
 
-  btnSummon.addEventListener("click", () => {
-    const cost = summonCost(vampireCount());
-    if (state.blood < cost) {
-      showToast(t("hud.notEnoughBlood", { cost }));
+  btnRebirth.addEventListener("click", () => {
+    if (isDecorating?.()) {
+      showToast(t("hud.finishDecorating"));
       return;
     }
-    state.blood -= cost;
-    // Vamp Shrimp는 상단 낙하가 아니라 맨 아래(바닥)에서 스폰 — createCharacter 기본값이 바닥·CRAWL
-    createCharacter(state, "vampire");
-    showToast(t("hud.vampJoined"));
+    const count = vampireCount(state);
+    if (count >= REBIRTH_MAX_VAMPIRES) {
+      showToast(t("hud.rebirthMaxed"));
+      return;
+    }
+    if (!canRebirth(state)) {
+      showToast(t("hud.rebirthLocked", { wave: rebirthWaveRequirement(count) }));
+      return;
+    }
+    rebirth(state);
+    showToast(t("hud.rebirthDone", { count: count + 1 }));
   });
 
   btnDecorate.addEventListener("click", () => {
@@ -97,7 +100,11 @@ export function initHud(state, { onDecorate, onReset, getBlockPowered, isDecorat
     btnAuto.classList.toggle("on", state.wave.auto);
     btnAuto.disabled = !!isDecorating?.();
     btnDecorate.disabled = state.wave.active;
-    elSummonCost.textContent = String(summonCost(vampireCount()));
+    const count = vampireCount(state);
+    const maxed = count >= REBIRTH_MAX_VAMPIRES;
+    btnRebirth.disabled = state.wave.active;
+    btnRebirth.classList.toggle("ready", !maxed && canRebirth(state));
+    elRebirthReq.textContent = maxed ? "" : String(rebirthWaveRequirement(count));
   }
   render();
   return { render };

@@ -53,9 +53,10 @@ describe("스킬트리 데이터", () => {
 
   it("레벨업 시 스킬포인트(별개 트랙)는 그대로 1씩 증가한다", () => {
     const char = createInitialState().chars.items[0];
+    const { level, skillPoints } = char;
     grantExp(char, expToNext(char.level), []);
-    expect(char.level).toBe(2);
-    expect(char.skillPoints).toBe(1);
+    expect(char.level).toBe(level + 1);
+    expect(char.skillPoints).toBe(skillPoints + 1);
   });
 
   it("normalizeSkillProgress: 잘못된 learnedSkills 정리", () => {
@@ -68,7 +69,7 @@ describe("스킬트리 데이터", () => {
   it("2열 1행 투자 시 SP 1을 쓰고 소유 좀비 체력만 1 올린다", () => {
     const state = createInitialState();
     const owner = state.chars.items[0];
-    const otherOwner = state.chars.items[1];
+    const otherOwner = createCharacter(state, "vampire");
     owner.skillPoints = 2;
     const ownZombie = createCharacter(state, "slave", {
       ownerVampireId: owner.id, maxHp: 5, hp: 3,

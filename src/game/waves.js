@@ -7,6 +7,7 @@ import {
   accountExpForWave, accountExpToNext,
   HUMAN_SPAWN_INTERVAL_S, AUTO_WAVE_DELAY_S,
   HUMAN_SPAWN_ZONE, VAMPIRE_SPAWN_ZONE, spawnXInZone, BASE_CORE_HP,
+  REBIRTH_MAX_VAMPIRES, rebirthWaveRequirement, BASE_SIEGE_COOLDOWN_S,
 } from "../constants.js";
 import { createCharacter } from "../state/gameState.js";
 import { findHumanSpawnRoutes } from "./descentNavigation.js";
@@ -83,31 +84,31 @@ export function reviveVampires(state, rng = Math.random) {
     c.y = FLOOR_Y - c.h;
     c.vx = 0; c.vy = 0;
     c._platformId = null;
+    c._reviveCd = 0;
   }
 }
 
 /**
- * Vamp Shrimp 스폰 존(베이스)에 도달한 Holy Shrimp를 처리한다.
- * 존에 들어온 Holy Shrimp는 즉시 제거되고 코어(state.core.hp)가 1 줄어든다.
- * @returns {Array<object>} invade 이벤트 목록
+ * Vamp Shrimp 스폰 존(베이스)에 도달한 Holy Shrimp가 코어를 공격한다.
+ * 존 안에 서 있는(CRAWL) Holy Shrimp는 사라지지 않고, 건물을 때리듯 공격 주기마다
+ * 코어(state.core.hp)를 1씩 깎는다. 교전(FIGHT) 중이거나 존을 벗어나면 공격을 멈춘다.
+ * @returns {Array<object>} invade 이벤트 목록 (때릴 때마다 1건씩)
  */
-export function tickBaseInvasion(state) {
+export function tickBaseSiege(state, simDt) {
   const events = [];
   const zone = VAMPIRE_SPAWN_ZONE;
   const reached = (c) =>
-    !c.dead && c.side === "human"
+    !c.dead && c.side === "human" && c.state === "CRAWL"
     && c.y + c.h >= FLOOR_Y - 2                 // 바닥에 서 있고
     && c.x + c.w / 2 <= zone.x + zone.w;        // 존의 오른쪽 끝까지 도달
-  const survivors = [];
   for (const c of state.chars.items) {
-    if (reached(c)) {
-      state.core.hp = Math.max(0, state.core.hp - 1);
-      events.push({ type: "invade", char: c, coreHp: state.core.hp });
-    } else {
-      survivors.push(c);
-    }
+    if (!reached(c)) continue;
+    c._siegeCd = (Number(c._siegeCd) || 0) - simDt;
+    if (c._siegeCd > 0) continue;
+    c._siegeCd = BASE_SIEGE_COOLDOWN_S;
+    state.core.hp = Math.max(0, state.core.hp - 1);
+    events.push({ type: "invade", char: c, coreHp: state.core.hp });
   }
-  if (events.length) state.chars.items = survivors;
   return events;
 }
 
@@ -123,9 +124,43 @@ function triggerGameOver(state, rng) {
   reviveVampires(state, rng);
 }
 
+/** 현재 Vamp Shrimp 마릿수 (생사 무관 — 죽은 개체도 재시작 시 부활한다) */
+export function vampireCount(state) {
+  return state.chars.items.filter((c) => c.side === "vampire").length;
+}
+
+/** 지금 재시작(웨이브 리셋 + Vamp Shrimp 1마리 증원)이 가능한가 */
+export function canRebirth(state) {
+  if (state.wave.active) return false;
+  const count = vampireCount(state);
+  if (count >= REBIRTH_MAX_VAMPIRES) return false;
+  return state.wave.current >= rebirthWaveRequirement(count);
+}
+
+/**
+ * 재시작: 레벨·스킬은 유지한 채 웨이브를 1로 되돌리고 Vamp Shrimp를 1마리 늘린다.
+ * (새 Vamp Shrimp는 레벨 1부터 새로 성장한다)
+ * @returns {boolean} 실행 여부
+ */
+export function rebirth(state, rng = Math.random) {
+  if (!canRebirth(state)) return false;
+  state.chars.items = state.chars.items.filter((c) => c.side !== "human");
+  const w = state.wave;
+  w.active = false;
+  w.pendingSpawns = [];
+  w.current = 1;
+  w.clock = 0;
+  w.nextAutoAt = null;
+  w.lastStartError = null;
+  state.core.hp = state.core.max ?? BASE_CORE_HP;
+  reviveVampires(state, rng);
+  createCharacter(state, "vampire");
+  return true;
+}
+
 /**
  * 웨이브 틱.
- * @returns {Array<object>} events — spawn/invade/gameover/clear/defeat/autostart
+ * @returns {Array<object>} events — spawn/invade/gameover/clear/autostart
  */
 export function tickWaves(state, simDt, rng = Math.random, blockPowered = null) {
   const events = [];
@@ -149,7 +184,7 @@ export function tickWaves(state, simDt, rng = Math.random, blockPowered = null) 
     }
 
     // 베이스 침입: Vamp Shrimp 존에 도달한 Holy Shrimp 처리 → 코어 감소
-    events.push(...tickBaseInvasion(state));
+    events.push(...tickBaseSiege(state, simDt));
     // 게임오버: 코어 소진 → 웨이브 1로 리셋, 코어 회복, Vamp Shrimp 부활
     if (state.core.hp <= 0) {
       triggerGameOver(state, rng);
@@ -157,17 +192,9 @@ export function tickWaves(state, simDt, rng = Math.random, blockPowered = null) 
       return events;
     }
 
-    // 패배: Vamp Shrimp 진영 전멸 → Holy Shrimp 제거, 웨이브 1로 리셋, Vamp Shrimp 부활
-    if (vampireSideAlive(state) === 0) {
-      state.chars.items = state.chars.items.filter((c) => c.side !== "human");
-      w.active = false;
-      w.pendingSpawns = [];
-      w.current = 1;
-      w.nextAutoAt = null;
-      reviveVampires(state, rng);
-      events.push({ type: "defeat" });
-      return events;
-    }
+    // Vamp Shrimp 진영이 전멸해도 더 이상 웨이브가 끝나지 않는다 — 죽은 새우는
+    // 각자 쿨타임(combat.js tickVampireAutoRevive) 후 알아서 되살아난다.
+    // 웨이브를 정말 끝내는 것은 베이스 코어 소진(게임오버)뿐이다.
 
     // 클리어: 스폰 완료 + Holy Shrimp 전멸
     if (w.pendingSpawns.length === 0 && humansAlive(state) === 0) {
