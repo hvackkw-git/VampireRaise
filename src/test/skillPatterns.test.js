@@ -25,16 +25,21 @@ describe("skillPatterns", () => {
     });
   });
 
-  it("카탈로그의 모든 스킬 카테고리는 유효한 슬롯이다", () => {
+  it("카탈로그의 모든 스킬은 유효한 슬롯·팔레트 색·진영을 가진다", () => {
     for (const skill of Object.values(SKILL_CATALOG)) {
       expect(SLOT_LAYER).toHaveProperty(skill.category);
+      expect(PATTERN_COLORS).toHaveProperty(skill.colorKey);
+      expect(["vampire", "human"]).toContain(skill.side);
     }
   });
 
-  it("카탈로그의 모든 스킬 색 키는 팔레트에 존재한다", () => {
-    for (const skill of Object.values(SKILL_CATALOG)) {
-      expect(PATTERN_COLORS).toHaveProperty(skill.colorKey);
-    }
+  it("뱀파이어 스킬표가 이미지대로 들어있다 (예시 몇 칸)", () => {
+    expect(SKILL_CATALOG.v_passive_red.name).toBe("소환");
+    expect(SKILL_CATALOG.v_passive_black.name).toBe("공격");
+    expect(SKILL_CATALOG.v_movement_dark_purple.name).toBe("아군소환");
+    expect(SKILL_CATALOG.v_aura_black.name).toBe("상대 살점뜯기");
+    // 오라 빈 칸은 카탈로그에 없다
+    expect(SKILL_CATALOG.v_aura_dark_red).toBeUndefined();
   });
 
   it("빈 장착은 어떤 레이어 색도 만들지 않는다", () => {
@@ -44,19 +49,19 @@ describe("skillPatterns", () => {
     });
   });
 
-  it("장착 스킬의 색 키가 해당 레이어로 스택된다 (회색 스페클 + 노랑 릴리 + 파랑 백라인 + glow)", () => {
+  it("장착 스킬의 색 키가 해당 레이어로 스택된다", () => {
     const char = {
       equipped: {
-        passive: "ironScale",   // gray
-        active: "frenzy",       // yellow
-        movement: "dash",       // blue
-        aura: "crimsonAura",    // red
+        passive: "v_passive_black",    // black
+        active: "v_active_yellow",     // yellow
+        movement: "v_movement_purple", // purple
+        aura: "v_aura_red",            // red
       },
     };
     expect(getEquippedLayers(char)).toEqual({
-      speckle: "gray",
+      speckle: "black",
       rili: "yellow",
-      backline: "blue",
+      backline: "purple",
       glow: "red",
     });
   });
@@ -67,29 +72,44 @@ describe("skillPatterns", () => {
   });
 });
 
-describe("장착 슬롯 조작", () => {
-  it("skillsInCategory는 해당 카테고리 스킬만 반환한다", () => {
+describe("장착 슬롯 조작 (진영별)", () => {
+  it("skillsInCategory는 해당 진영·카테고리 스킬만 반환한다", () => {
     for (const category of SKILL_CATEGORIES) {
-      const ids = skillsInCategory(category);
+      const ids = skillsInCategory("vampire", category);
       expect(ids.length).toBeGreaterThan(0);
-      for (const id of ids) expect(SKILL_CATALOG[id].category).toBe(category);
+      for (const id of ids) {
+        expect(SKILL_CATALOG[id].category).toBe(category);
+        expect(SKILL_CATALOG[id].side).toBe("vampire");
+      }
+    }
+  });
+
+  it("인간은 아직 스킬이 없다", () => {
+    for (const category of SKILL_CATEGORIES) {
+      expect(skillsInCategory("human", category)).toEqual([]);
     }
   });
 
   it("equipSkill은 슬롯에 스킬을 끼우고 변경 여부를 반환한다", () => {
-    const char = { equipped: emptyEquip() };
-    expect(equipSkill(char, "passive", "ironScale")).toBe(true);
-    expect(char.equipped.passive).toBe("ironScale");
-    expect(equipSkill(char, "passive", "ironScale")).toBe(false); // 동일 → 변경 없음
+    const char = { side: "vampire", equipped: emptyEquip() };
+    expect(equipSkill(char, "passive", "v_passive_red")).toBe(true);
+    expect(char.equipped.passive).toBe("v_passive_red");
+    expect(equipSkill(char, "passive", "v_passive_red")).toBe(false); // 동일 → 변경 없음
   });
 
-  it("카테고리가 맞지 않는 스킬이나 null은 슬롯을 비운다", () => {
-    const char = { equipped: { ...emptyEquip(), active: "frenzy" } };
-    expect(equipSkill(char, "active", "dash")).toBe(true); // dash는 movement → 비움
+  it("카테고리·진영이 맞지 않는 스킬이나 null은 슬롯을 비운다", () => {
+    const char = { side: "vampire", equipped: { ...emptyEquip(), active: "v_active_red" } };
+    expect(equipSkill(char, "active", "v_movement_red")).toBe(true); // 카테고리 불일치 → 비움
     expect(char.equipped.active).toBeNull();
-    char.equipped.active = "frenzy";
+    char.equipped.active = "v_active_red";
     expect(equipSkill(char, "active", null)).toBe(true);
     expect(char.equipped.active).toBeNull();
+  });
+
+  it("다른 진영 스킬은 장착되지 않는다", () => {
+    const human = { side: "human", equipped: emptyEquip() };
+    expect(equipSkill(human, "passive", "v_passive_red")).toBe(false);
+    expect(human.equipped.passive).toBeNull();
   });
 });
 
@@ -128,11 +148,11 @@ describe("색상별 패턴 스프라이트 인프라", () => {
 });
 
 describe("gameState equipped 슬롯", () => {
-  it("뱀파이어는 기본 장착 세트를, 인간은 빈 슬롯을 가진다", () => {
+  it("뱀파이어는 데모 장착 세트를, 인간은 빈 슬롯을 가진다", () => {
     const state = createInitialState();
     const vamp = createCharacter(state, "vampire");
     const human = createCharacter(state, "human");
-    expect(vamp.equipped.passive).toBe("ironScale");
+    expect(vamp.equipped.passive).toBe("v_passive_red");
     expect(getEquippedLayers(vamp).glow).toBe("red");
     expect(human.equipped).toEqual(emptyEquip());
   });
@@ -141,13 +161,13 @@ describe("gameState equipped 슬롯", () => {
     const storage = memoryStorage();
     const state = createInitialState();
     const vamp = createCharacter(state, "vampire", {
-      equipped: { passive: "toxicSkin", active: "venomShot", movement: "blink", aura: "frostAura" },
+      equipped: { passive: "v_passive_orange", active: "v_active_purple", movement: "v_movement_black", aura: "v_aura_yellow" },
     });
     storage.setItem("vampireraise.save.v1", serialize(state));
     const restored = loadState(storage);
     const rc = restored.chars.items.find((c) => c.id === vamp.id);
     expect(rc.equipped).toEqual({
-      passive: "toxicSkin", active: "venomShot", movement: "blink", aura: "frostAura",
+      passive: "v_passive_orange", active: "v_active_purple", movement: "v_movement_black", aura: "v_aura_yellow",
     });
   });
 });

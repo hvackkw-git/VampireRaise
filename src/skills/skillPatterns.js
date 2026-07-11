@@ -23,8 +23,8 @@ export const SKILL_CATEGORIES = Object.freeze(["passive", "active", "movement", 
 export const CATEGORY_LABEL = Object.freeze({
   passive: "패시브",
   active: "액티브",
-  movement: "이동기",
-  aura: "오러",
+  movement: "이동",
+  aura: "오라",
 });
 
 /** 레이어 키 → 색상별로 구운 스프라이트 파일명 접두사 */
@@ -71,54 +71,75 @@ export function bakedPatternPath(layer, colorKey) {
 }
 
 /**
- * 스킬 카탈로그. 각 스킬은 슬롯 카테고리와 팔레트 색 키(colorKey)를 가진다.
- * 색은 슬롯이 아니라 "어떤 스킬을 꼈는지"에 따라 달라진다 —
- * 예: 패시브 슬롯에 회색 스페클, 액티브에 노란 릴리, 이동기에 파란 백라인.
+ * 진영별 스킬표. category → { colorKey → 스킬 이름 }.
+ * 행 색(colorKey)이 곧 그 스킬의 패턴 색이다. 빈 칸(그 색에 스킬 없음)은 생략한다.
+ * 색상 계열로 진영을 나눈다 — 뱀파이어는 난색+보라+검정, 인간은 한색 계열(이후 단계).
  * (스킬의 게임플레이 효과는 이후 단계에서 붙인다.)
  */
-export const SKILL_CATALOG = Object.freeze({
-  // 패시브 → 스페클
-  ironScale: { id: "ironScale", name: "강철 껍질", category: "passive", colorKey: "gray" },
-  bloodThirst: { id: "bloodThirst", name: "흡혈 갈망", category: "passive", colorKey: "red" },
-  toxicSkin: { id: "toxicSkin", name: "독성 피부", category: "passive", colorKey: "green" },
-
-  // 액티브 → 릴리
-  frenzy: { id: "frenzy", name: "광폭화", category: "active", colorKey: "yellow" },
-  venomShot: { id: "venomShot", name: "맹독 사출", category: "active", colorKey: "purple" },
-  crush: { id: "crush", name: "분쇄", category: "active", colorKey: "orange" },
-
-  // 이동기 → 백라인
-  dash: { id: "dash", name: "혈귀 돌진", category: "movement", colorKey: "blue" },
-  blink: { id: "blink", name: "점멸", category: "movement", colorKey: "teal" },
-  leap: { id: "leap", name: "도약", category: "movement", colorKey: "dark_yellow" },
-
-  // 오러 → glow
-  crimsonAura: { id: "crimsonAura", name: "진홍 오러", category: "aura", colorKey: "red" },
-  frostAura: { id: "frostAura", name: "서리 오러", category: "aura", colorKey: "dark_blue" },
-  goldAura: { id: "goldAura", name: "황금 오러", category: "aura", colorKey: "yellow" },
+export const SIDE_SKILLS = Object.freeze({
+  vampire: {
+    passive:  { red: "소환", dark_red: "먹기", orange: "이속", yellow: "투사속도", dark_yellow: "투사공격", purple: "방어", dark_purple: "회피", black: "공격" },
+    active:   { red: "흡혈", dark_red: "강타", orange: "안개", yellow: "투사", dark_yellow: "저격투사", purple: "좀비소환", dark_purple: "회피안개", black: "마비" },
+    movement: { red: "대쉬", dark_red: "당겨", orange: "안개속 휩쓸기", yellow: "분신", dark_yellow: "더미", purple: "강력점프", dark_purple: "아군소환", black: "플립" },
+    aura:     { red: "흡혈", orange: "이속", yellow: "공격력", purple: "상대 이속방해", black: "상대 살점뜯기" },
+  },
+  human: {
+    passive: {}, active: {}, movement: {}, aura: {}, // 인간 스킬은 이후 단계
+  },
 });
+
+const SIDE_PREFIX = Object.freeze({ vampire: "v", human: "h" });
+
+/**
+ * 스킬 카탈로그 (id → 스킬). SIDE_SKILLS 그리드에서 생성한다.
+ * id 규칙: `${sidePrefix}_${category}_${colorKey}` (예: v_passive_red).
+ * 각 스킬: { id, side, category, colorKey, name }.
+ */
+export const SKILL_CATALOG = (() => {
+  const catalog = {};
+  for (const [side, categories] of Object.entries(SIDE_SKILLS)) {
+    for (const [category, byColor] of Object.entries(categories)) {
+      for (const [colorKey, name] of Object.entries(byColor)) {
+        const id = `${SIDE_PREFIX[side]}_${category}_${colorKey}`;
+        catalog[id] = { id, side, category, colorKey, name };
+      }
+    }
+  }
+  return Object.freeze(catalog);
+})();
 
 /** 빈 장착 슬롯 (스킬 id 또는 null) */
 export function emptyEquip() {
   return { passive: null, active: null, movement: null, aura: null };
 }
 
-/** 해당 카테고리에 속한 스킬 id 목록 */
-export function skillsInCategory(category) {
+/**
+ * 데모용 기본 장착 (장착 UI가 붙기 전 패턴을 눈으로 확인하기 위함).
+ * 뱀파이어만 표본 세트를 준다.
+ */
+export function demoEquip(side) {
+  if (side === "vampire") {
+    return { passive: "v_passive_red", active: "v_active_yellow", movement: "v_movement_purple", aura: "v_aura_red" };
+  }
+  return emptyEquip();
+}
+
+/** 해당 진영·카테고리에 속한 스킬 id 목록 (표 정의 순서 = 팔레트 색 순서) */
+export function skillsInCategory(side, category) {
   return Object.values(SKILL_CATALOG)
-    .filter((s) => s.category === category)
+    .filter((s) => s.side === side && s.category === category)
     .map((s) => s.id);
 }
 
 /**
- * 슬롯에 스킬을 장착한다. skillId가 null이거나 카테고리가 맞지 않으면 슬롯을 비운다.
+ * 슬롯에 스킬을 장착한다. skillId가 null이거나 카테고리·진영이 맞지 않으면 슬롯을 비운다.
  * @returns {boolean} 실제로 값이 바뀌었으면 true
  */
 export function equipSkill(char, category, skillId) {
   if (!char || !(category in SLOT_LAYER)) return false;
   if (!char.equipped) char.equipped = emptyEquip();
   const skill = SKILL_CATALOG[skillId];
-  const next = skill && skill.category === category ? skillId : null;
+  const next = skill && skill.category === category && skill.side === char.side ? skillId : null;
   if (char.equipped[category] === next) return false;
   char.equipped[category] = next;
   return true;

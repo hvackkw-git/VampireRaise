@@ -6,18 +6,9 @@ import {
   INITIAL_VAMPIRE_COUNT, VAMPIRE_SPAWN_ZONE, spawnXInZone, BASE_CORE_HP,
 } from "../constants.js";
 
-import { emptyEquip } from "../skills/skillPatterns.js";
+import { emptyEquip, demoEquip } from "../skills/skillPatterns.js";
 
 export const SAVE_KEY = "vampireraise.save.v1";
-
-// v1 데모 기본 장착: 흰 스페클(패시브) + 노란 릴리(액티브) + 파란 백라인(이동기) + glow(오러).
-// 장착 UI가 붙기 전까지 뱀파이어에 적용해 패턴 스택을 시각적으로 확인한다.
-const DEFAULT_VAMPIRE_EQUIP = Object.freeze({
-  passive: "ironScale",   // 흰 스페클
-  active: "frenzy",       // 노란 릴리
-  movement: "dash",       // 파란 백라인
-  aura: "crimsonAura",    // 진홍 glow
-});
 
 /** 캐릭터 레코드 생성 */
 function nextVampireOrder(state) {
@@ -76,10 +67,10 @@ export function createCharacter(state, side, opts = {}) {
     learnedSkills: side === "vampire" && Array.isArray(opts.learnedSkills)
       ? [...opts.learnedSkills]
       : [],
-    // 4슬롯 스킬 장착(패시브·액티브·이동기·오러) → 색상별 패턴 오버레이. 장착 UI는 후속.
+    // 4슬롯 스킬 장착(패시브·액티브·이동·오라) → 색상별 패턴 오버레이.
     equipped: opts.equipped
       ? { ...emptyEquip(), ...opts.equipped }
-      : (side === "vampire" ? { ...DEFAULT_VAMPIRE_EQUIP } : emptyEquip()),
+      : demoEquip(side),
     projectileSkill: opts.projectileSkill ?? null, // 인간 투사체 성장 훅(count/homing/damage/cooldown/range/speed)
     ownerVampireId: opts.ownerVampireId ?? null, // 노예 소유 뱀파이어 id
     vampireOrder: side === "vampire" ? (opts.vampireOrder ?? nextVampireOrder(state)) : null,

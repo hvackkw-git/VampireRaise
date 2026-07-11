@@ -54,7 +54,7 @@ export function initSkillTreePanel({ getCharacter, onChange, onOpenChange } = {}
   function cycleSlot(category) {
     const char = getCharacter?.();
     if (!char) return;
-    const options = [null, ...skillsInCategory(category)]; // 비움 포함 순환
+    const options = [null, ...skillsInCategory(char.side, category)]; // 비움 포함 순환
     const current = char.equipped?.[category] ?? null;
     const idx = options.indexOf(current);
     const next = options[(idx + 1) % options.length];
