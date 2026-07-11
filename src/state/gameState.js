@@ -6,8 +6,6 @@ import {
   INITIAL_VAMPIRE_COUNT, VAMPIRE_SPAWN_ZONE, spawnXInZone, BASE_CORE_HP,
 } from "../constants.js";
 
-import { emptyEquip, demoEquip } from "../skills/skillPatterns.js";
-
 export const SAVE_KEY = "vampireraise.save.v1";
 
 /** 캐릭터 레코드 생성 */
@@ -67,9 +65,6 @@ export function createCharacter(state, side, opts = {}) {
     learnedSkills: side === "vampire" && Array.isArray(opts.learnedSkills)
       ? [...opts.learnedSkills]
       : [],
-    equipped: opts.equipped
-      ? { ...emptyEquip(), ...opts.equipped }
-      : demoEquip(side),
     projectileSkill: opts.projectileSkill ?? null, // 인간 투사체 성장 훅(count/homing/damage/cooldown/range/speed)
     ownerVampireId: opts.ownerVampireId ?? null, // 노예 소유 뱀파이어 id
     vampireOrder: side === "vampire" ? (opts.vampireOrder ?? nextVampireOrder(state)) : null,
@@ -127,7 +122,7 @@ export function serialize(state) {
           level: c.level, exp: c.exp, maxHp: c.maxHp, hp: c.hp,
           maxMp: c.maxMp, mp: c.mp, atk: c.atk,
           ownerVampireId: c.ownerVampireId, vampireOrder: c.vampireOrder,
-          job: c.job, skills: c.skills, equipped: c.equipped,
+          job: c.job, skills: c.skills,
           skillPoints: c.skillPoints, learnedSkills: c.learnedSkills,
           dead: c.dead,
         })),
@@ -189,7 +184,6 @@ export function loadState(storage = globalThis.localStorage) {
       ownerVampireId: rec.ownerVampireId, vampireOrder: rec.vampireOrder,
       skillPoints: rec.skillPoints ?? Math.max(0, (Number(rec.level) || 1) - 1),
       learnedSkills: rec.learnedSkills,
-      equipped: rec.equipped, // 구버전 저장본(undefined)은 createCharacter 기본값 사용
     });
     c.id = rec.id;
     c.dir = rec.dir === -1 ? -1 : 1;
