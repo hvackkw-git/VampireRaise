@@ -1,8 +1,13 @@
 import { describe, it, expect } from "vitest";
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import {
-  SLOT_LAYER, LAYER_MASK, SKILL_CATALOG, emptyEquip, getEquippedLayers,
+  SLOT_LAYER, LAYER_MASK, LAYER_SPRITE_PREFIX, PATTERN_COLORS, SKILL_CATALOG,
+  emptyEquip, getEquippedLayers, bakedPatternPath,
 } from "../skills/skillPatterns.js";
 import { createCharacter, createInitialState, serialize, loadState } from "../state/gameState.js";
+
+const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
 
 function memoryStorage() {
   const values = new Map();
@@ -59,6 +64,40 @@ describe("skillPatterns", () => {
   it("알 수 없는 스킬 id는 무시된다", () => {
     const char = { equipped: { ...emptyEquip(), passive: "nope" } };
     expect(getEquippedLayers(char).speckle).toBeNull();
+  });
+});
+
+describe("색상별 패턴 스프라이트 인프라", () => {
+  const COLOR_KEYS = [
+    "red", "dark_red", "orange", "blue", "dark_blue", "yellow", "dark_yellow",
+    "green", "dark_green", "teal", "purple", "dark_purple", "black", "gray",
+  ];
+
+  it("팔레트는 14색이며 모두 hex 값이다", () => {
+    expect(Object.keys(PATTERN_COLORS).sort()).toEqual([...COLOR_KEYS].sort());
+    for (const hex of Object.values(PATTERN_COLORS)) {
+      expect(hex).toMatch(/^#[0-9a-f]{6}$/);
+    }
+  });
+
+  it("bakedPatternPath가 올바른 경로를 만든다", () => {
+    expect(bakedPatternPath("speckle", "red")).toBe("assets/shrimp_variants/SPECKLE-red.png");
+    expect(bakedPatternPath("rili", "dark_green")).toBe("assets/shrimp_variants/RILI-dark_green.png");
+    expect(bakedPatternPath("backline", "gray")).toBe("assets/shrimp_variants/BACKLINE-gray.png");
+  });
+
+  it("알 수 없는 레이어/색은 null", () => {
+    expect(bakedPatternPath("glow", "red")).toBeNull();
+    expect(bakedPatternPath("speckle", "chartreuse")).toBeNull();
+  });
+
+  it("3패턴 × 14색 = 42개 스프라이트가 실제로 존재한다", () => {
+    for (const layer of Object.keys(LAYER_SPRITE_PREFIX)) {
+      for (const colorKey of COLOR_KEYS) {
+        const rel = bakedPatternPath(layer, colorKey);
+        expect(existsSync(new URL(rel, `file://${repoRoot}`))).toBe(true);
+      }
+    }
   });
 });
 

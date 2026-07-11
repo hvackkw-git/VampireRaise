@@ -23,6 +23,49 @@ export const LAYER_MASK = Object.freeze({
   backline: "assets/shrimp_variants/BACKLINE.png",
 });
 
+/** 레이어 키 → 색상별로 구운 스프라이트 파일명 접두사 */
+export const LAYER_SPRITE_PREFIX = Object.freeze({
+  speckle: "SPECKLE",
+  rili: "RILI",
+  backline: "BACKLINE",
+});
+
+/**
+ * 색상별로 미리 구운 패턴 스프라이트 팔레트 (14색).
+ * tools/generate_pattern_colors.py의 COLORS와 동기화할 것.
+ * RILI는 회색조 음영을 색 안에 보존하도록 굽는다.
+ */
+export const PATTERN_COLORS = Object.freeze({
+  red:         "#ff4757",
+  dark_red:    "#5c0f0f",
+  orange:      "#e8850a",
+  blue:        "#3f6ff3",
+  dark_blue:   "#0f1f5c",
+  yellow:      "#f3c83f",
+  dark_yellow: "#6e5a16",
+  green:       "#3f9a3f",
+  dark_green:  "#123d18",
+  teal:        "#17a6a6",
+  purple:      "#7a3fb3",
+  dark_purple: "#3a1a5c",
+  black:       "#202020",
+  gray:        "#9aa0a8",
+});
+
+const VARIANT_DIR = "assets/shrimp_variants";
+
+/**
+ * 색상별로 구운 패턴 스프라이트 경로.
+ * @param {string} layer     – speckle | rili | backline
+ * @param {string} colorKey  – PATTERN_COLORS의 키 (예: "red", "dark_green")
+ * @returns {string|null} 스프라이트 경로 (알 수 없는 조합이면 null)
+ */
+export function bakedPatternPath(layer, colorKey) {
+  const prefix = LAYER_SPRITE_PREFIX[layer];
+  if (!prefix || !(colorKey in PATTERN_COLORS)) return null;
+  return `${VARIANT_DIR}/${prefix}-${colorKey}.png`;
+}
+
 /**
  * 스킬 카탈로그. 각 스킬은 슬롯 카테고리와 표시 색을 가진다.
  * 색은 슬롯이 아니라 "어떤 스킬을 꼈는지"에 따라 달라진다 —
