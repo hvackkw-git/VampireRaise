@@ -7,7 +7,7 @@ import {
   accountExpForWave, accountExpToNext,
   HUMAN_SPAWN_INTERVAL_S, AUTO_WAVE_DELAY_S,
   HUMAN_SPAWN_ZONE, VAMPIRE_SPAWN_ZONE, spawnXInZone, BASE_CORE_HP,
-  REBIRTH_MAX_VAMPIRES, rebirthWaveRequirement,
+  REBIRTH_MAX_VAMPIRES, rebirthWaveRequirement, BASE_SIEGE_COOLDOWN_S,
 } from "../constants.js";
 import { createCharacter } from "../state/gameState.js";
 import { findHumanSpawnRoutes } from "./descentNavigation.js";
@@ -84,31 +84,31 @@ export function reviveVampires(state, rng = Math.random) {
     c.y = FLOOR_Y - c.h;
     c.vx = 0; c.vy = 0;
     c._platformId = null;
+    c._reviveCd = 0;
   }
 }
 
 /**
- * Vamp Shrimp 스폰 존(베이스)에 도달한 Holy Shrimp를 처리한다.
- * 존에 들어온 Holy Shrimp는 즉시 제거되고 코어(state.core.hp)가 1 줄어든다.
- * @returns {Array<object>} invade 이벤트 목록
+ * Vamp Shrimp 스폰 존(베이스)에 도달한 Holy Shrimp가 코어를 공격한다.
+ * 존 안에 서 있는(CRAWL) Holy Shrimp는 사라지지 않고, 건물을 때리듯 공격 주기마다
+ * 코어(state.core.hp)를 1씩 깎는다. 교전(FIGHT) 중이거나 존을 벗어나면 공격을 멈춘다.
+ * @returns {Array<object>} invade 이벤트 목록 (때릴 때마다 1건씩)
  */
-export function tickBaseInvasion(state) {
+export function tickBaseSiege(state, simDt) {
   const events = [];
   const zone = VAMPIRE_SPAWN_ZONE;
   const reached = (c) =>
-    !c.dead && c.side === "human"
+    !c.dead && c.side === "human" && c.state === "CRAWL"
     && c.y + c.h >= FLOOR_Y - 2                 // 바닥에 서 있고
     && c.x + c.w / 2 <= zone.x + zone.w;        // 존의 오른쪽 끝까지 도달
-  const survivors = [];
   for (const c of state.chars.items) {
-    if (reached(c)) {
-      state.core.hp = Math.max(0, state.core.hp - 1);
-      events.push({ type: "invade", char: c, coreHp: state.core.hp });
-    } else {
-      survivors.push(c);
-    }
+    if (!reached(c)) continue;
+    c._siegeCd = (Number(c._siegeCd) || 0) - simDt;
+    if (c._siegeCd > 0) continue;
+    c._siegeCd = BASE_SIEGE_COOLDOWN_S;
+    state.core.hp = Math.max(0, state.core.hp - 1);
+    events.push({ type: "invade", char: c, coreHp: state.core.hp });
   }
-  if (events.length) state.chars.items = survivors;
   return events;
 }
 
@@ -184,7 +184,7 @@ export function tickWaves(state, simDt, rng = Math.random, blockPowered = null) 
     }
 
     // 베이스 침입: Vamp Shrimp 존에 도달한 Holy Shrimp 처리 → 코어 감소
-    events.push(...tickBaseInvasion(state));
+    events.push(...tickBaseSiege(state, simDt));
     // 게임오버: 코어 소진 → 웨이브 1로 리셋, 코어 회복, Vamp Shrimp 부활
     if (state.core.hp <= 0) {
       triggerGameOver(state, rng);

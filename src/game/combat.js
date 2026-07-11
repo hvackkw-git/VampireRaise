@@ -6,7 +6,8 @@
 import {
   ENGAGE_RANGE, FIGHT_BREAK_RANGE, ENGAGE_MAX_DY, ATTACK_COOLDOWN_S, isEnemySide,
   expToNext, expForKill, LEVELUP_HP_GAIN, LEVELUP_ATK_GAIN, KILL_BLOOD_REWARD,
-  CHAR_SPRITES, SLAVE_BASE,
+  CHAR_SPRITES, SLAVE_BASE, vampireReviveCooldown,
+  FLOOR_Y, VAMPIRE_SPAWN_ZONE, spawnXInZone,
 } from "../constants.js";
 import { revengeAttackMult, multiHitChance } from "../skills/dashColors.js";
 import { hasZombieTrait, zombieHpBonus } from "../skills/zombieSkills.js";
@@ -166,6 +167,24 @@ function tickSlaveDecay(state, simDt, events) {
   }
 }
 
+/** 죽은 Vamp Shrimp 자동 부활: 사망 시 걸어둔 쿨타임(5초+레벨×1초)이 다 되면 왼쪽 아래 스폰 존 바닥에서 되살아난다 */
+function tickVampireAutoRevive(state, simDt, events, rng = Math.random) {
+  for (const c of state.chars.items) {
+    if (c.side !== "vampire" || !c.dead) continue;
+    c._reviveCd = Math.max(0, (Number(c._reviveCd) || 0) - simDt);
+    if (c._reviveCd > 0) continue;
+    c.dead = false;
+    c.hp = c.maxHp;
+    c.state = "CRAWL";
+    c.x = spawnXInZone(VAMPIRE_SPAWN_ZONE, c.w, rng);
+    c.y = FLOOR_Y - c.h;
+    c.vx = 0; c.vy = 0;
+    c._platformId = null;
+    c._fightTargetId = null;
+    events.push({ type: "vampireRevive", char: c });
+  }
+}
+
 /** 교전 진입: 멈춰서 대상을 마주본다 (핑 추적 종료) */
 function engage(c, target) {
   c.state = "FIGHT";
@@ -188,7 +207,9 @@ function disengage(c) {
  *    유지 중에는 쿨다운마다 공격.
  * 3) 처치: Holy Shrimp가 Vamp Shrimp 진영에게 죽으면 그 자리에서 Jombie Shrimp로 전염.
  *    Vamp Shrimp는 dead 마크(부활 대상), Jombie Shrimp는 제거.
- * @returns {Array<object>} events — engage/hit/kill/infect/levelup (연출·보상용)
+ * 4) 자동 부활: dead 마크된 Vamp Shrimp는 사망 시 걸린 쿨타임(5초+레벨×1초)이
+ *    다 되면 웨이브 중이라도 왼쪽 아래 스폰 존에서 자동으로 되살아난다.
+ * @returns {Array<object>} events — engage/hit/kill/infect/levelup/vampireRevive (연출·보상용)
  */
 export function tickCombat(state, simDt) {
   const events = [];
@@ -297,12 +318,14 @@ export function tickCombat(state, simDt) {
       t.dead = true;
       t.state = "DEAD";
       t._fightTargetId = null;
+      if (t.side === "vampire") t._reviveCd = vampireReviveCooldown(t.level);
       events.push({ type: "kill", target: t });
     }
   }
 
   tickSlaveDecay(state, simDt, events);
   tickPoison(state, simDt, events);
+  tickVampireAutoRevive(state, simDt, events);
 
   // Jombie/Holy Shrimp 시체는 제거 (Vamp Shrimp 시체는 부활 대상으로 보존)
   state.chars.items = state.chars.items.filter((c) => !c.dead || c.side === "vampire");

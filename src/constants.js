@@ -105,6 +105,14 @@ export const ENGAGE_RANGE = 34;       // 교전 시작 거리 (중심 간 px)
 export const FIGHT_BREAK_RANGE = 48;  // 이 거리보다 멀어지면 교전 해제
 export const ENGAGE_MAX_DY = 26;      // 교전 가능한 최대 높이 차 (중심 기준)
 export const ATTACK_COOLDOWN_S = 1.0; // 공격 주기(초)
+/** 베이스 코어를 공격하는 주기(초) — 일반 공격 주기와 동일하게 맞춘다 */
+export const BASE_SIEGE_COOLDOWN_S = ATTACK_COOLDOWN_S;
+
+// ── Vamp Shrimp 자동 부활 (웨이브 중 사망 시) ──
+/** 사망 후 자동 부활까지 대기 시간(초) = 기본 5초 + 레벨×1초 */
+export function vampireReviveCooldown(level) {
+  return 5 + Math.max(1, Math.floor(level) || 1);
+}
 
 // ── Holy Shrimp 투사체(파란새우 원거리 공격) ──
 export const HUMAN_PROJECTILE_RANGE = DETECT_RANGE.human; // 인식 범위 안에 들어온 적에게 투척

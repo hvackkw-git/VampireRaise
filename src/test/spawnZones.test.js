@@ -2,11 +2,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { createInitialState, createCharacter } from "../state/gameState.js";
 import {
-  startWave, tickWaves, reviveVampires, tickBaseInvasion, humansAlive,
+  startWave, tickWaves, reviveVampires, tickBaseSiege, humansAlive,
 } from "../game/waves.js";
 import {
   HUMAN_SPAWN_ZONE, VAMPIRE_SPAWN_ZONE, FLOOR_Y, CHAR_SIZE,
-  humanCountForWave, BASE_CORE_HP,
+  humanCountForWave, BASE_CORE_HP, BASE_SIEGE_COOLDOWN_S,
 } from "../constants.js";
 
 function inZoneX(x, size, zone) {
@@ -71,23 +71,46 @@ describe("베이스 코어 (뱀파이어 존 침입)", () => {
     expect(state.core.max).toBe(BASE_CORE_HP);
   });
 
-  it("인간이 뱀파이어 존에 도달하면 코어가 1 줄고 그 인간은 제거된다", () => {
+  it("인간이 뱀파이어 존에 도달하면 건물처럼 공격 주기마다 코어가 1씩 줄고, 그 인간은 제거되지 않는다", () => {
     state.chars.items = [];
     const h = createCharacter(state, "human", {
       x: VAMPIRE_SPAWN_ZONE.x, y: FLOOR_Y - CHAR_SIZE, state: "CRAWL",
     });
+    h._siegeCd = 0; // 첫 공격이 이번 틱에 나가도록
     const before = state.core.hp;
-    const events = tickBaseInvasion(state);
+    const events = tickBaseSiege(state, 0.1);
     expect(events.some((e) => e.type === "invade")).toBe(true);
     expect(state.core.hp).toBe(before - 1);
-    expect(state.chars.items.includes(h)).toBe(false);
+    expect(state.chars.items.includes(h)).toBe(true); // 제거되지 않는다
+
+    // 공격 주기가 다 차기 전까지는 더 깎이지 않는다
+    const midEvents = tickBaseSiege(state, BASE_SIEGE_COOLDOWN_S - 0.05);
+    expect(midEvents.length).toBe(0);
+    expect(state.core.hp).toBe(before - 1);
+
+    // 다음 공격 주기가 돌아오면 다시 1 깎인다
+    const nextEvents = tickBaseSiege(state, 0.1);
+    expect(nextEvents.some((e) => e.type === "invade")).toBe(true);
+    expect(state.core.hp).toBe(before - 2);
+  });
+
+  it("교전(FIGHT) 중인 인간은 코어를 공격하지 않는다", () => {
+    state.chars.items = [];
+    const h = createCharacter(state, "human", {
+      x: VAMPIRE_SPAWN_ZONE.x, y: FLOOR_Y - CHAR_SIZE, state: "FIGHT",
+    });
+    h._siegeCd = 0;
+    const before = state.core.hp;
+    const events = tickBaseSiege(state, 0.1);
+    expect(events.length).toBe(0);
+    expect(state.core.hp).toBe(before);
   });
 
   it("존 밖(공중 낙하 중)의 인간은 코어를 줄이지 않는다", () => {
     state.chars.items = [];
     createCharacter(state, "human", { x: VAMPIRE_SPAWN_ZONE.x, y: -CHAR_SIZE, state: "FALL" });
     const before = state.core.hp;
-    const events = tickBaseInvasion(state);
+    const events = tickBaseSiege(state, 0.1);
     expect(events.length).toBe(0);
     expect(state.core.hp).toBe(before);
   });
@@ -99,9 +122,10 @@ describe("베이스 코어 (뱀파이어 존 침입)", () => {
     state.chars.items = [];
     const vamp = createCharacter(state, "vampire");
     vamp.dead = true;
-    createCharacter(state, "human", {
+    const h = createCharacter(state, "human", {
       x: VAMPIRE_SPAWN_ZONE.x, y: FLOOR_Y - CHAR_SIZE, state: "CRAWL",
     });
+    h._siegeCd = 0; // 이번 틱에 즉시 공격하도록
     const events = tickWaves(state, 0.1, () => 0.5);
     expect(events.some((e) => e.type === "gameover")).toBe(true);
     expect(state.core.hp).toBe(state.core.max);

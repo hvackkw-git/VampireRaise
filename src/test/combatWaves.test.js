@@ -11,9 +11,10 @@ import {
 } from "../game/waves.js";
 import {
   humanCountForWave, humanStatsForWave, expToNext, SLAVE_BASE,
-  accountExpForWave, accountExpToNext, FLOOR_Y,
+  accountExpForWave, accountExpToNext, FLOOR_Y, VAMPIRE_SPAWN_ZONE,
   REBIRTH_MAX_VAMPIRES, rebirthWaveRequirement,
   INITIAL_VAMPIRE_COUNT, INITIAL_VAMPIRE_LEVEL, vampireStatsForLevel,
+  vampireReviveCooldown,
 } from "../constants.js";
 
 let state;
@@ -279,6 +280,31 @@ describe("전투와 전염", () => {
     expect(state.chars.items.includes(slave)).toBe(false); // 노예 제거
     expect(state.chars.items.includes(vamp)).toBe(true);   // 뱀파이어 보존
     expect(vamp.dead).toBe(true);
+  });
+
+  it("사망한 뱀파이어는 5초+레벨×1초 쿨타임 후 자동 부활한다", () => {
+    const vamp = state.chars.items[0];
+    state.chars.items = [vamp];
+    vamp.level = 3;
+    const human = createCharacter(state, "human", {
+      x: vamp.x + 8, y: vamp.y, maxHp: 9999, atk: 9999, level: 1,
+    });
+    human._atkCd = 0;
+    expect(vampireReviveCooldown(3)).toBe(8);
+    tickCombat(state, 0.1); // 이 틱에 사망 + 부활 카운트다운 0.1초 소진
+    expect(vamp.dead).toBe(true);
+    expect(vamp._reviveCd).toBeCloseTo(7.9);
+
+    tickCombat(state, 7.8); // 쿨타임이 다 차기 직전
+    expect(vamp.dead).toBe(true);
+
+    tickCombat(state, 0.2); // 쿨타임 만료 — 자동 부활
+    expect(vamp.dead).toBe(false);
+    expect(vamp.hp).toBe(vamp.maxHp);
+    expect(vamp.state).toBe("CRAWL");
+    expect(vamp.y).toBe(FLOOR_Y - vamp.h);
+    expect(vamp.x).toBeGreaterThanOrEqual(VAMPIRE_SPAWN_ZONE.x);
+    expect(vamp.x + vamp.w).toBeLessThanOrEqual(VAMPIRE_SPAWN_ZONE.x + VAMPIRE_SPAWN_ZONE.w);
   });
 
   it("경험치 누적으로 레벨업하며 스탯 성장", () => {

@@ -62,6 +62,8 @@ export function createCharacter(state, side, opts = {}) {
     _dashCd: 0,
     _atkCd: Math.random(),      // 첫 공격 타이밍 분산
     _projectileCd: Math.random(), // Holy Shrimp 투사체 첫 발사 타이밍 분산
+    _siegeCd: Math.random(),    // 베이스 코어 공격 타이밍 분산 (Holy Shrimp)
+    _reviveCd: 0,                // 사망한 Vamp Shrimp 자동 부활까지 남은 시간(초)
     // ── 성장 ──
     level: opts.level ?? 1,
     exp: 0,

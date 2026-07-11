@@ -482,7 +482,7 @@ export function renderCombatEvents(events) {
     } else if (ev.type === "shieldBlock") {
       const v = visualBounds(ev.target);
       spawnFloatText(v.x - 6, v.top - 8, `🛡${ev.absorbed}`, "fx-shieldblock");
-    } else if (ev.type === "zombieRevive") {
+    } else if (ev.type === "zombieRevive" || ev.type === "vampireRevive") {
       const v = visualBounds(ev.char);
       spawnFloatText(ev.char.x, v.top - 14, t("events.revive"), "fx-infect");
     } else if (ev.type === "zombiePoisonExplosion") {
