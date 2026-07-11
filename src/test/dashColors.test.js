@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   DASH_COLORS, DASH_COLOR_HEX, defaultDashColors, DEFAULT_DASH_POINTS,
-  dashGhostCount, allocateGhostSlots, dashGhostColorSequence, ghostColorAtProgress,
+  dashGhostCount, dashColorCycle, dashGhostColorSequence, ghostColorAtProgress,
   investDashColor, resetDashColors, normalizeDashPoints,
   BASE_DETECT_RANGE, effectiveDetectRange, revengeAttackMult, dashDistanceMult,
   detectRangeMult, investDetect,
@@ -17,21 +17,9 @@ function memoryStorage() {
   };
 }
 
-// 결정적 테스트용 시드 RNG(선형 합동). 시드를 먼저 섞어 순차 시드끼리도 잘 흩어지게 한다.
-function seededRng(seed = 1) {
-  let s = ((seed * 2654435761) >>> 0) ^ 0x9e3779b9;
-  const next = () => {
-    s = (s * 1664525 + 1013904223) >>> 0;
-    return s / 0x100000000;
-  };
-  next(); next(); // 워밍업
-  return next;
-}
-
-function tally(seq) {
-  const t = {};
-  for (const c of seq) t[c] = (t[c] || 0) + 1;
-  return t;
+/** 사이클을 N개까지 타일링(시퀀스를 새우→꼬리 순으로 읽은 것과 같아야 한다) */
+function tiled(cycle, n) {
+  return Array.from({ length: n }, (_, i) => cycle[i % cycle.length]);
 }
 
 describe("Dash 잔상 색 로직", () => {
@@ -51,62 +39,44 @@ describe("Dash 잔상 색 로직", () => {
     expect(dashGhostCount({ red: 20, orange: 20 })).toBeLessThanOrEqual(18);
   });
 
-  it("분배 슬롯 합은 항상 정확히 N", () => {
-    const rng = seededRng(42);
-    const points = { red: 3, orange: 2, blue: 1 };
-    const N = dashGhostCount(points);
-    for (let i = 0; i < 50; i++) {
-      const slots = allocateGhostSlots(points, N, rng);
-      const sum = Object.values(slots).reduce((a, b) => a + b, 0);
-      expect(sum).toBe(N);
-    }
+  it("사이클: 최소 투자량을 1단위로 round(points/min) 반복 (0 제외)", () => {
+    // 빨6 주2 → 최소 2 → 빨3 주1
+    expect(dashColorCycle({ red: 6, orange: 2 })).toEqual(["red", "red", "red", "orange"]);
+    // 빨10 주3 초2 → 최소 2 → 빨5 주2(반올림) 초1
+    expect(dashColorCycle({ red: 10, orange: 3, green: 2 })).toEqual([
+      "red", "red", "red", "red", "red", "orange", "orange", "green",
+    ]);
+    // 빨1 주1 노1 초1 → 빨주노초
+    expect(dashColorCycle({ red: 1, orange: 1, yellow: 1, green: 1 })).toEqual([
+      "red", "orange", "yellow", "green",
+    ]);
+    // 0 투자 색은 제외
+    expect(dashColorCycle({ red: 4, orange: 0, blue: 2 })).toEqual(["red", "red", "blue"]);
+    // 투자 없음 → 전부 빨강 안전장치
+    expect(dashColorCycle({})).toEqual(["red"]);
   });
 
   it("빨강만 있으면 전부 빨강", () => {
-    const seq = dashGhostColorSequence({ red: 1 }, { rng: seededRng(7) });
+    const seq = dashGhostColorSequence({ red: 1 });
     expect(new Set(seq)).toEqual(new Set(["red"]));
     expect(seq.length).toBe(dashGhostCount({ red: 1 }));
   });
 
-  it("빨강+주황이면 새우 근처(끝)는 빨강, 꼬리(앞)는 주황", () => {
-    const seq = dashGhostColorSequence({ red: 3, orange: 3 }, { rng: seededRng(3) });
-    expect(seq[seq.length - 1]).toBe("red"); // 새우 근처
-    expect(seq[0]).toBe("orange");           // 꼬리
+  it("결정적: 시퀀스는 사이클을 N개까지 타일링한 뒤 뒤집은 것(새우 근처=사이클 첫 색)", () => {
+    const points = { red: 6, orange: 2 };
+    const seq = dashGhostColorSequence(points);
+    const N = dashGhostCount(points);
+    expect(seq).toHaveLength(N);
+    expect(seq[seq.length - 1]).toBe("red"); // 새우 근처 = 사이클 첫 색
+    // 새우→꼬리로 읽으면(역순) 사이클 타일링과 같다
+    expect([...seq].reverse()).toEqual(tiled(dashColorCycle(points), N));
   });
 
-  it("골고루 찍으면 무지개(모든 색이 최소 1번, 팔레트 순서)", () => {
-    const points = { red: 3, orange: 3, yellow: 3, green: 3, blue: 3, purple: 3, white: 3 };
-    const seq = dashGhostColorSequence(points, { rng: seededRng(11) });
-    const t = tally(seq);
-    for (const c of DASH_COLORS) expect(t[c]).toBeGreaterThan(0);
-    // 시퀀스는 팔레트 역순(끝이 빨강)으로 단조 정렬 — 색 경계가 한 번씩만 바뀐다
-    const order = DASH_COLORS.slice().reverse();
-    let idx = 0;
-    for (const c of seq) {
-      while (order[idx] !== c) idx++;
-      expect(idx).toBeLessThan(order.length);
-    }
-  });
-
-  it("치우친 포인트는 그 색이 가장 많다", () => {
-    const seq = dashGhostColorSequence({ red: 10, blue: 1 }, { rng: seededRng(99) });
-    const t = tally(seq);
-    expect(t.red).toBeGreaterThan(t.blue ?? 0);
-  });
-
-  it("기대치 1 미만의 작은 색은 시드에 따라 안 나올 수 있다(운)", () => {
-    // 빨강이 지배적 → 파랑 기대 슬롯 < 1 → 일부 시드에서는 파랑 0
-    const points = { red: 12, blue: 1 }; // N=18, 파랑 기대 ≈ 18/13 ≈ 1.38 → 조정 위해 더 치우치게
-    const skewed = { red: 30, blue: 1 };
-    let missing = 0, present = 0;
-    for (let s = 1; s <= 30; s++) {
-      const seq = dashGhostColorSequence(skewed, { rng: seededRng(s) });
-      if (seq.includes("blue")) present++; else missing++;
-    }
-    expect(missing).toBeGreaterThan(0); // 운 나쁘면 안 나옴
-    expect(present).toBeGreaterThan(0); // 운 좋으면 나옴
-    // points는 참조만(캡 확인)
-    expect(dashGhostCount(points)).toBeLessThanOrEqual(18);
+  it("빨주노초 반복: 새우에서 바깥으로 빨주노초빨주노초…", () => {
+    const points = { red: 1, orange: 1, yellow: 1, green: 1 };
+    const seq = dashGhostColorSequence(points);
+    const fromShrimp = [...seq].reverse(); // 새우(마지막 index)부터 바깥으로
+    expect(fromShrimp).toEqual(tiled(["red", "orange", "yellow", "green"], seq.length));
   });
 
   it("뱀파이어 기본 dashColors는 복수 1포인트, 저장·복원된다", () => {

@@ -34,13 +34,13 @@ export function effectiveDetectRange(char) {
 //   ├───┼──────┼─────────────────────┼──────────────────────┼───────────────┤
 //   │ O │ 빨강 │ 복수(피격 시 공격력)│ ×1.0 → 1.1 → 1.2     │ combat 피격    │
 //   │ O │ 주황 │ 거리(돌진 사거리)   │ ×2 → 2.1 → 2.2       │ ai 돌진 예산   │
-//   │   │ 노랑 │ 경로상 적 데미지    │ dmg×0.1 → 0.2        │ ai 돌진 틱     │
-//   │   │ 초록 │ 연타 확률           │ 0% → 10%             │ combat 공격 롤 │
-//   │   │ 파랑 │ 도착 후 폭발        │ dmg×0.1 → 0.2        │ ai endDash     │
-//   │   │ 보라 │ 도착 후 실드(5초)   │ Hp×0.1 → 0.2         │ ai endDash     │
-//   │   │ 하양 │ 도착 후 스턴(인간)  │ 1초 → 2초            │ ai endDash     │
+//   │ O │ 노랑 │ 경로상 적 데미지    │ dmg×0.1 → 0.2        │ dashEffects/틱 │
+//   │ O │ 초록 │ 연타 확률           │ 0% → 10% → 20%       │ combat 공격 롤 │
+//   │ O │ 파랑 │ 도착 후 폭발        │ dmg×0.1 → 0.2        │ dashEffects/도착│
+//   │ O │ 보라 │ 도착 후 실드(5초)   │ Hp×0.1 → 0.2         │ dashEffects/도착│
+//   │ O │ 하양 │ 도착 후 스턴(인간)  │ 1초 → 2초            │ dashEffects/도착│
 //   └───┴──────┴─────────────────────┴──────────────────────┴───────────────┘
-//   빨강=revengeAttackMult(), 주황=dashDistanceMult(). 나머지 색 헬퍼는 이 자리에 이어 추가.
+//   헬퍼: revenge/dashDistance/pathDamage/multiHit/explosionDamage/shieldHp/stunSeconds Mult.
 //   포인트 출처: 현재는 char.dashColors 맵(독립). 향후 스킬트리 노드 습득 → dashColors 반영 배선 필요.
 //   ─ 색 외 스킬 ─ 인식범위(detectPoints): 포인트당 ×1.1 → detectRangeMult()/effectiveDetectRange().
 //     실제 감지·돌진 예산·잔상 개수·감지 원 시각에 모두 반영된다.
@@ -166,91 +166,63 @@ export function revengeAttackMult(points = {}) {
 export function dashDistanceMult(points = {}, base = DASH_ROUTE_MULT) {
   return base + 0.1 * Math.max(0, Number(points.orange) || 0);
 }
+/** 노랑 · 경로 데미지: 돌진 경로에서 스친 적에게 공격력×(0.1·노랑) 피해 */
+export function pathDamageMult(points = {}) {
+  return 0.1 * Math.max(0, Number(points.yellow) || 0);
+}
+/** 초록 · 연타: 근접 공격이 한 번 더 나갈 확률 (포인트당 +10%, 최대 100%) */
+export function multiHitChance(points = {}) {
+  return Math.min(1, 0.1 * Math.max(0, Number(points.green) || 0));
+}
+/** 파랑 · 폭발: 도착 지점 주변 적에게 공격력×(0.1·파랑) 폭발 피해 */
+export function explosionDamageMult(points = {}) {
+  return 0.1 * Math.max(0, Number(points.blue) || 0);
+}
+/** 보라 · 실드: 도착 시 최대 HP×(0.1·보라) 흡수 실드(지속 5초) */
+export function shieldHpMult(points = {}) {
+  return 0.1 * Math.max(0, Number(points.purple) || 0);
+}
+/** 하양 · 스턴: 도착 시 대상(인간) 스턴 지속(초) — 포인트당 1초 */
+export function stunSeconds(points = {}) {
+  return 1.0 * Math.max(0, Number(points.white) || 0);
+}
 
 /**
- * 색상별 잔상 슬롯 개수를 정한다. 합은 정확히 N.
- * - 기대 슬롯 = N · weight/Σweight
- * - 정수부는 확정 배분, 남는 슬롯은 소수부를 가중치로 랜덤 배정(랜덤 라운딩).
- *   → 포인트가 큰 색은 확정으로 나오고, 포인트가 작아 기대치가 1 미만인 색은
- *     "운이 좋아야" 나온다(노트: 작은 포인트 색은 운 나쁘면 안 나올 수도).
+ * 잔상 "한 사이클" 구성. 투자된(0 제외) 색 중 최소 투자량을 1단위로 보고,
+ * 각 색의 반복 수 = round(points / min). 팔레트 순서(빨→…→하)로 펼친다.
+ * 예) 빨6 주2 → [빨,빨,빨,주] · 빨10 주3 초2 → [빨×5,주×2,초×1] · 빨1주1노1초1 → [빨,주,노,초]
  * @param {{[color:string]: number}} points
- * @param {number} N 총 잔상 개수
- * @param {() => number} [rng]
- * @returns {{[color:string]: number}} 색 → 슬롯 개수
+ * @returns {string[]} 사이클(최소 길이 1)
  */
-export function allocateGhostSlots(points, N, rng = Math.random) {
-  const weights = DASH_COLORS.map((c) => Math.max(0, Number(points[c]) || 0));
-  const total = weights.reduce((a, b) => a + b, 0);
-  const counts = new Array(DASH_COLORS.length).fill(0);
-  if (N <= 0) return {};
-  if (total <= 0) {
-    counts[0] = N; // 안전장치: 포인트가 전무하면 전부 빨강
-    return toColorMap(counts);
+export function dashColorCycle(points = {}) {
+  const nz = DASH_COLORS
+    .map((c) => [c, Math.max(0, Number(points[c]) || 0)])
+    .filter(([, v]) => v > 0);
+  if (nz.length === 0) return ["red"]; // 안전장치: 투자 없음 → 전부 빨강
+  const min = Math.min(...nz.map(([, v]) => v));
+  const cycle = [];
+  for (const [color, v] of nz) {
+    const reps = Math.max(1, Math.round(v / min));
+    for (let k = 0; k < reps; k++) cycle.push(color);
   }
-
-  const fracs = [];
-  let assigned = 0;
-  for (let i = 0; i < weights.length; i++) {
-    const exact = (N * weights[i]) / total;
-    const base = Math.floor(exact);
-    counts[i] = base;
-    assigned += base;
-    if (weights[i] > 0) fracs.push({ i, frac: exact - base });
-  }
-
-  // 남은 슬롯을 소수부 가중치로 무작위 배정(비복원)
-  let remaining = N - assigned;
-  const pool = fracs.filter((f) => f.frac > 0);
-  while (remaining > 0 && pool.length > 0) {
-    const sum = pool.reduce((a, f) => a + f.frac, 0);
-    let r = rng() * sum;
-    let pick = pool.length - 1;
-    for (let k = 0; k < pool.length; k++) {
-      r -= pool[k].frac;
-      if (r <= 0) { pick = k; break; }
-    }
-    counts[pool[pick].i] += 1;
-    pool.splice(pick, 1);
-    remaining -= 1;
-  }
-  // 소수부가 모두 0인데 남으면(정수 비율) 가중치 큰 색부터 채운다
-  while (remaining > 0) {
-    let best = 0;
-    for (let i = 1; i < weights.length; i++) if (weights[i] > weights[best]) best = i;
-    counts[best] += 1;
-    remaining -= 1;
-  }
-  return toColorMap(counts);
-}
-
-function toColorMap(counts) {
-  const out = {};
-  for (let i = 0; i < DASH_COLORS.length; i++) {
-    if (counts[i] > 0) out[DASH_COLORS[i]] = counts[i];
-  }
-  return out;
+  return cycle;
 }
 
 /**
- * 잔상 색 시퀀스(스폰/진행도 순). index 0 = 새우에서 가장 먼 꼬리 쪽,
- * 마지막 index = 새우에 가장 가까운 앞쪽. 팔레트 앞 색(빨강)을 앞쪽(새우 근처)에 둔다.
- * → 골고루면 무지개, 빨강+주황만 있으면 새우 근처 빨강 / 꼬리 쪽 주황.
+ * 잔상 색 시퀀스(진행도 순). index 0 = 새우에서 가장 먼 꼬리, 마지막 = 새우에 가장 가까운 앞쪽.
+ * dashColorCycle을 잔상 개수 N만큼 반복 타일링한 뒤 뒤집어, 새우 근처가 사이클 첫 색(빨강)이 되게 한다.
  * @param {{[color:string]: number}} points
- * @param {{ rng?: () => number, detectRange?: number }} [opts]
- * @returns {string[]} 길이 N, 각 원소는 색상 키
+ * @param {{ detectRange?: number }} [opts]
+ * @returns {string[]} 길이 N
  */
 export function dashGhostColorSequence(points = {}, opts = {}) {
-  const { rng = Math.random, detectRange = BASE_DETECT_RANGE } = opts;
+  const { detectRange = BASE_DETECT_RANGE } = opts;
   const N = dashGhostCount(points, detectRange);
-  const slots = allocateGhostSlots(points, N, rng);
-  // 팔레트 순서(빨→…→하)로 펼친다: [빨,빨,주,주,…]
-  const palette = [];
-  for (const color of DASH_COLORS) {
-    for (let k = 0; k < (slots[color] || 0); k++) palette.push(color);
-  }
-  // 앞쪽(새우 근처) = 빨강이 되도록 뒤집는다: 마지막 원소가 팔레트 첫 색(빨강)
-  palette.reverse();
-  return palette;
+  const cycle = dashColorCycle(points);
+  const seq = [];
+  for (let i = 0; i < N; i++) seq.push(cycle[i % cycle.length]);
+  seq.reverse(); // 새우 근처(마지막 index) = 사이클 첫 색
+  return seq;
 }
 
 /**

@@ -1,26 +1,27 @@
 import {
-  SKILL_BY_ID, SKILL_TREE, learnSkill, normalizeSkillProgress, skillStatus,
+  SKILL_BY_ID, SKILL_TREE, normalizeSkillProgress,
 } from "../skills/skillTree.js";
 import {
-  DASH_COLORS, DASH_COLOR_HEX, dashGhostCount, investDashColor,
+  DASH_COLOR_HEX, dashGhostCount, investDashColor, investDetect,
   normalizeDashPoints, resetDashColors, effectiveDetectRange,
-  revengeAttackMult, dashDistanceMult, detectRangeMult, investDetect,
+  revengeAttackMult, dashDistanceMult, detectRangeMult,
 } from "../skills/dashColors.js";
 
-const DASH_COLOR_LABEL = {
-  red: "빨강 · 복수", orange: "주황 · 거리", yellow: "노랑 · 경로데미지",
-  green: "초록 · 연타", blue: "파랑 · 폭발", purple: "보라 · 실드", white: "하양 · 스턴",
-};
+/** dash 스킬의 현재 투자 포인트 */
+function dashInvested(char, dash) {
+  if (!dash) return 0;
+  return dash.kind === "detect" ? (char.detectPoints || 0) : (char.dashColors[dash.key] || 0);
+}
 
-const SVG_NS = "http://www.w3.org/2000/svg";
-
-function statusLabel(status) {
-  if (status.state === "learned") return "습득 완료";
-  if (status.state === "available") return "습득 가능 · SP 1";
-  if (status.state === "level") return `Lv.${status.skill.requiredLevel} 필요`;
-  if (status.state === "prerequisite") return "선행 슬롯 필요";
-  if (status.state === "points") return "SP 부족";
-  return "사용 불가";
+/** dash 스킬의 현재 효과값 문자열(구현된 것만 수치, 나머지는 빈 문자열) */
+function dashEffectValue(char, dash) {
+  if (!dash) return "";
+  if (dash.key === "red") return ` · 현재 ×${revengeAttackMult(char.dashColors).toFixed(1)}`;
+  if (dash.key === "orange") return ` · 현재 ×${dashDistanceMult(char.dashColors).toFixed(1)}`;
+  if (dash.kind === "detect") {
+    return ` · 현재 ×${detectRangeMult(char.detectPoints).toFixed(1)} (${Math.round(effectiveDetectRange(char))}px)`;
+  }
+  return "";
 }
 
 export function initSkillTreePanel({ getCharacter, onChange, onOpenChange } = {}) {
@@ -28,122 +29,50 @@ export function initSkillTreePanel({ getCharacter, onChange, onOpenChange } = {}
   const owner = document.getElementById("skillTreeOwner");
   const level = document.getElementById("skillTreeLevel");
   const points = document.getElementById("skillTreePoints");
-  const lines = document.getElementById("skillTreeLines");
   const nodes = document.getElementById("skillTreeNodes");
   const detail = document.getElementById("skillTreeDetail");
   const closeButton = document.getElementById("btnSkillTreeClose");
-  const dashRows = document.getElementById("dashColorRows");
   const dashGhostN = document.getElementById("dashGhostN");
   const dashPointsLeft = document.getElementById("dashPointsLeft");
   const dashResetBtn = document.getElementById("btnDashReset");
-  const dashDetectInfo = document.getElementById("dashDetectInfo");
-  const detectPlusBtn = document.getElementById("btnDetectPlus");
-  const dashCountEls = new Map(); // color → 개수 표시 span
-  const dashLabelEls = new Map(); // color → 라벨 span(효과값 갱신용)
   const nodeEls = new Map();
-  const lineEls = [];
-  let selectedSkillId = SKILL_TREE[0].id;
+  let selectedSkillId = SKILL_TREE.find((s) => s.dash)?.id ?? SKILL_TREE[0].id;
 
-  // Dash 색상 투자 행: 색별 스와치 + 개수 + "+" 버튼. 레벨 제한 없이 포인트만 있으면 투자.
-  for (const color of DASH_COLORS) {
-    const row = document.createElement("div");
-    row.className = "dash-alloc-row";
-    const swatch = document.createElement("span");
-    swatch.className = "dash-swatch";
-    swatch.style.background = DASH_COLOR_HEX[color];
-    const label = document.createElement("span");
-    label.className = "dash-alloc-label";
-    label.textContent = DASH_COLOR_LABEL[color] ?? color;
-    const count = document.createElement("strong");
-    count.className = "dash-alloc-count";
-    count.textContent = "0";
-    const plus = document.createElement("button");
-    plus.type = "button";
-    plus.className = "dash-alloc-plus";
-    plus.textContent = "+";
-    plus.setAttribute("aria-label", `${DASH_COLOR_LABEL[color] ?? color} 투자`);
-    plus.addEventListener("click", () => {
-      const char = getCharacter?.();
-      if (investDashColor(char, color)) { onChange?.(char); render(); }
-    });
-    row.append(swatch, label, count, plus);
-    dashRows?.appendChild(row);
-    dashCountEls.set(color, count);
-    dashLabelEls.set(color, label);
-  }
-  detectPlusBtn?.addEventListener("click", () => {
-    const char = getCharacter?.();
-    if (investDetect(char)) { onChange?.(char); render(); }
-  });
   dashResetBtn?.addEventListener("click", () => {
     const char = getCharacter?.();
-    if (char && resetDashColors(char) >= 0) { onChange?.(char); render(); }
+    if (char) { resetDashColors(char); onChange?.(char); render(); }
   });
 
+  // 노드 생성: dash 슬롯은 색/개수 표시 + 클릭 투자, 빈 슬롯은 비활성.
   for (const skill of SKILL_TREE) {
-    for (const parentId of skill.parents) {
-      const parent = SKILL_BY_ID.get(parentId);
-      if (!parent) continue;
-      const path = document.createElementNS(SVG_NS, "path");
-      const midY = (parent.y + skill.y) / 2;
-      path.setAttribute("d", `M ${parent.x} ${parent.y} V ${midY} H ${skill.x} V ${skill.y}`);
-      path.dataset.from = parent.id;
-      path.dataset.to = skill.id;
-      lines.appendChild(path);
-      lineEls.push(path);
-    }
-
     const button = document.createElement("button");
     button.type = "button";
     button.className = "skill-tree-node";
     button.dataset.skillId = skill.id;
     button.style.left = `${skill.x}%`;
     button.style.top = `${skill.y}%`;
-    button.innerHTML = `<span class="skill-node-level">${skill.requiredLevel}</span><span class="skill-node-check" aria-hidden="true">✓</span>`;
+    if (skill.dash) {
+      button.classList.add("dash-node", `dash-node-${skill.dash.kind}`);
+      if (skill.dash.kind === "color") {
+        button.style.setProperty("--dash-color", DASH_COLOR_HEX[skill.dash.key]);
+      }
+      button.innerHTML = '<span class="skill-node-count">0</span>';
+    } else {
+      button.classList.add("empty-node");
+    }
     button.addEventListener("click", () => {
       selectedSkillId = skill.id;
       const char = getCharacter?.();
-      const result = learnSkill(char, skill.id);
-      if (result.learnedNow) onChange?.(char, skill);
+      if (char && skill.dash) {
+        const ok = skill.dash.kind === "detect"
+          ? investDetect(char)
+          : investDashColor(char, skill.dash.key);
+        if (ok) onChange?.(char);
+      }
       render();
     });
     nodes.appendChild(button);
     nodeEls.set(skill.id, button);
-  }
-
-  function renderDashColors(char) {
-    const disabled = !char;
-    if (dashResetBtn) dashResetBtn.disabled = disabled;
-    if (detectPlusBtn) detectPlusBtn.disabled = disabled;
-    if (disabled) {
-      if (dashGhostN) dashGhostN.textContent = "0";
-      if (dashPointsLeft) dashPointsLeft.textContent = "0";
-      if (dashDetectInfo) dashDetectInfo.textContent = "×1.0";
-      for (const el of dashCountEls.values()) el.textContent = "0";
-      for (const row of dashRows?.children ?? []) row.querySelector(".dash-alloc-plus")?.setAttribute("disabled", "");
-      return;
-    }
-    normalizeDashPoints(char);
-    const noPoints = char.dashPoints <= 0;
-    // 인식범위: 현재 배율 + 실제 반경(px). 포인트가 없을 때만 + 비활성(레벨 제한 없음)
-    if (dashDetectInfo) {
-      dashDetectInfo.textContent = `×${detectRangeMult(char.detectPoints).toFixed(1)} · ${Math.round(effectiveDetectRange(char))}px`;
-    }
-    if (detectPlusBtn) detectPlusBtn.disabled = noPoints;
-    if (dashGhostN) dashGhostN.textContent = String(dashGhostCount(char.dashColors, effectiveDetectRange(char)));
-    if (dashPointsLeft) dashPointsLeft.textContent = String(char.dashPoints);
-    for (const color of DASH_COLORS) {
-      dashCountEls.get(color).textContent = String(char.dashColors[color] || 0);
-    }
-    // 빨강·주황은 실제 스킬 효과값을 라벨에 표기(현재 반영값)
-    const redLabel = dashLabelEls.get("red");
-    if (redLabel) redLabel.textContent = `빨강 · 복수 ×${revengeAttackMult(char.dashColors).toFixed(1)}`;
-    const orangeLabel = dashLabelEls.get("orange");
-    if (orangeLabel) orangeLabel.textContent = `주황 · 거리 ×${dashDistanceMult(char.dashColors).toFixed(1)}`;
-    for (const row of dashRows?.children ?? []) {
-      const plus = row.querySelector(".dash-alloc-plus");
-      if (plus) plus.disabled = noPoints; // 레벨 제한 없음 — 포인트가 없을 때만 비활성
-    }
   }
 
   function render() {
@@ -154,41 +83,48 @@ export function initSkillTreePanel({ getCharacter, onChange, onOpenChange } = {}
       level.textContent = "—";
       points.textContent = "0";
       detail.textContent = "스킬 트리 사용 불가";
+      if (dashGhostN) dashGhostN.textContent = "0";
+      if (dashPointsLeft) dashPointsLeft.textContent = "0";
+      if (dashResetBtn) dashResetBtn.disabled = true;
       for (const button of nodeEls.values()) button.disabled = true;
-      renderDashColors(null);
       return;
     }
 
     normalizeSkillProgress(char);
-    renderDashColors(char);
+    normalizeDashPoints(char);
     const order = Number.isFinite(char.vampireOrder) ? `${char.vampireOrder}번 새우` : "새우";
     owner.textContent = order;
     level.textContent = String(char.level);
     points.textContent = String(char.skillPoints);
-    const learned = new Set(char.learnedSkills);
+    const noPoints = char.dashPoints <= 0;
+    if (dashGhostN) dashGhostN.textContent = String(dashGhostCount(char.dashColors, effectiveDetectRange(char)));
+    if (dashPointsLeft) dashPointsLeft.textContent = String(char.dashPoints);
+    if (dashResetBtn) dashResetBtn.disabled = false;
 
     for (const skill of SKILL_TREE) {
-      const status = skillStatus(char, skill.id);
       const button = nodeEls.get(skill.id);
-      button.disabled = false;
-      button.classList.toggle("learned", status.state === "learned");
-      button.classList.toggle("available", status.state === "available");
-      button.classList.toggle("locked", !["learned", "available"].includes(status.state));
       button.classList.toggle("selected", selectedSkillId === skill.id);
-      button.title = `${skill.name} · Lv.${skill.requiredLevel} · ${statusLabel(status)}`;
-      button.setAttribute("aria-label", button.title);
-    }
-
-    for (const path of lineEls) {
-      const sourceLearned = learned.has(path.dataset.from);
-      const targetLearned = learned.has(path.dataset.to);
-      path.classList.toggle("learned", sourceLearned && targetLearned);
-      path.classList.toggle("active", sourceLearned && !targetLearned);
+      if (skill.dash) {
+        const cur = dashInvested(char, skill.dash);
+        const countEl = button.querySelector(".skill-node-count");
+        if (countEl) countEl.textContent = String(cur);
+        button.classList.toggle("invested", cur > 0);
+        button.disabled = noPoints; // 레벨 제한 없음 — 남은 포인트가 없을 때만 비활성
+        button.title = `${skill.name} · ${cur}p · ${skill.dash.effect}`;
+        button.setAttribute("aria-label", button.title);
+      } else {
+        button.disabled = true;
+        button.title = "빈 슬롯";
+      }
     }
 
     const selected = SKILL_BY_ID.get(selectedSkillId) ?? SKILL_TREE[0];
-    const selectedStatus = skillStatus(char, selected.id);
-    detail.textContent = `${selected.name} · Lv.${selected.requiredLevel} · ${statusLabel(selectedStatus)}`;
+    if (selected.dash) {
+      const cur = dashInvested(char, selected.dash);
+      detail.textContent = `${selected.name} · ${cur}p${dashEffectValue(char, selected.dash)} — ${selected.dash.effect}`;
+    } else {
+      detail.textContent = "빈 슬롯";
+    }
   }
 
   function open() {

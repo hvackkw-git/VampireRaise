@@ -8,7 +8,8 @@ import {
   expToNext, expForKill, LEVELUP_HP_GAIN, LEVELUP_ATK_GAIN, KILL_BLOOD_REWARD,
   CHAR_SPRITES, SLAVE_BASE,
 } from "../constants.js";
-import { revengeAttackMult } from "../skills/dashColors.js";
+import { revengeAttackMult, multiHitChance } from "../skills/dashColors.js";
+import { absorbWithShield } from "./dashEffects.js";
 
 const center = (c) => ({ x: c.x + c.w / 2, y: c.y + c.h / 2 });
 const dist = (a, b) => {
@@ -124,8 +125,14 @@ export function tickCombat(state, simDt) {
   const chars = aliveChars(state);
   const byId = new Map(chars.map((c) => [c.id, c]));
 
-  // 쿨다운은 항상 진행
-  for (const c of chars) c._atkCd -= simDt;
+  // 쿨다운·버프 타이머는 항상 진행
+  for (const c of chars) {
+    c._atkCd -= simDt;
+    if (c._shieldT > 0) { // 보라 실드 지속
+      c._shieldT -= simDt;
+      if (c._shieldT <= 0) { c._shieldT = 0; c._shieldHp = 0; }
+    }
+  }
 
   // 1) 교전 시작
   for (const c of chars) {
@@ -160,14 +167,31 @@ export function tickCombat(state, simDt) {
       c._revengePending = false;
     }
     hitRecords.push({ attacker: c, target: t, dmg });
+    // 초록=연타: 확률로 같은 피해가 한 번 더 나간다.
+    if (c.side === "vampire") {
+      const p = multiHitChance(c.dashColors);
+      if (p > 0 && Math.random() < p) {
+        hitRecords.push({ attacker: c, target: t, dmg });
+        events.push({ type: "multiHit", attacker: c, target: t });
+      }
+    }
+  }
+
+  // 돌진 색상 효과(노랑 경로·파랑 폭발)로 예약된 피해를 합류시켜 처치·전염을 일괄 처리
+  if (state._dashHits?.length) {
+    for (const h of state._dashHits) hitRecords.push(h);
+    state._dashHits = [];
   }
 
   for (const r of hitRecords) {
     if (r.attacker.dead || r.target.dead) continue;
-    r.target.hp -= r.dmg;
+    // 보라=실드: 대상이 실드를 두르고 있으면 피해를 먼저 흡수한다.
+    const { dealt, absorbed } = absorbWithShield(r.target, r.dmg);
+    r.target.hp -= dealt;
+    if (absorbed > 0) events.push({ type: "shieldBlock", target: r.target, absorbed });
     // 빨강=복수: 뱀파이어가 '피격'당하면 다음 공격에 쓸 복수 버프를 예약한다.
     if (r.target.side === "vampire") r.target._revengePending = true;
-    events.push({ type: "hit", attacker: r.attacker, target: r.target, dmg: r.dmg });
+    if (dealt > 0) events.push({ type: "hit", attacker: r.attacker, target: r.target, dmg: dealt });
   }
 
   const killed = [...new Set(hitRecords.map((r) => r.target))].filter((t) => !t.dead && t.hp <= 0);

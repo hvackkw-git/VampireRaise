@@ -10,6 +10,7 @@ import {
 } from "../constants.js";
 import { aliveChars, findNearestEnemy } from "./combat.js";
 import { requestRangedDash } from "./ai.js";
+import { absorbWithShield } from "./dashEffects.js";
 
 const centerOf = (c) => ({ x: c.x + c.w / 2, y: c.y + c.h / 2 });
 
@@ -98,12 +99,15 @@ export function tickHumanProjectiles(state, simDt) {
       if (Math.hypot(cc.x - p.x, cc.y - p.y) <= HUMAN_PROJECTILE_HIT_RADIUS) { hit = c; break; }
     }
     if (!hit) { kept.push(p); continue; }
-    hit.hp -= p.damage;
+    // 보라=실드: 원거리 피해도 실드가 먼저 흡수한다.
+    const { dealt, absorbed } = absorbWithShield(hit, p.damage);
+    hit.hp -= dealt;
     const attacker = byId.get(p.attackerId) ?? null;
     // 빨강=복수: 원거리 피격도 '피격'이므로 복수 버프를 예약한다.
     if (hit.side === "vampire") hit._revengePending = true;
     if (hit.side === "vampire" && attacker) requestRangedDash(hit, attacker.id);
-    events.push({ type: "projectileHit", attacker, target: hit, dmg: p.damage });
+    if (absorbed > 0) events.push({ type: "shieldBlock", target: hit, absorbed });
+    if (dealt > 0) events.push({ type: "projectileHit", attacker, target: hit, dmg: dealt });
     if (hit.hp <= 0) {
       hit.hp = 0;
       hit.dead = true;

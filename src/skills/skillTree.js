@@ -1,28 +1,41 @@
-// Placeholder skill-tree graph. Slots intentionally carry only progression data;
-// real skill effects and artwork can be attached later without changing the UI.
+// 스킬 트리 그래프. MVP: Dash 스킬(7색 + 인식범위)을 슬롯에 배치한다.
+// 배치 규칙 — 왼쪽 열부터 위→아래로 차례대로, 넘치면 다음 열로. 레벨 제한·선행 없음.
+// (스프라이트/아트는 아직 굽지 않음. 색·이름·효과 텍스트만.)
 
 const COLUMN_X = [8, 29, 50, 71, 92];
 const ROW_Y = [8, 25, 42, 59, 76, 93];
-const REQUIRED_LEVELS = [2, 4, 6, 8, 10, 12];
 
-const PARENTS = [
-  [], [], [], [], [],
-  ["skill-01"], ["skill-01"], [], ["skill-04"], ["skill-05"],
-  ["skill-06"], ["skill-06", "skill-07"], ["skill-08"], ["skill-09"], ["skill-10"],
-  ["skill-11"], ["skill-12"], [], ["skill-14"], ["skill-14", "skill-15"],
-  ["skill-16"], ["skill-16", "skill-17"], ["skill-18"], ["skill-19"], ["skill-20"],
-  ["skill-21"], ["skill-22"], ["skill-23"], ["skill-24", "skill-25"], [],
-];
+/** 트리에 올릴 Dash 스킬 정의(배치 순서대로). kind: color=잔상 색, detect=인식범위 */
+export const DASH_SKILL_DEFS = Object.freeze([
+  { key: "red",    kind: "color",  name: "빨강 · 복수",        effect: "피격 시 다음 공격력 ×1.1씩 (구현됨)" },
+  { key: "orange", kind: "color",  name: "주황 · 거리",        effect: "돌진 사거리 배율 +0.1씩 (구현됨)" },
+  { key: "yellow", kind: "color",  name: "노랑 · 경로 데미지", effect: "경로상 적 피해 (미구현)" },
+  { key: "green",  kind: "color",  name: "초록 · 연타",        effect: "연타 확률 (미구현)" },
+  { key: "blue",   kind: "color",  name: "파랑 · 폭발",        effect: "도착 후 폭발 (미구현)" },
+  { key: "purple", kind: "color",  name: "보라 · 실드",        effect: "도착 후 실드 (미구현)" },
+  { key: "white",  kind: "color",  name: "하양 · 스턴",        effect: "도착 후 스턴 (미구현)" },
+  { key: "detect", kind: "detect", name: "인식범위",           effect: "인식 범위 ×1.1씩 (구현됨)" },
+]);
+
+// 열 우선(column-major) 슬롯 인덱스: 왼쪽 열(col0) 위→아래, 그다음 col1 …
+const SLOT_ORDER = [];
+for (let col = 0; col < COLUMN_X.length; col++) {
+  for (let row = 0; row < ROW_Y.length; row++) SLOT_ORDER.push(row * COLUMN_X.length + col);
+}
+const dashByIndex = new Map();
+DASH_SKILL_DEFS.forEach((def, i) => dashByIndex.set(SLOT_ORDER[i], def));
 
 export const SKILL_TREE = Object.freeze(
   Array.from({ length: 30 }, (_, index) => {
     const row = Math.floor(index / 5);
     const col = index % 5;
+    const dash = dashByIndex.get(index) ?? null;
     return Object.freeze({
       id: `skill-${String(index + 1).padStart(2, "0")}`,
-      name: `빈 스킬 ${String(index + 1).padStart(2, "0")}`,
-      requiredLevel: REQUIRED_LEVELS[row],
-      parents: Object.freeze(PARENTS[index]),
+      name: dash ? dash.name : `빈 슬롯 ${String(index + 1).padStart(2, "0")}`,
+      dash, // { key, kind, name, effect } | null
+      requiredLevel: 1,          // 레벨 제한 없음
+      parents: Object.freeze([]), // 선행 없음
       x: COLUMN_X[col],
       y: ROW_Y[row],
     });
@@ -38,25 +51,4 @@ export function normalizeSkillProgress(char) {
   if (!Array.isArray(char.learnedSkills)) char.learnedSkills = [];
   char.learnedSkills = [...new Set(char.learnedSkills.filter((id) => SKILL_BY_ID.has(id)))];
   return char;
-}
-
-export function skillStatus(char, skillId) {
-  const skill = SKILL_BY_ID.get(skillId);
-  if (!char || !skill) return { state: "invalid", skill };
-  normalizeSkillProgress(char);
-  const learned = new Set(char.learnedSkills);
-  if (learned.has(skillId)) return { state: "learned", skill };
-  if ((char.level ?? 1) < skill.requiredLevel) return { state: "level", skill };
-  const missingParents = skill.parents.filter((id) => !learned.has(id));
-  if (missingParents.length) return { state: "prerequisite", skill, missingParents };
-  if (char.skillPoints < 1) return { state: "points", skill };
-  return { state: "available", skill };
-}
-
-export function learnSkill(char, skillId) {
-  const status = skillStatus(char, skillId);
-  if (status.state !== "available") return status;
-  char.skillPoints -= 1;
-  char.learnedSkills.push(skillId);
-  return { state: "learned", skill: status.skill, learnedNow: true };
 }
