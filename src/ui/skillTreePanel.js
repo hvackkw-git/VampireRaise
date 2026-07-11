@@ -1,6 +1,9 @@
 import {
   SKILL_BY_ID, SKILL_TREE, learnSkill, normalizeSkillProgress, skillStatus,
 } from "../skills/skillTree.js";
+import {
+  SKILL_CATEGORIES, CATEGORY_LABEL, COLOR_LABEL, COLOR_KEYS, PATTERN_COLORS, equipColor,
+} from "../skills/skillPatterns.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -21,10 +24,54 @@ export function initSkillTreePanel({ getCharacter, onChange, onOpenChange } = {}
   const lines = document.getElementById("skillTreeLines");
   const nodes = document.getElementById("skillTreeNodes");
   const detail = document.getElementById("skillTreeDetail");
+  const slotsBar = document.getElementById("skillTreeSlots");
   const closeButton = document.getElementById("btnSkillTreeClose");
   const nodeEls = new Map();
+  const slotEls = new Map(); // category → { button, name, chip }
   const lineEls = [];
   let selectedSkillId = SKILL_TREE[0].id;
+
+  // 장착 슬롯: 클릭하면 14색을 순환(비움 포함)해 그 레이어 색을 정한다.
+  for (const category of SKILL_CATEGORIES) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `equip-slot equip-slot-${category}`;
+    button.dataset.category = category;
+    const label = document.createElement("span");
+    label.className = "equip-slot-label";
+    label.textContent = CATEGORY_LABEL[category];
+    const chip = document.createElement("span");
+    chip.className = "equip-slot-chip";
+    const name = document.createElement("span");
+    name.className = "equip-slot-name";
+    button.append(label, chip, name);
+    button.addEventListener("click", () => cycleSlot(category));
+    slotsBar.appendChild(button);
+    slotEls.set(category, { button, name, chip });
+  }
+
+  function cycleSlot(category) {
+    const char = getCharacter?.();
+    if (!char) return;
+    const options = [null, ...COLOR_KEYS];
+    const current = char.equipped?.[category] ?? null;
+    const idx = options.indexOf(current);
+    const next = options[(idx + 1) % options.length];
+    if (equipColor(char, category, next)) onChange?.(char);
+    render();
+  }
+
+  function renderSlots(char) {
+    for (const category of SKILL_CATEGORIES) {
+      const { button, name, chip } = slotEls.get(category);
+      const colorKey = char?.equipped?.[category] ?? null;
+      const known = colorKey && colorKey in PATTERN_COLORS;
+      button.disabled = !char;
+      button.classList.toggle("filled", !!known);
+      name.textContent = known ? COLOR_LABEL[colorKey] : "비어있음";
+      chip.style.background = known ? PATTERN_COLORS[colorKey] : "transparent";
+    }
+  }
 
   for (const skill of SKILL_TREE) {
     for (const parentId of skill.parents) {
@@ -66,6 +113,7 @@ export function initSkillTreePanel({ getCharacter, onChange, onOpenChange } = {}
       points.textContent = "0";
       detail.textContent = "스킬 트리 사용 불가";
       for (const button of nodeEls.values()) button.disabled = true;
+      renderSlots(null);
       return;
     }
 
@@ -94,6 +142,8 @@ export function initSkillTreePanel({ getCharacter, onChange, onOpenChange } = {}
       path.classList.toggle("learned", sourceLearned && targetLearned);
       path.classList.toggle("active", sourceLearned && !targetLearned);
     }
+
+    renderSlots(char);
 
     const selected = SKILL_BY_ID.get(selectedSkillId) ?? SKILL_TREE[0];
     const selectedStatus = skillStatus(char, selected.id);
