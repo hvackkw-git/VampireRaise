@@ -151,12 +151,14 @@ export function tickCombat(state, simDt) {
     c.dir = t.x + t.w / 2 >= c.x + c.w / 2 ? 1 : -1;
     if (c._atkCd > 0) continue;
     c._atkCd = ATTACK_COOLDOWN_S;
+    // TODO(dash색상 효과·미구현): 초록=연타확률(0~10%)로 이 공격이 한 번 더 hitRecords에 추가되는 훅.
     hitRecords.push({ attacker: c, target: t, dmg: c.atk });
   }
 
   for (const r of hitRecords) {
     if (r.attacker.dead || r.target.dead) continue;
     r.target.hp -= r.dmg;
+    // TODO(dash색상 효과·미구현): 빨강=복수 — 뱀파이어가 '피격'당하면 다음 공격력 ×1.1~1.2 버프 훅.
     events.push({ type: "hit", attacker: r.attacker, target: r.target, dmg: r.dmg });
   }
 
