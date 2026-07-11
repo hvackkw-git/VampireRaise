@@ -157,7 +157,7 @@ button { font-family: inherit; color: inherit; }
   background-repeat: no-repeat;
   image-rendering: pixelated;
 }
-/* 스킬 패턴 오버레이: 흰/회색조 마스크 스프라이트를 스킬 색으로 칠해 몸통 위에 겹친다.
+/* 스킬 패턴 오버레이: 색상별로 구운 스프라이트를 몸통 위에 겹친다.
    컨테이너는 몸통과 함께 좌우 반전되고, 각 레이어는 프레임 위치를 몸통과 동기화한다. */
 .char-patterns {
   position: absolute; inset: 0;
@@ -166,7 +166,7 @@ button { font-family: inherit; color: inherit; }
 }
 .char-pattern {
   position: absolute; inset: 0;
-  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  background-repeat: no-repeat;
   image-rendering: pixelated;
 }
 /* 오러 glow: 장착 오러 스킬 색(--aura-glow)으로 드롭섀도우 */

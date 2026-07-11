@@ -9,7 +9,7 @@ import {
   TANK_W, TANK_H, PANEL_H, CHAR_SPRITES, DETECT_RANGE, HUMAN_PROJECTILE_RADIUS,
   HUMAN_SPAWN_ZONE, VAMPIRE_SPAWN_ZONE,
 } from "../constants.js";
-import { LAYER_MASK, getEquippedLayers } from "../skills/skillPatterns.js";
+import { PATTERN_COLORS, getEquippedLayers, bakedPatternPath } from "../skills/skillPatterns.js";
 
 const blockEls = new Map(); // platId → { el, img, lastSrc, lastRot }
 const charEls = new Map();  // charId → { el, sprite, hpFill, lastSide }
@@ -198,8 +198,6 @@ export function renderChars(state, nowMs, ui) {
       for (const layer of ["backline", "rili", "speckle"]) {
         const p = document.createElement("div");
         p.className = `char-pattern char-pattern-${layer}`;
-        p.style.webkitMaskImage = `url('${LAYER_MASK[layer]}')`;
-        p.style.maskImage = `url('${LAYER_MASK[layer]}')`;
         patterns.appendChild(p);
         patternEls[layer] = p;
       }
@@ -224,12 +222,10 @@ export function renderChars(state, nowMs, ui) {
       entry.el.className = `char side-${c.side}`;
       entry.lastSide = c.side;
       entry.lastFrame = -1;
-      // 패턴 마스크 시트도 몸통 스프라이트와 동일 규격(가로 frames칸)으로 맞춘다.
-      const maskSize = `${cfg.size * cfg.frames}px ${cfg.size}px`;
+      // 패턴 스프라이트 시트도 몸통과 동일 규격(가로 frames칸)으로 맞춘다.
+      const sheetSize = `${cfg.size * cfg.frames}px ${cfg.size}px`;
       for (const layer of ["backline", "rili", "speckle"]) {
-        const p = entry.patternEls[layer];
-        p.style.webkitMaskSize = maskSize;
-        p.style.maskSize = maskSize;
+        entry.patternEls[layer].style.backgroundSize = sheetSize;
       }
       entry.lastEquipKey = null; // 진영 변경 시 장착 색 재적용 강제
       // 감지 원: 캐릭터 중심 기준 반경 (진영별, 노예는 작음)
@@ -248,9 +244,7 @@ export function renderChars(state, nowMs, ui) {
       const pos = `${-frame * cfg.size}px 0`;
       entry.sprite.style.backgroundPosition = pos;
       for (const layer of ["backline", "rili", "speckle"]) {
-        const p = entry.patternEls[layer];
-        p.style.webkitMaskPosition = pos;
-        p.style.maskPosition = pos;
+        entry.patternEls[layer].style.backgroundPosition = pos;
       }
       entry.lastFrame = frame;
     }
@@ -260,17 +254,19 @@ export function renderChars(state, nowMs, ui) {
       : "";
     if (entry.lastEquipKey !== equipKey) {
       const layers = getEquippedLayers(c);
-      for (const [layer, key] of [["speckle", "speckle"], ["rili", "rili"], ["backline", "backline"]]) {
+      for (const layer of ["speckle", "rili", "backline"]) {
         const p = entry.patternEls[layer];
-        if (layers[key]) {
-          p.style.backgroundColor = layers[key];
+        const path = layers[layer] && bakedPatternPath(layer, layers[layer]);
+        if (path) {
+          p.style.backgroundImage = `url('${path}')`;
           p.style.display = "";
         } else {
+          p.style.backgroundImage = "";
           p.style.display = "none";
         }
       }
       if (layers.glow) {
-        entry.el.style.setProperty("--aura-glow", layers.glow);
+        entry.el.style.setProperty("--aura-glow", PATTERN_COLORS[layers.glow] ?? "#fff");
         entry.el.classList.add("has-aura");
       } else {
         entry.el.classList.remove("has-aura");

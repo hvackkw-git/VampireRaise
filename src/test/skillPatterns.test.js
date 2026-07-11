@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
-  SLOT_LAYER, LAYER_MASK, LAYER_SPRITE_PREFIX, PATTERN_COLORS, SKILL_CATALOG,
+  SLOT_LAYER, LAYER_SPRITE_PREFIX, PATTERN_COLORS, SKILL_CATALOG,
   emptyEquip, getEquippedLayers, bakedPatternPath,
 } from "../skills/skillPatterns.js";
 import { createCharacter, createInitialState, serialize, loadState } from "../state/gameState.js";
@@ -31,10 +31,10 @@ describe("skillPatterns", () => {
     }
   });
 
-  it("스페클/릴리/백라인 마스크 스프라이트 경로가 존재한다", () => {
-    expect(LAYER_MASK.speckle).toContain("SPECKLE.png");
-    expect(LAYER_MASK.rili).toContain("RILI.png");
-    expect(LAYER_MASK.backline).toContain("BACKLINE.png");
+  it("카탈로그의 모든 스킬 색 키는 팔레트에 존재한다", () => {
+    for (const skill of Object.values(SKILL_CATALOG)) {
+      expect(PATTERN_COLORS).toHaveProperty(skill.colorKey);
+    }
   });
 
   it("빈 장착은 어떤 레이어 색도 만들지 않는다", () => {
@@ -44,20 +44,20 @@ describe("skillPatterns", () => {
     });
   });
 
-  it("장착 스킬의 색이 해당 레이어로 스택된다 (하양 스페클 + 노랑 릴리 + 파랑 백라인 + glow)", () => {
+  it("장착 스킬의 색 키가 해당 레이어로 스택된다 (회색 스페클 + 노랑 릴리 + 파랑 백라인 + glow)", () => {
     const char = {
       equipped: {
-        passive: "ironScale",   // #ffffff
-        active: "frenzy",       // #ffd23b
-        movement: "dash",       // #3b7bff
-        aura: "crimsonAura",    // #ff2020
+        passive: "ironScale",   // gray
+        active: "frenzy",       // yellow
+        movement: "dash",       // blue
+        aura: "crimsonAura",    // red
       },
     };
     expect(getEquippedLayers(char)).toEqual({
-      speckle: "#ffffff",
-      rili: "#ffd23b",
-      backline: "#3b7bff",
-      glow: "#ff2020",
+      speckle: "gray",
+      rili: "yellow",
+      backline: "blue",
+      glow: "red",
     });
   });
 
@@ -107,7 +107,7 @@ describe("gameState equipped 슬롯", () => {
     const vamp = createCharacter(state, "vampire");
     const human = createCharacter(state, "human");
     expect(vamp.equipped.passive).toBe("ironScale");
-    expect(getEquippedLayers(vamp).glow).toBe("#ff2020");
+    expect(getEquippedLayers(vamp).glow).toBe("red");
     expect(human.equipped).toEqual(emptyEquip());
   });
 
