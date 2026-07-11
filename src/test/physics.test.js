@@ -1,6 +1,6 @@
 // 캐릭터 물리 테스트: 착지·이탈 낙하·측면 반전·스프링·워프·스턴
 import { describe, it, expect } from "vitest";
-import { tickCharacter, startJump, startDrop } from "../engine/physics.js";
+import { tickCharacter, startJump, startDrop, tickSeparation } from "../engine/physics.js";
 import { FLOOR_Y, CHAR_SIZE, CHAR_SPRITES } from "../constants.js";
 import { CHAR_HITBOX_W } from "../platform/platformBlockRenderer.js";
 
@@ -415,5 +415,47 @@ describe("startJump", () => {
       tickCharacter(c, ctx, 1 / 60);
       expect(["IDLE", "STAY"]).not.toContain(c.state);
     }
+  });
+});
+
+describe("군중 분리(tickSeparation)", () => {
+  it("완전히 포개진 같은 편 걷는 새우를 좌우로 밀어낸다", () => {
+    const a = makeChar({ id: 1, x: 200 });
+    const b = makeChar({ id: 2, x: 200 });
+    tickSeparation([a, b], 1 / 60);
+    expect(a.x).not.toBe(b.x);         // 더 이상 완전히 포개지지 않음
+    expect(a.x).toBeLessThan(b.x);     // id 순으로 대칭이 깨져 a가 왼쪽
+  });
+
+  it("여러 프레임 뒤 중심 간격이 목표치(약 0.32×2w) 이상으로 벌어진다", () => {
+    const a = makeChar({ id: 1, x: 200 });
+    const b = makeChar({ id: 2, x: 205 });
+    for (let i = 0; i < 60; i++) tickSeparation([a, b], 1 / 60);
+    const gap = Math.abs((a.x + a.w / 2) - (b.x + b.w / 2));
+    expect(gap).toBeGreaterThanOrEqual((a.w + b.w) * 0.32 - 0.5);
+  });
+
+  it("서로 다른 편은 밀지 않는다", () => {
+    const a = makeChar({ id: 1, side: "vampire", x: 200 });
+    const b = makeChar({ id: 2, side: "human", x: 200 });
+    tickSeparation([a, b], 1 / 60);
+    expect(a.x).toBe(200);
+    expect(b.x).toBe(200);
+  });
+
+  it("걷지 않는(예: DASH) 새우는 분리에서 제외된다", () => {
+    const a = makeChar({ id: 1, x: 200, state: "DASH" });
+    const b = makeChar({ id: 2, x: 200, state: "DASH" });
+    tickSeparation([a, b], 1 / 60);
+    expect(a.x).toBe(200);
+    expect(b.x).toBe(200);
+  });
+
+  it("세로로 다른 줄(위아래로 떨어진)에 있으면 밀지 않는다", () => {
+    const a = makeChar({ id: 1, x: 200, y: 100 });
+    const b = makeChar({ id: 2, x: 200, y: 100 + CHAR_SIZE });
+    tickSeparation([a, b], 1 / 60);
+    expect(a.x).toBe(200);
+    expect(b.x).toBe(200);
   });
 });

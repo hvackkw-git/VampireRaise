@@ -479,3 +479,38 @@ export function defaultMoveDecide(c, ctx, rng = Math.random) {
   else if (c.x > TANK_W - 72) c.dir = -1;
   else if (c.dir !== 1 && c.dir !== -1) c.dir = rng() > 0.5 ? 1 : -1;
 }
+
+// ── 같은 편 군중 분리(separation) ──
+// 같은 방향으로 같은 속도(CRAWL_SPD)로 걷는 새우들은 간격이 0으로 수렴해 한 마리처럼
+// 겹쳐 보인다. 멈춰 세우지 않고(= stop-start 떨림 없이) 겹친 만큼만 수평으로 약하게
+// 밀어내 부채꼴로 퍼지게 한다. 걷는(CRAWL) 유닛에만 적용 — 돌진·점프·낙하·교전 물리는
+// 건드리지 않는다.
+const SEPARATION_STATE = "CRAWL";
+const SEPARATION_GAP_FACTOR = 0.32; // 원하는 중심 간격 = (w_a + w_b) × 이 값
+const SEPARATION_PUSH_SPD = 90;     // 프레임당 최대 밀어내기 속도 px/s
+
+export function tickSeparation(chars, simDt) {
+  const walkers = chars.filter((c) => !c.dead && c.state === SEPARATION_STATE);
+  for (let i = 0; i < walkers.length; i++) {
+    const a = walkers[i];
+    const acx = a.x + a.w / 2, acy = a.y + a.h / 2;
+    for (let j = i + 1; j < walkers.length; j++) {
+      const b = walkers[j];
+      if (b.side !== a.side) continue;
+      const bcy = b.y + b.h / 2;
+      // 세로로 같은 줄(발판 높이)일 때만 — 위아래로 겹친 건 밀지 않는다.
+      if (Math.abs(acy - bcy) > Math.min(a.h, b.h) * 0.5) continue;
+      const bcx = b.x + b.w / 2;
+      const dx = bcx - acx;
+      const dist = Math.abs(dx);
+      const minGap = (a.w + b.w) * SEPARATION_GAP_FACTOR;
+      if (dist >= minGap) continue;
+      const overlap = minGap - dist;
+      // 완전히 포개졌으면 id로 좌우를 정해 대칭을 깬다.
+      const dir = dist > 0.01 ? Math.sign(dx) : (a.id < b.id ? 1 : -1);
+      const push = Math.min(overlap * 0.5, SEPARATION_PUSH_SPD * simDt);
+      a.x = Math.max(0, Math.min(TANK_W - a.w, a.x - dir * push));
+      b.x = Math.max(0, Math.min(TANK_W - b.w, b.x + dir * push));
+    }
+  }
+}

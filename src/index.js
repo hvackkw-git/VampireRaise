@@ -12,7 +12,7 @@ import {
 } from "./platform/logicBlocks.js";
 import { TANK_W, TANK_H, MP_REGEN_PER_S, VAMPIRE_SPAWN_ZONE } from "./constants.js";
 import { createInitialState, loadState, saveState } from "./state/gameState.js";
-import { tickCharacter } from "./engine/physics.js";
+import { tickCharacter, tickSeparation } from "./engine/physics.js";
 import { tickAggro } from "./game/ai.js";
 import { tickCombat, aliveChars } from "./game/combat.js";
 import { tickHumanProjectiles } from "./game/projectiles.js";
@@ -257,6 +257,8 @@ function frame(nowMs) {
     // MP 자연 재생 (돌진 등 스킬 사용으로 소모)
     if (c.maxMp) c.mp = Math.min(c.maxMp, (c.mp ?? c.maxMp) + MP_REGEN_PER_S * simDt);
   }
+  // 같은 편 걷는 새우들이 완전히 포개져 한 마리처럼 보이지 않도록 수평 분리
+  tickSeparation(chars, simDt);
 
   // 3) 투사체 → 전투·전염 → 4) 웨이브
   const projectileEvents = tickHumanProjectiles(state, simDt);

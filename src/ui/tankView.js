@@ -300,7 +300,10 @@ export function renderChars(state, nowMs, ui) {
     const moving = Math.abs(c.vx) > 1 || c.state === "CRAWL" || c.state === "JUMP"
       || c.state === "FIGHT" || c.state === "DASH";
     const fast = c.state === "FIGHT" || c.state === "DASH";
-    const frame = moving ? Math.floor(nowMs / (fast ? 60 : 90)) % cfg.frames : 0;
+    // 캐릭터별 걷기 위상 오프셋: 겹쳐 있어도 다리 프레임이 서로 어긋나 "여러 마리"로
+    // 읽히게 한다(전원 같은 프레임이면 겹쳤을 때 한 마리처럼 보임). c.id로 고정.
+    const phase = ((c.id % cfg.frames) + cfg.frames) % cfg.frames;
+    const frame = moving ? (Math.floor(nowMs / (fast ? 60 : 90)) + phase) % cfg.frames : 0;
     if (entry.lastFrame !== frame) {
       const framePosition = `${-frame * cfg.size}px ${-cfg.topPad}px`;
       entry.sprite.style.backgroundPosition = framePosition;
