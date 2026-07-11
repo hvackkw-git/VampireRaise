@@ -199,8 +199,8 @@ describe("기믹 블록", () => {
   });
 });
 
-describe("적 인간 이동 제한", () => {
-  it("플랫폼 위에서 전방 블록에 막히면 점프·반전 대신 아래로 드롭한다", () => {
+describe("Holy Shrimp 이동 제한", () => {
+  it("전방 블록에 막히면 방향을 바꾸고 첫 충돌 5초 뒤 밟고 있는 플랫폼에서 드롭한다", () => {
     const current = { id: 31, x: 140, y: 400, blockType: "platform_block" };
     const blocker = { id: 32, x: 160, y: 380, blockType: "platform_block" };
     const lower = { id: 33, x: 140, y: 480, blockType: "platform_block" };
@@ -212,12 +212,33 @@ describe("적 인간 이동 제한", () => {
     const ctx = makeCtx([current, blocker, lower]);
 
     tickCharacter(c, ctx, 1 / 60);
+    expect(c.state).toBe("CRAWL");
+    expect(c.dir).toBe(-1);
+    expect(c._platformId).toBe(current.id);
+    expect(c._obstacleDropAt).toBe(15000);
+    expect(c.state).not.toBe("JUMP");
+
+    // 좁은 틈에서 다시 같은 블록에 부딪혀도 최초 예약 시각은 밀리지 않는다.
+    c.x = 137.5;
+    c.dir = 1;
+    ctx.now = 12000;
+    tickCharacter(c, ctx, 1 / 60);
+    expect(c._obstacleDropAt).toBe(15000);
+    expect(c.state).toBe("CRAWL");
+
+    ctx.now = 14999;
+    tickCharacter(c, ctx, 0);
+    expect(c.state).toBe("CRAWL");
+    expect(c._platformId).toBe(current.id);
+
+    ctx.now = 15000;
+    tickCharacter(c, ctx, 0);
     expect(c.state).toBe("FALL");
     expect(c._platformId).toBeNull();
     expect(c._dropThroughId).toBe(current.id);
-    expect(c.state).not.toBe("JUMP");
 
     for (let t = 0; t < 2 && c._platformId == null; t += 1 / 60) {
+      ctx.now += 1000 / 60;
       tickCharacter(c, ctx, 1 / 60);
       expect(c.state).not.toBe("JUMP");
     }
@@ -237,6 +258,31 @@ describe("적 인간 이동 제한", () => {
     expect(c.vy).toBeGreaterThanOrEqual(0);
     expect(c._dropThroughId).toBe(current.id);
     expect(c._platformId).toBeNull();
+  });
+
+  it("충돌 후 다른 플랫폼으로 이동해도 최초 충돌 5초 뒤 현재 플랫폼에서 드롭한다", () => {
+    const first = { id: 36, x: 140, y: 400, blockType: "platform_block" };
+    const blocker = { id: 37, x: 160, y: 380, blockType: "platform_block" };
+    const current = { id: 38, x: 140, y: 480, blockType: "platform_block" };
+    const c = makeChar({
+      side: "human", x: 137.5, y: first.y - CHAR_SIZE,
+      state: "CRAWL", dir: 1, timer: 99, _platformId: first.id,
+    });
+    const ctx = makeCtx([first, blocker, current]);
+
+    tickCharacter(c, ctx, 1 / 60);
+    expect(c._obstacleDropAt).toBe(15000);
+
+    c.x = 140;
+    c.y = current.y - CHAR_SIZE;
+    c._platformId = current.id;
+    ctx.now = 15000;
+    tickCharacter(c, ctx, 0);
+
+    expect(c.state).toBe("FALL");
+    expect(c._dropThroughId).toBe(current.id);
+    expect(c._platformId).toBeNull();
+    expect(c._obstacleDropAt).toBeNull();
   });
 
   it("인간은 직접 점프와 스프링 도약을 하지 않는다", () => {

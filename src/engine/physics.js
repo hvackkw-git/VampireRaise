@@ -16,6 +16,8 @@ import {
   HUMAN_RANGED_BRACE_SPEED_MULT,
 } from "../constants.js";
 
+const HOLY_OBSTACLE_DROP_DELAY_MS = 5000;
+
 /**
  * 현재 걷기 속도. Holy Shrimp는 원거리 사거리 안에 적이 들어오면(_rangedBraced) 자세를 잡느라
  * 이속이 1/4로 줄어든다 — ai.tickAggro가 매 프레임 _rangedBraced를 갱신한다.
@@ -257,6 +259,13 @@ export function tickCharacter(c, ctx, simDt) {
     }
   }
 
+  // Holy Shrimp는 전방 블록에 처음 막힌 시점부터 5초 동안 방향을 바꿔 걷는다.
+  // 재충돌이나 플랫폼 이동으로 예약을 갱신하지 않고, 만료 순간 밟고 있는 발판에서 드롭한다.
+  if (c.side === "human" && c._obstacleDropAt != null && now >= c._obstacleDropAt) {
+    c._obstacleDropAt = null;
+    if (c._platformId != null) startDrop(c);
+  }
+
   // ── 스턴 만료 ──
   if (c.state === "STUN" && now >= c._stunUntil) {
     c.state = "CRAWL"; c.timer = 0.3;
@@ -314,7 +323,11 @@ export function tickCharacter(c, ctx, simDt) {
         triggerSpike(c, now); break;
       }
       if (c.side === "human" && c._platformId != null) {
-        startDrop(c);
+        if (c._obstacleDropAt == null) {
+          c._obstacleDropAt = now + HOLY_OBSTACLE_DROP_DELAY_MS;
+        }
+        c.dir *= -1;
+        c.vx = c.dir * spd;
         droppedForObstacle = true;
         break;
       }
@@ -330,8 +343,7 @@ export function tickCharacter(c, ctx, simDt) {
     }
     if (!droppedForObstacle && (c._blockBounces || 0) >= 4) {
       c._blockBounces = 0; c._blockBounceDecay = 0;
-      if (c.side === "human" && c._platformId != null) startDrop(c);
-      else if (c.side !== "human") startJump(c, rng, 40, 20);
+      if (c.side !== "human") startJump(c, rng, 40, 20);
     } else if (!droppedForObstacle && c.timer <= 0) {
       defaultMoveDecide(c, ctx, rng);
     } else if (!droppedForObstacle && c.side !== "human" && c._platformId != null
