@@ -29,7 +29,7 @@ import { startJump, NON_PLATFORM_BLOCK_TYPES } from "../engine/physics.js";
 import { isLogicLayerBlock, getSpikeDir, PLATFORM_W, PLATFORM_H } from "../platform/platformBlockRenderer.js";
 import { findNearestEnemy, aliveChars } from "./combat.js";
 import { createHumanDescentNavigator } from "./descentNavigation.js";
-import { dashGhostColorSequence, effectiveDetectRange } from "../skills/dashColors.js";
+import { dashColorCycle, effectiveDetectRange } from "../skills/dashColors.js";
 import {
   resetDashEffects, applyDashPathDamage, applyDashArrivalEffects,
 } from "./dashEffects.js";
@@ -90,13 +90,8 @@ function beginDash(c, found) {
   c._platformId = null;
   c._jumpApexY = null; // 점프 중 돌진 진입 시 잔여 점프 상태 정리
   c._dropThroughId = null; // 하강(드롭스루) 중 돌진 진입 시 잔여 드롭 상태 정리
-  // 잔상 색: 이번 돌진의 색 시퀀스를 확정하고, 진행도 0에서 시작
-  const cx = c.x + c.w / 2, cy = c.y + c.h / 2;
-  c._dashDist0 = Math.max(1, Math.hypot((found.goal?.x ?? cx) - cx, (found.goal?.y ?? cy) - cy));
-  c._dashProgress = 0;
-  c._dashGhostSeq = dashGhostColorSequence(c.dashColors ?? { red: 1 }, {
-    detectRange: effectiveDetectRange(c),
-  });
+  // 잔상 색: 이번 돌진의 색 사이클(빨빨빨주…)을 확정. 잔상은 스폰 순서대로 이 사이클을 따라 칠한다.
+  c._dashCycle = dashColorCycle(c.dashColors ?? { red: 1 });
   resetDashEffects(c); // 이번 돌진의 경로 피해 중복 방지 집합 초기화
 }
 
@@ -480,23 +475,22 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null, 
     if (c.state === "DASH") {
       const t = byId.get(c._dashTargetId);
       c._dashTimeLeft = (c._dashTimeLeft ?? 0) - simDt;
-      if (!t || t.dead || c._dashTimeLeft <= 0) {
-        endDash(c, state.platforms.items, { blockPowered }); // 중단 — 제자리 낙하
+      // 목표 지점(goal)은 돌진 시작 시 고정. 대상이 죽거나 사라져도 그 지점까지 마저 날아가 착지한다
+      // (자기 경로/폭발 피해로 대상이 먼저 죽어도 도중에 뚝 떨어지지 않게 한다).
+      const goal = c._dashGoal ?? (t ? centerOf(t) : null);
+      if (!goal || c._dashTimeLeft <= 0) {
+        endDash(c, state.platforms.items, { blockPowered }); // 타임아웃/목표 소실 — 제자리 낙하
         continue;
       }
       const cx = c.x + c.w / 2, cy = c.y + c.h / 2;
-      const goal = c._dashGoal ?? centerOf(t);
       const tx = goal.x, ty = goal.y;
-      // 잔상 색 매핑용 진행도: 0(출발)→1(도착/새우 위치)
-      c._dashProgress = Math.max(0, Math.min(1,
-        1 - Math.hypot(tx - cx, ty - cy) / (c._dashDist0 || 1)));
       // 노랑 · 경로 데미지: 비행 중 스친 적에게 1회씩 피해
       applyDashPathDamage(c, chars, state, dashEvents);
       const arriveDist = goal.platformId != null ? 4 : DASH_ARRIVE_DIST;
       if (Math.hypot(tx - cx, ty - cy) <= arriveDist) {
         endDash(c, state.platforms.items, {
           arrived: true, blockPowered,
-          fx: { chars, target: t, state, nowMs, dashEvents },
+          fx: { chars, target: t && !t.dead ? t : null, state, nowMs, dashEvents },
         });
         continue;
       }

@@ -280,21 +280,18 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
     expect(Math.abs(human.x - 120)).toBeLessThan(0.001);
   });
 
-  it("돌진 중 대상이 죽으면 목표로 순간이동하지 않고 그 자리에서 낙하한다", () => {
+  it("돌진 중 대상이 죽어도 뚝 떨어지지 않고 고정된 목표까지 마저 날아간다", () => {
     const vamp = put("vampire", 100);
     const human = put("human", 100 + DETECT_RANGE.vampire - 20);
     state.platforms.items.push({ id: 1, x: human.x, y: human.y + human.h, blockType: "platform_block" });
     tickAggro(state, 0.016, () => 0.9);
     expect(vamp.state).toBe("DASH");
-    const xBefore = vamp.x, yBefore = vamp.y;
-    human.dead = true;
+    human.dead = true; // 자기 경로/폭발 피해 등으로 대상이 먼저 죽는 상황
     tickAggro(state, 0.016, () => 0.9);
-    expect(vamp.state).toBe("FALL");        // 중단 — 스냅 착지 없음
-    expect(vamp.x).toBe(xBefore);
-    expect(vamp.y).toBe(yBefore);
+    // 목표 지점(고정)으로 계속 비행 — 제자리 낙하도, 플랫폼 스냅 착지(순간이동)도 아니다
+    expect(vamp.state).toBe("DASH");
     expect(vamp._platformId).toBeNull();
-    expect(vamp._dashTargetId).toBeNull();
-    expect(vamp._dashCd).toBeGreaterThan(0); // 쿨다운은 걸린다
+    expect(Math.hypot(vamp.vx, vamp.vy)).toBeGreaterThan(0); // 목표로 향하는 속도 유지
   });
 
   it("돌진이 타임아웃되면 목표로 순간이동하지 않는다", () => {

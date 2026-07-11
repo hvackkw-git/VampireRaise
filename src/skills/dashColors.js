@@ -209,30 +209,13 @@ export function dashColorCycle(points = {}) {
 }
 
 /**
- * 잔상 색 시퀀스(진행도 순). index 0 = 새우에서 가장 먼 꼬리, 마지막 = 새우에 가장 가까운 앞쪽.
- * dashColorCycle을 잔상 개수 N만큼 반복 타일링한 뒤 뒤집어, 새우 근처가 사이클 첫 색(빨강)이 되게 한다.
+ * 잔상 트레일 = dashColorCycle을 스폰 순서대로 반복(k번째 잔상 = cycle[k % len]).
+ * 런타임(tankView)은 45ms마다 이 인덱스를 하나씩 올려 칠한다. 아래는 그 결과를 미리 펼친 것(문서·테스트용).
  * @param {{[color:string]: number}} points
- * @param {{ detectRange?: number }} [opts]
- * @returns {string[]} 길이 N
+ * @param {number} count 펼칠 잔상 개수
+ * @returns {string[]}
  */
-export function dashGhostColorSequence(points = {}, opts = {}) {
-  const { detectRange = BASE_DETECT_RANGE } = opts;
-  const N = dashGhostCount(points, detectRange);
+export function dashGhostTrail(points = {}, count = 0) {
   const cycle = dashColorCycle(points);
-  const seq = [];
-  for (let i = 0; i < N; i++) seq.push(cycle[i % cycle.length]);
-  seq.reverse(); // 새우 근처(마지막 index) = 사이클 첫 색
-  return seq;
-}
-
-/**
- * 돌진 진행도(0=출발, 1=도착/새우 위치)에 대응하는 잔상 색.
- * @param {string[]} sequence dashGhostColorSequence 결과
- * @param {number} progress 0..1
- * @returns {string} 색상 키(비면 'red')
- */
-export function ghostColorAtProgress(sequence, progress) {
-  if (!Array.isArray(sequence) || sequence.length === 0) return "red";
-  const p = Math.max(0, Math.min(0.999999, Number(progress) || 0));
-  return sequence[Math.floor(p * sequence.length)];
+  return Array.from({ length: Math.max(0, count) }, (_, i) => cycle[i % cycle.length]);
 }

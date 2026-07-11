@@ -9,7 +9,7 @@ import {
   TANK_W, TANK_H, PANEL_H, CHAR_SPRITES, HUMAN_PROJECTILE_RADIUS,
   HUMAN_SPAWN_ZONE, VAMPIRE_SPAWN_ZONE,
 } from "../constants.js";
-import { DASH_COLOR_HEX, ghostColorAtProgress, effectiveDetectRange } from "../skills/dashColors.js";
+import { DASH_COLOR_HEX, effectiveDetectRange } from "../skills/dashColors.js";
 
 const blockEls = new Map(); // platId → { el, img, lastSrc, lastRot }
 const charEls = new Map();  // charId → { el, sprite, hpFill, lastSide }
@@ -253,11 +253,16 @@ export function renderChars(state, nowMs, ui) {
       ui.panelCharId === c.id && ui.selectedCharId !== c.id);
     entry.el.classList.toggle("selected", ui.selectedCharId === c.id);
     entry.hpFill.style.width = `${Math.max(0, Math.min(100, (c.hp / c.maxHp) * 100))}%`;
-    // 돌진 잔상: 45ms 간격으로 현재 모습의 고스트를 남긴다.
-    // 색은 이번 돌진의 색 시퀀스를 진행도(0→1)로 인덱싱 — 새우 근처(진행도 1) = 팔레트 앞 색(빨강).
-    if (c.state === "DASH" && nowMs - (entry.lastGhostAt ?? 0) > 45) {
+    // 돌진 잔상: 45ms 간격으로 고스트를 남긴다. 색은 이번 돌진의 사이클(빨빨빨주…)을
+    // 스폰 순서대로 따라간다 — 경로 곡률/돌진 길이와 무관하게 항상 순서대로 나온다.
+    const dashing = c.state === "DASH";
+    if (dashing && !entry.wasDashing) entry.ghostIdx = 0; // 새 돌진 시작 → 사이클 처음부터
+    entry.wasDashing = dashing;
+    if (dashing && nowMs - (entry.lastGhostAt ?? 0) > 45) {
       entry.lastGhostAt = nowMs;
-      const colorKey = ghostColorAtProgress(c._dashGhostSeq, c._dashProgress ?? 1);
+      const cyc = c._dashCycle?.length ? c._dashCycle : ["red"];
+      const colorKey = cyc[(entry.ghostIdx ?? 0) % cyc.length];
+      entry.ghostIdx = (entry.ghostIdx ?? 0) + 1;
       spawnDashGhost(c, entry, DASH_COLOR_HEX[colorKey] ?? DASH_COLOR_HEX.red);
     }
   }
