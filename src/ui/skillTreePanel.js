@@ -2,15 +2,17 @@ import {
   SKILL_BY_ID, SKILL_TREE, normalizeSkillProgress,
 } from "../skills/skillTree.js";
 import {
-  DASH_COLOR_HEX, dashGhostCount, investDashColor, investDetect,
+  DASH_COLOR_HEX, dashGhostCount, investDashColor, investDetect, investDashCdMana,
   normalizeDashPoints, resetDashColors, effectiveDetectRange,
-  revengeAttackMult, dashDistanceMult, detectRangeMult,
+  revengeAttackMult, dashDistanceMult, detectRangeMult, dashCdManaMult,
 } from "../skills/dashColors.js";
 
 /** dash 스킬의 현재 투자 포인트 */
 function dashInvested(char, dash) {
   if (!dash) return 0;
-  return dash.kind === "detect" ? (char.detectPoints || 0) : (char.dashColors[dash.key] || 0);
+  if (dash.kind === "detect") return char.detectPoints || 0;
+  if (dash.kind === "passive") return char.dashCdManaPoints || 0;
+  return char.dashColors[dash.key] || 0;
 }
 
 /** dash 스킬의 현재 효과값 문자열(구현된 것만 수치, 나머지는 빈 문자열) */
@@ -20,6 +22,9 @@ function dashEffectValue(char, dash) {
   if (dash.key === "orange") return ` · 현재 ×${dashDistanceMult(char.dashColors).toFixed(1)}`;
   if (dash.kind === "detect") {
     return ` · 현재 ×${detectRangeMult(char.detectPoints).toFixed(1)} (${Math.round(effectiveDetectRange(char))}px)`;
+  }
+  if (dash.kind === "passive") {
+    return ` · 현재 ×${dashCdManaMult(char.dashCdManaPoints).toFixed(1)}`;
   }
   return "";
 }
@@ -64,8 +69,8 @@ export function initSkillTreePanel({ getCharacter, onChange, onOpenChange } = {}
       selectedSkillId = skill.id;
       const char = getCharacter?.();
       if (char && skill.dash) {
-        const ok = skill.dash.kind === "detect"
-          ? investDetect(char)
+        const ok = skill.dash.kind === "detect" ? investDetect(char)
+          : skill.dash.kind === "passive" ? investDashCdMana(char)
           : investDashColor(char, skill.dash.key);
         if (ok) onChange?.(char);
       }
