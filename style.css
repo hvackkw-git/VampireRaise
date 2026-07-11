@@ -938,7 +938,7 @@ button { font-family: inherit; color: inherit; }
 }
 .skill-tree-node.zombie-node.locked { opacity: 0.35; }
 .skill-tree-footer {
-  flex: 0 0 32px;
+  flex: 0 0 52px;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -946,25 +946,25 @@ button { font-family: inherit; color: inherit; }
 .skill-tree-detail {
   flex: 1 1 auto;
   min-width: 0;
-  height: 32px;
+  height: 52px;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  padding: 0 7px;
+  padding: 3px 9px;
   border: 1px solid #465258;
   border-radius: 4px;
   background: #192024;
   color: #bdc8cb;
-  font-size: 9px;
+  font-size: 10px;
+  line-height: 1.35;
   text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
 }
 .skill-tree-level-up {
   flex: 0 0 52px;
   width: 52px;
-  height: 32px;
+  height: 52px;
   padding: 0;
   border: 1px solid #8b6b2a;
   border-radius: 4px;

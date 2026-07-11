@@ -4,8 +4,8 @@
 // 레벨 제한·선행 없음.
 // (스프라이트/아트는 아직 굽지 않음. 색·이름·효과 텍스트만.)
 
-const COLUMN_X = [8, 29, 50, 71, 92];
-const ROW_Y = [8, 20.14, 32.29, 44.43, 56.57, 68.71, 80.86, 93];
+const COLUMN_X = [14, 32, 50, 68, 86];
+const ROW_Y = [10, 21.43, 32.86, 44.29, 55.71, 67.14, 78.57, 90];
 const NUM_COLS = COLUMN_X.length;
 const NUM_ROWS = ROW_Y.length;
 

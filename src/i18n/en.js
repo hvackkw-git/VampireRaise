@@ -57,7 +57,7 @@ export default {
     rgb_white_block: "RGB Block (White)", stun_block: "Stun Block",
   },
   skillTree: {
-    title: "Skill Tree", dashSkills: "Dash Skills", ghosts: "Ghosts", points: "Points", ghostsAndPoints: "Ghosts {ghosts} · Points {points}",
+    title: "Skill Tree", dashSkills: "Dash Skills", ghosts: "Ghosts",
     reset: "Reset", investHint: "Select a slot to invest", noShrimp: "No shrimp selected",
     unavailable: "Skill Tree unavailable", shrimpNumber: "Shrimp #{number}", shrimp: "Shrimp",
     current: "Current", choiceCost: "Cost {cost} SP · Choose 1 of 2–4", choice: "{cost} SP · Choose 1", emptySlot: "Empty slot",
