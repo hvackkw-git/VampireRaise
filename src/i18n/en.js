@@ -5,14 +5,14 @@ export default {
   controls: {
     testTools: "Test tools", hideRanges: "Hide detection ranges", showRanges: "Show detection ranges",
     levelAll: "Level up all Vamp Shrimp by 1", logicLayer: "Logic layer", done: "Done",
-    skillTree: "Skill Tree", startWave: "Start wave", autoWave: "Auto wave",
+    skillTree: "Skill Tree", stats: "Stats", startWave: "Start wave", autoWave: "Auto wave",
     rebirth: "Rebirth", decorate: "Decorate", reset: "Restart from scratch",
     closeSkillTree: "Close Skill Tree", close: "Close", dashSummary: "Dash skill summary",
     testLevelUp: "Test level +1", switchKorean: "Switch to Korean", switchEnglish: "Switch to English",
   },
   info: {
     attack: "ATK", emptySlot: "Empty slot", noEquippedSkills: "No equipped skills",
-    noVampShrimp: "— No Vamp Shrimp —", dash: "Bloodrush Dash",
+    noVampShrimp: "— No Vamp Shrimp —", dash: "Bloody Dash",
     vampShrimp: "Vamp Shrimp", holyShrimp: "Holy Shrimp", jombieShrimp: "Jombie Shrimp",
     numberedVamp: "Vamp Shrimp #{number}", order: "#{number} ",
     reviveIn: "Vamp Shrimp #{number} · revives in {secs}s",

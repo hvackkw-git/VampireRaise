@@ -8,6 +8,7 @@ import { tickCharacter } from "../engine/physics.js";
 import {
   DETECT_RANGE, PING_REFRESH_S, FLOOR_Y, CHAR_SIZE,
   HUMAN_PROJECTILE_RANGE, HUMAN_RANGED_BRACE_SPEED_MULT, CRAWL_SPD,
+  DASH_COOLDOWN_S,
 } from "../constants.js";
 
 let state;
@@ -121,6 +122,7 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
     state.platforms.items.push({ id: 1, x: human.x, y: human.y + human.h, blockType: "platform_block" });
     tickAggro(state, 0.016, () => 0.9);
     expect(vamp.state).toBe("DASH");
+    expect(vamp._dashCd).toBe(0);
   });
 
   it("직선 감지 원 밖이면 우회 거리가 예산(×2) 이내여도 돌진하지 않는다", () => {
@@ -257,6 +259,7 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
       if (vamp._dashTargetId == null && vamp._dashCd > 0) { ended = true; break; }
     }
     expect(ended).toBe(true);
+    expect(vamp._dashCd).toBeCloseTo(DASH_COOLDOWN_S);
   });
 
   it("위쪽 플랫폼 목표에 도달하면 떨어지지 않고 플랫폼 위에 안착한다", () => {
@@ -306,7 +309,7 @@ describe("뱀파이어 패시브: 혈귀 돌진", () => {
     tickAggro(state, 0.016, () => 0.9);
     expect(vamp.state).toBe("FALL");
     expect(vamp.x).toBe(xBefore);
-    expect(vamp._dashCd).toBeGreaterThan(0);
+    expect(vamp._dashCd).toBeCloseTo(DASH_COOLDOWN_S);
   });
 
   it("전원 ON(투명) 게이트는 돌진 경로의 벽으로 치지 않는다", () => {

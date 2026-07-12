@@ -3,7 +3,7 @@ export default {
   controls: {
     testTools: "테스트 도구", hideRanges: "인지범위 숨기기", showRanges: "인지범위 보이기",
     levelAll: "Vamp Shrimp 전체 레벨 1 증가", logicLayer: "논리 레이어", done: "완료",
-    skillTree: "스킬 트리", startWave: "웨이브 시작", autoWave: "자동 웨이브",
+    skillTree: "스킬 트리", stats: "능력치", startWave: "웨이브 시작", autoWave: "자동 웨이브",
     rebirth: "재시작", decorate: "꾸미기", reset: "처음부터 재시작",
     closeSkillTree: "스킬 트리 닫기", close: "닫기", dashSummary: "Dash 스킬 요약",
     testLevelUp: "테스트 레벨 +1", switchKorean: "한국어로 전환", switchEnglish: "영어로 전환",

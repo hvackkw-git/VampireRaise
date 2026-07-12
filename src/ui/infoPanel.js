@@ -1,9 +1,9 @@
 // src/ui/infoPanel.js
-// 하단 상시 패널 (1행×4열): [HP/MP/EXP 바] [데미지] [장착 스킬 2×2] [핫키 2×3].
+// 하단 상시 패널: 선택 시 [HP/MP/EXP/ATK/ARM/SPD] [장착 스킬] [핫키].
 // 계정 레벨·경험치 바는 게임 영역 상단(levelBar)에 별도로 표시된다.
 // 표시 대상 캐릭터는 index.js가 결정한다 — 직접 탭한 캐릭터가 있으면 그 캐릭터를 보여주고,
 // 없으면(선택 해제 상태) renderSquadPanel로 스탯/데미지/장착 스킬 자리에 생존 Vamp Shrimp
-// 얼굴 그리드(2행6열)를 대신 보여준다 (핫키는 그대로 유지). 얼굴을 탭하면 그 캐릭터가 선택된다.
+// 얼굴 그리드(5칸)를 대신 보여준다 (핫키는 그대로 유지). 얼굴을 탭하면 그 캐릭터가 선택된다.
 
 import { expToNext, accountExpToNext } from "../constants.js";
 import { getLocale, t } from "../i18n/index.js";
@@ -16,7 +16,7 @@ const SKILL_BOOK = {
   dash: { nameKey: "info.dash", icon: "assets/skills/skill_dash.png" },
 };
 const SKILL_SLOT_COUNT = 4;  // 2×2
-const FACE_SLOT_COUNT = 12;  // 2×6
+const FACE_SLOT_COUNT = 5;
 
 let els = null;
 let lastSkillKey = null; // 장착 스킬 재구성 최소화용 캐시 키
@@ -30,10 +30,13 @@ export function initInfoPanel({ onSkillTree, onSelectVampire } = {}) {
     acctExpFill: $("acctExpFill"),
     acctExpNum: $("acctExpNum"),
     statName: $("statName"),
+    statLevel: $("statLevel"),
     hpFill: $("pHpFill"), hpNum: $("pHpNum"),
     mpFill: $("pMpFill"), mpNum: $("pMpNum"),
     expFill: $("pExpFill"), expNum: $("pExpNum"),
     atk: $("pAtk"),
+    arm: $("pArm"),
+    spd: $("pSpd"),
     skillGrid: $("skillGrid"),
     skillName: $("skillName"),
     faceGrid: $("faceGrid"),
@@ -80,18 +83,35 @@ function updateLevelBar(account) {
   els.acctExpNum.textContent = `${account.exp} / ${need}`;
 }
 
+function numberStat(...values) {
+  for (const value of values) {
+    const n = Number(value);
+    if (Number.isFinite(n)) return Math.round(n);
+  }
+  return 0;
+}
+
+function stat3(...values) {
+  return String(Math.max(0, numberStat(...values))).padStart(3, "0");
+}
+
 function renderSkills(char) {
   const equipped = (char?.skills ?? []).filter((s) => SKILL_BOOK[s]);
-  const key = `${getLocale()}:${char ? `${char.id}:${equipped.join(",")}` : "none"}`;
+  const dashCd = Math.max(0, Number(char?._dashCd) || 0);
+  const dashCdSec = Math.ceil(dashCd);
+  const key = `${getLocale()}:${char ? `${char.id}:${equipped.join(",")}:${dashCdSec}` : "none"}`;
   if (key === lastSkillKey) return;
   lastSkillKey = key;
   els.skillSlots.forEach((slot, i) => {
-    const skill = SKILL_BOOK[equipped[i]];
+    const skillKey = equipped[i];
+    const skill = SKILL_BOOK[skillKey];
     const name = skill ? t(skill.nameKey) : "";
+    const cooling = skillKey === "dash" && dashCdSec > 0;
     slot.classList.toggle("locked", !skill);
-    slot.title = skill ? name : t("info.emptySlot");
+    slot.classList.toggle("cooldown", cooling);
+    slot.title = skill ? (cooling ? `${name} · ${dashCdSec}s` : name) : t("info.emptySlot");
     slot.innerHTML = skill
-      ? `<img src="${skill.icon}" alt="${name}" draggable="false">`
+      ? `<img src="${skill.icon}" alt="${name}" draggable="false">${cooling ? `<span class="skill-cd">${dashCdSec}</span>` : ""}`
       : "";
   });
   els.skillName.textContent = equipped.length
@@ -110,26 +130,31 @@ export function renderInfoPanel(char, account = null) {
   els.panel.classList.toggle("no-char", !char);
   if (!char) {
     els.statName.textContent = t("info.noVampShrimp");
+    els.statLevel.textContent = "";
     setBar(els.hpFill, els.hpNum, 0, 0);
     setBar(els.mpFill, els.mpNum, 0, 0);
     setBar(els.expFill, els.expNum, 0, 0);
     els.atk.textContent = "—";
+    els.arm.textContent = "—";
+    els.spd.textContent = "—";
     renderSkills(null);
     return;
   }
-  const order = Number.isFinite(char.vampireOrder) ? t("info.order", { number: char.vampireOrder }) : "";
-  els.statName.textContent =
-    `${SIDE_ICON[char.side] ?? ""} ${order}${t(SIDE_NAME_KEY[char.side] ?? "info.vampShrimp")} Lv.${char.level}`;
+  const order = Number.isFinite(char.vampireOrder) ? `#${char.vampireOrder} ` : "";
+  els.statName.textContent = `${order}${t(SIDE_NAME_KEY[char.side] ?? "info.vampShrimp")}`;
+  els.statLevel.textContent = `Lv.${char.level}`;
   setBar(els.hpFill, els.hpNum, char.hp, char.maxHp);
   setBar(els.mpFill, els.mpNum, char.mp ?? 0, char.maxMp ?? 0);
   setBar(els.expFill, els.expNum, char.exp, expToNext(char.level));
-  els.atk.textContent = String(char.atk);
+  els.atk.textContent = stat3(char.atk);
+  els.arm.textContent = stat3(char.arm, char.armor);
+  els.spd.textContent = stat3(char.spd, char.speed);
   renderSkills(char);
 }
 
 /**
  * 선택한 캐릭터가 없을 때(탭 해제 상태) 보여주는 화면 — 스탯/데미지/장착 스킬 자리에
- * Vamp Shrimp 얼굴 그리드(2행6열)를 대신 띄운다. 얼굴을 탭하면 그 캐릭터가 선택된다.
+ * Vamp Shrimp 얼굴 그리드(5칸)를 대신 띄운다. 얼굴을 탭하면 그 캐릭터가 선택된다.
  * 사망한 Vamp Shrimp도 자기 순서 칸에 그대로 남아, 얼굴 위에 부활까지 남은 초를
  * 카운트다운으로 겹쳐 보여준다(탭 불가). 전멸해도 이 그리드로 부활 시점을 알린다.
  * @param {object[]} vampires Vamp Shrimp 목록(생존·사망 모두)

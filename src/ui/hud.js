@@ -1,5 +1,5 @@
 // src/ui/hud.js
-// 수조 내 오버레이 HUD: 좌상단 상태 칩 + 중앙 픽셀 스프라이트 버튼(꾸미기·시작·재시작) + 패널 핫키.
+// 수조 내 오버레이 HUD: 좌상단 상태 칩 + 중앙 픽셀 스프라이트 버튼(꾸미기·시작·환생) + 패널 핫키.
 // 중앙 3버튼은 2탭 방식: 1탭 → 색상 강조(armed), 2탭 → 실행/메뉴 진입.
 
 import { rebirthWaveRequirement, REBIRTH_MAX_VAMPIRES } from "../constants.js";
@@ -15,11 +15,13 @@ export function initHud(state, { onDecorate, onReset, getBlockPowered, isDecorat
   const elHumans = document.getElementById("hudHumans");
   const elBlood = document.getElementById("hudBlood");
   const btnWave = document.getElementById("btnWave");
-  const btnAuto = document.getElementById("btnAuto");
   const btnRebirth = document.getElementById("btnRebirth");
   const btnDecorate = document.getElementById("btnDecorate");
   const elRebirthReq = document.getElementById("rebirthReq");
   const waveCenterControls = document.getElementById("waveCenterControls");
+
+  state.wave.auto = false;
+  state.wave.nextAutoAt = null;
 
   // 픽셀 스프라이트 주입 (스프라이트 자체가 버튼). rebirthReq 배지는 유지.
   btnDecorate.insertAdjacentHTML("afterbegin", SPRITES.decorate);
@@ -55,19 +57,7 @@ export function initHud(state, { onDecorate, onReset, getBlockPowered, isDecorat
     performStartWave();
   });
 
-  btnAuto.addEventListener("click", () => {
-    if (isDecorating?.()) {
-      showToast(t("hud.finishDecoratingAuto"));
-      return;
-    }
-    state.wave.auto = !state.wave.auto;
-    if (state.wave.auto && !state.wave.active) {
-      // 대기 중이면 즉시 시작
-      if (!performStartWave()) state.wave.auto = false;
-    }
-  });
-
-  // 재시작(나비/빨강): 1탭 armed → 2탭 rebirth
+  // 환생(나비/빨강): 1탭 armed → 2탭 rebirth
   btnRebirth.addEventListener("click", () => {
     if (btnRebirth.disabled) return;
     if (isDecorating?.()) { showToast(t("hud.finishDecorating")); setArmed(null); return; }
@@ -122,8 +112,6 @@ export function initHud(state, { onDecorate, onReset, getBlockPowered, isDecorat
     // 중앙 버튼은 웨이브 진행 중·꾸미기 중에는 통째로 숨김
     const clusterHidden = state.wave.active || !!isDecorating?.();
     waveCenterControls.classList.toggle("hidden", clusterHidden);
-    btnAuto.classList.toggle("on", state.wave.auto);
-    btnAuto.disabled = !!isDecorating?.();
     btnDecorate.disabled = state.wave.active;
     const count = vampireCount(state);
     const maxed = count >= REBIRTH_MAX_VAMPIRES;

@@ -41,7 +41,7 @@
             <span id="hudHumans" class="hud-chip"></span>
             <span id="hudBlood" class="hud-chip">🩸 0</span>
           </header>
-          <!-- 웨이브 종료/대기 중에만 노출되는 중앙 픽셀 스프라이트 버튼: 좌=꾸미기(망치), 가운데=웨이브 시작(재생), 우=재시작(나비).
+          <!-- 웨이브 종료/대기 중에만 노출되는 중앙 픽셀 스프라이트 버튼: 좌=꾸미기(망치), 가운데=웨이브 시작(재생), 우=환생(나비).
                스프라이트 자체가 버튼(박스 없음). 스프라이트는 sprites.js에서 주입. -->
           <div id="waveCenterControls" class="ui-overlay hidden">
             <button id="btnDecorate" class="sprite-btn" type="button" title="Decorate" aria-label="Decorate" data-i18n-title="controls.decorate" data-i18n-aria-label="controls.decorate"></button>
@@ -50,6 +50,7 @@
           </div>
           <div id="testControls" class="test-controls ui-overlay" aria-label="Test tools" data-i18n-aria-label="controls.testTools">
             <button id="btnLanguage" class="test-control" type="button" aria-label="Switch to Korean" title="Switch to Korean">KO</button>
+            <button id="btnReset" class="test-control test-reset" type="button" aria-label="Restart from scratch" title="Restart from scratch" data-i18n-title="controls.reset" data-i18n-aria-label="controls.reset">↻</button>
             <button id="btnDetectRanges" class="test-control on" type="button" aria-pressed="true" aria-label="Hide detection ranges" title="Hide detection ranges">◎</button>
             <button id="btnAllVampireLevelUp" class="test-control test-level-up" type="button" aria-label="Level up all Vamp Shrimp by 1" title="Level up all Vamp Shrimp by 1" data-i18n-aria-label="controls.levelAll" data-i18n-title="controls.levelAll">LV+</button>
           </div>
@@ -74,18 +75,19 @@
             <div class="decorate-palette" id="decoratePalette"></div>
           </div>
           <section id="info-panel">
-            <!-- 캐릭터 선택 시: [스탯 바] [데미지] [장착 스킬] [핫키].
-                 미선택 시: 스탯/데미지/장착 스킬 자리에 Vamp Shrimp 얼굴 2행6열([cardFaces])이 대신 나오고 핫키는 그대로. -->
+            <!-- 캐릭터 선택 시: [스탯/전투 지표] [장착 스킬] [핫키].
+                 미선택 시: 스탯/데미지/장착 스킬 자리에 Vamp Shrimp 얼굴 5칸([cardFaces])이 대신 나오고 핫키는 그대로. -->
             <div class="panel-grid">
               <div class="panel-card" id="cardStat">
-                <div class="card-title card-title-name" id="statName">—</div>
-                <div class="stat-row"><span class="stat-label">HP</span><div class="stat-bar sb-hp"><i id="pHpFill"></i><em id="pHpNum"></em></div></div>
-                <div class="stat-row"><span class="stat-label">MP</span><div class="stat-bar sb-mp"><i id="pMpFill"></i><em id="pMpNum"></em></div></div>
-                <div class="stat-row"><span class="stat-label">EXP</span><div class="stat-bar sb-exp"><i id="pExpFill"></i><em id="pExpNum"></em></div></div>
-              </div>
-              <div class="panel-card card-center" id="cardDmg">
-                <div class="dmg-value" id="pAtk">—</div>
-                <div class="dmg-sub">⚔ <span data-i18n="info.attack">ATK</span></div>
+                <div class="card-title card-title-name"><span id="statName">—</span><span id="statLevel">Lv.1</span></div>
+                <div class="stat-mix-grid">
+                  <div class="stat-mix-cell stat-bar-cell"><span class="stat-label">HP</span><div class="stat-bar sb-hp"><i id="pHpFill"></i><em id="pHpNum"></em></div></div>
+                  <div class="stat-mix-cell stat-value-cell"><span>ATK</span><b id="pAtk">—</b></div>
+                  <div class="stat-mix-cell stat-bar-cell"><span class="stat-label">MP</span><div class="stat-bar sb-mp"><i id="pMpFill"></i><em id="pMpNum"></em></div></div>
+                  <div class="stat-mix-cell stat-value-cell"><span>ARM</span><b id="pArm">—</b></div>
+                  <div class="stat-mix-cell stat-bar-cell"><span class="stat-label">EXP</span><div class="stat-bar sb-exp"><i id="pExpFill"></i><em id="pExpNum"></em></div></div>
+                  <div class="stat-mix-cell stat-value-cell"><span>SPD</span><b id="pSpd">—</b></div>
+                </div>
               </div>
               <div class="panel-card" id="cardSkill">
                 <div class="slot-grid" id="skillGrid"></div>
@@ -93,13 +95,44 @@
               </div>
               <div class="panel-card" id="cardFaces">
                 <div class="slot-grid face-grid" id="faceGrid"></div>
+                <div class="face-action-grid" aria-label="Shrimp actions">
+                  <div class="face-action-set" aria-label="Shrimp 1 actions">
+                    <button class="face-action-btn" type="button" aria-label="Shrimp 1 action 1"></button>
+                    <button class="face-action-btn" type="button" aria-label="Shrimp 1 action 2"></button>
+                    <button class="face-action-btn" type="button" aria-label="Shrimp 1 action 3"></button>
+                    <button class="face-action-btn" type="button" aria-label="Shrimp 1 action 4"></button>
+                  </div>
+                  <div class="face-action-set" aria-label="Shrimp 2 actions">
+                    <button class="face-action-btn" type="button" aria-label="Shrimp 2 action 1"></button>
+                    <button class="face-action-btn" type="button" aria-label="Shrimp 2 action 2"></button>
+                    <button class="face-action-btn" type="button" aria-label="Shrimp 2 action 3"></button>
+                    <button class="face-action-btn" type="button" aria-label="Shrimp 2 action 4"></button>
+                  </div>
+                  <div class="face-action-set" aria-label="Shrimp 3 actions">
+                    <button class="face-action-btn" type="button" aria-label="Shrimp 3 action 1"></button>
+                    <button class="face-action-btn" type="button" aria-label="Shrimp 3 action 2"></button>
+                    <button class="face-action-btn" type="button" aria-label="Shrimp 3 action 3"></button>
+                    <button class="face-action-btn" type="button" aria-label="Shrimp 3 action 4"></button>
+                  </div>
+                  <div class="face-action-set" aria-label="Shrimp 4 actions">
+                    <button class="face-action-btn" type="button" aria-label="Shrimp 4 action 1"></button>
+                    <button class="face-action-btn" type="button" aria-label="Shrimp 4 action 2"></button>
+                    <button class="face-action-btn" type="button" aria-label="Shrimp 4 action 3"></button>
+                    <button class="face-action-btn" type="button" aria-label="Shrimp 4 action 4"></button>
+                  </div>
+                  <div class="face-action-set" aria-label="Shrimp 5 actions">
+                    <button class="face-action-btn" type="button" aria-label="Shrimp 5 action 1"></button>
+                    <button class="face-action-btn" type="button" aria-label="Shrimp 5 action 2"></button>
+                    <button class="face-action-btn" type="button" aria-label="Shrimp 5 action 3"></button>
+                    <button class="face-action-btn" type="button" aria-label="Shrimp 5 action 4"></button>
+                  </div>
+                </div>
               </div>
               <div class="panel-card" id="cardHotkey">
-                <!-- 핫키: 기존 우상단 조작 버튼들을 이 그리드(2행3열)로 이전 -->
+                <!-- 핫키: 주 전투 조작 버튼 -->
                 <div class="slot-grid" id="hotkeyGrid">
-                  <button id="btnSkillTree" class="hotkey-slot assigned" title="Skill Tree" aria-label="Skill Tree" data-i18n-title="controls.skillTree" data-i18n-aria-label="controls.skillTree"><span class="hotkey-glyph">✦</span></button>
-                  <button id="btnAuto" class="hotkey-slot assigned" title="Auto wave" data-i18n-title="controls.autoWave">♻</button>
-                  <button id="btnReset" class="hotkey-slot assigned hotkey-danger" title="Restart from scratch" data-i18n-title="controls.reset">🔄</button>
+                  <button id="btnStat" class="hotkey-slot assigned stat-hotkey" title="Stats" aria-label="Stats" data-i18n-title="controls.stats" data-i18n-aria-label="controls.stats"><span class="hotkey-glyph">STAT</span></button>
+                  <button id="btnSkillTree" class="hotkey-slot assigned skill-hotkey" title="Skill Tree" aria-label="Skill Tree" data-i18n-title="controls.skillTree" data-i18n-aria-label="controls.skillTree"><span class="hotkey-glyph">SKILL</span></button>
                 </div>
                 <div id="versionBadge">v0003</div>
               </div>

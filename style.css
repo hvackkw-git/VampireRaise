@@ -1,15 +1,54 @@
 /* 뱀파이어 키우기 — 320×640 논리 해상도, Shrimprium 픽셀 UI 톤 재활용 */
-* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  letter-spacing: 0;
+  -webkit-tap-highlight-color: transparent;
+}
 html, body {
   background: #0b0710;
   color: #f0e6ff;
   font-family: Galmuri11, Galmuri9, monospace;
+  font-weight: 700;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
   height: 100%;
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
 }
-button { font-family: inherit; color: inherit; }
+button, input, select, textarea {
+  font-family: inherit;
+  font-weight: inherit;
+  color: inherit;
+}
+button,
+.hud-chip,
+#versionBadge,
+.deco-btn,
+.palette-item,
+.bar,
+.bar > i,
+.panel-card,
+.stat-mix-cell,
+.stat-bar,
+.skill-slot,
+.hotkey-slot,
+.face-slot,
+.face-action-btn,
+.skill-tree-panel,
+.skill-tree-header,
+.skill-tree-close,
+.skill-tree-level,
+.skill-tree-points,
+.skill-tree-board,
+.skill-tree-node,
+.dash-alloc,
+.dash-alloc-reset,
+.skill-tree-level-up {
+  border-radius: 0 !important;
+}
 .hidden { display: none !important; }
 
 #app { height: 100%; display: flex; justify-content: center; }
@@ -79,6 +118,12 @@ button { font-family: inherit; color: inherit; }
   color: #bdefff;
   background: rgba(28, 65, 76, 0.88);
 }
+.test-reset {
+  border-color: #8e3448;
+  color: #ff9aaa;
+  background: rgba(70, 20, 30, 0.88);
+  font-size: 13px;
+}
 .test-level-up {
   width: 35px;
   border-color: #8e3448;
@@ -91,15 +136,14 @@ button { font-family: inherit; color: inherit; }
 #tank.detect-ranges-hidden .char-detect { display: none !important; }
 
 #versionBadge {
-  align-self: center;
-  margin-top: 4px;
-  padding: 1px 6px;
+  align-self: flex-end;
+  margin-top: 3px;
+  padding: 1px 3px;
   border: 1px solid rgba(255, 210, 87, 0.55);
   border-radius: 7px;
   background: rgba(20, 10, 34, 0.72);
   color: #ffd257;
-  font-size: 9px;
-  letter-spacing: 0.04em;
+  font-size: 8px;
   pointer-events: none;
 }
 
@@ -555,7 +599,7 @@ button { font-family: inherit; color: inherit; }
 /* ── 상시 정보 패널 (패널 영역 내부): 캐릭터 4열 ── */
 #info-panel {
   height: 100%;
-  padding: 6px 7px;
+  padding: 6px 4px;
   display: flex;
   flex-direction: column;
 }
@@ -573,8 +617,8 @@ button { font-family: inherit; color: inherit; }
 .panel-grid {
   flex: 1;
   display: grid;
-  grid-template-columns: 84px 46px 66px 88px;
-  gap: 5px;
+  grid-template-columns: 135px 1fr 58px;
+  gap: 3px;
   min-height: 0;
 }
 .panel-card {
@@ -591,25 +635,67 @@ button { font-family: inherit; color: inherit; }
   flex: 0 0 auto;
   font-size: 9px;
   color: #8a76a8;
-  letter-spacing: 0.04em;
   margin-bottom: 4px;
   white-space: nowrap;
 }
-.card-title-name { font-size: 10px; color: #f0e6ff; }
+.card-title-name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  font-size: 10px;
+  color: #f0e6ff;
+}
+#statName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#statLevel {
+  flex: 0 0 auto;
+  color: #ffd257;
+}
 #info-panel.no-char .panel-card { opacity: 0.55; }
 
 /* 캐릭터 미선택(squad-mode): 스탯/데미지/장착 스킬 대신 뱀파이어 얼굴 그리드, 핫키는 그대로 */
 #cardFaces { display: none; }
 #info-panel.squad-mode #cardStat,
-#info-panel.squad-mode #cardDmg,
 #info-panel.squad-mode #cardSkill { display: none; }
 #info-panel.squad-mode #cardFaces { display: flex; }
-#info-panel.squad-mode .panel-grid { grid-template-columns: 1fr 88px; }
+#info-panel.squad-mode .panel-grid { grid-template-columns: 1fr 58px; }
+#cardFaces {
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 2px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
 
-/* 1열: HP/MP/EXP 바 */
-.stat-row { display: flex; align-items: center; gap: 4px; margin-top: 3px; }
+.stat-mix-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  grid-template-rows: repeat(3, 1fr);
+  gap: 3px;
+  min-height: 0;
+}
+.stat-mix-cell {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  border: 1px solid #55396b;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.28);
+}
+.stat-bar-cell {
+  gap: 3px;
+  padding: 0 3px;
+}
 .stat-label {
-  flex: 0 0 20px;
+  flex: 0 0 18px;
   font-size: 8px;
   color: #9c88bc;
   text-align: right;
@@ -636,20 +722,22 @@ button { font-family: inherit; color: inherit; }
 .sb-mp > i { background: linear-gradient(90deg, #2a5fb0, #4d9fdc); }
 .sb-exp > i { background: linear-gradient(90deg, #7a50c0, #a880e8); }
 
-/* 2열: 데미지 */
-.card-center { align-items: center; text-align: center; }
-.dmg-value {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  font-size: 20px;
-  font-weight: 700;
-  color: #ff8898;
-  text-shadow: 0 0 8px rgba(224, 72, 88, 0.45);
+.stat-value-cell {
+  justify-content: space-between;
+  gap: 2px;
+  padding: 0 3px;
 }
-.dmg-sub { flex: 0 0 auto; font-size: 8px; color: #6a5888; padding-bottom: 2px; }
+.stat-value-cell span {
+  font-size: 7px;
+  color: #9c88bc;
+}
+.stat-value-cell b {
+  font-size: 10px;
+  color: #ff8898;
+  text-shadow: 0 0 6px rgba(224, 72, 88, 0.35);
+}
 
-/* 3~4열: 슬롯 그리드 (스킬 2×2 / 핫키 2×3) */
+/* 3~4열: 슬롯 그리드 (스킬 2×2 / 핫키) */
 .slot-grid {
   display: grid;
   grid-template-columns: repeat(2, 26px);
@@ -665,11 +753,33 @@ button { font-family: inherit; color: inherit; }
   border-radius: 5px;
 }
 .skill-slot {
+  position: relative;
   background: #2c1430;
   border: 1px solid #7a3050;
   box-shadow: inset 0 0 5px rgba(224, 72, 88, 0.25);
 }
 .skill-slot img { width: 20px; height: 20px; image-rendering: pixelated; }
+.skill-slot.cooldown {
+  background: #1a1720;
+  border-color: #504a58;
+  box-shadow: none;
+}
+.skill-slot.cooldown img {
+  filter: grayscale(1) brightness(0.48);
+  opacity: 0.6;
+}
+.skill-cd {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #f0e6ff;
+  font-size: 12px;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95);
+  pointer-events: none;
+}
 .skill-slot.locked {
   background: #241536;
   border: 1px dashed #55396b;
@@ -685,23 +795,61 @@ button { font-family: inherit; color: inherit; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
-#cardHotkey .slot-grid { grid-template-columns: repeat(3, 24px); gap: 3px; }
+#cardHotkey .slot-grid {
+  grid-template-columns: 58px;
+  gap: 4px;
+  justify-content: end;
+}
+#cardHotkey {
+  align-items: flex-end;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
 .face-grid {
-  grid-template-columns: repeat(6, 26px);
-  gap: 3px;
+  grid-template-columns: repeat(5, 44px);
+  gap: 1px;
+  justify-content: start;
+  align-content: start;
+}
+.face-action-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 44px);
+  gap: 1px;
+  justify-content: start;
+  align-content: start;
+}
+.face-action-set {
+  display: grid;
+  grid-template-columns: repeat(4, 11px);
+  gap: 0;
   justify-content: center;
-  align-content: center;
+}
+.face-action-btn {
+  width: 11px;
+  height: 11px;
+  border: 1px solid #4f3b6c;
+  border-radius: 2px;
+  background: #241536;
+  box-shadow: inset 0 0 4px rgba(140, 100, 190, 0.18);
+  cursor: pointer;
+  padding: 0;
+}
+.face-action-btn:active {
+  background: #2f1b44;
+  border-color: #7a5da0;
 }
 .face-slot {
   position: relative;
-  width: 26px; height: 26px;
+  width: 44px; height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 5px;
   background: #241536;
   border: 1px solid #55396b;
-  font-size: 14px;
+  font-size: 22px;
   color: inherit;
   cursor: pointer;
   padding: 0;
@@ -725,7 +873,7 @@ button { font-family: inherit; color: inherit; }
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   color: #ffd7d7;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
@@ -733,8 +881,8 @@ button { font-family: inherit; color: inherit; }
 }
 .face-slot small {
   position: absolute;
-  right: 1px; bottom: 0;
-  font-size: 6px;
+  right: 2px; bottom: 1px;
+  font-size: 7px;
   color: #cbb8e8;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.8);
 }
@@ -776,8 +924,20 @@ button { font-family: inherit; color: inherit; }
 }
 .hotkey-slot i:empty { display: none; }
 .hotkey-glyph { font-size: 13px; line-height: 1; }
+.skill-hotkey,
+.stat-hotkey {
+  width: 58px;
+  height: 25px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.skill-hotkey .hotkey-glyph,
+.stat-hotkey .hotkey-glyph {
+  font-size: 10px;
+  line-height: 1;
+}
 
-/* ── 중앙 픽셀 스프라이트 버튼: 좌=꾸미기(망치), 가운데=시작(재생), 우=재시작(나비) ──
+/* ── 중앙 픽셀 스프라이트 버튼: 좌=꾸미기(망치), 가운데=시작(재생), 우=환생(나비) ──
    박스 없음 — 스프라이트 자체가 버튼. color가 곧 스프라이트 색이다. */
 #waveCenterControls {
   left: 50%; top: 50%;
@@ -796,10 +956,11 @@ button { font-family: inherit; color: inherit; }
   cursor: pointer;
   color: #565163; /* 비활성: 회색 */
   -webkit-tap-highlight-color: transparent;
-  transition: transform 0.08s ease, color 0.12s ease;
+  opacity: 0.45;
+  transition: transform 0.08s ease, color 0.12s ease, opacity 0.12s ease;
 }
 .sprite-btn:not(:disabled) { color: #f2f2f6; } /* 활성: 흰색 */
-.sprite-btn:disabled { cursor: default; }
+.sprite-btn:disabled { cursor: default; opacity: 0.28; }
 .pixel-sprite {
   display: block;
   width: 100%; height: 100%;
@@ -813,12 +974,12 @@ button { font-family: inherit; color: inherit; }
 #btnWave.armed    { color: #35d17a; } /* 재생 → 초록 */
 #btnRebirth.armed { color: #ff3b52; } /* 나비 → 빨강 */
 #btnDecorate.armed { color: #ffd23f; } /* 망치 → 노랑 */
-.sprite-btn.armed { transform: scale(1.12); }
+.sprite-btn.armed { opacity: 1; transform: scale(1.12); }
 .sprite-btn.armed .pixel-sprite {
   filter: drop-shadow(0 0 5px currentColor) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
 }
 
-/* 재시작 잠김: 필요한 웨이브 수 배지 */
+/* 환생 잠김: 필요한 웨이브 수 배지 */
 #rebirthReq {
   position: absolute;
   bottom: -3px; right: -5px;
@@ -1090,7 +1251,6 @@ button { font-family: inherit; color: inherit; }
   margin: 0;
   font-size: 10px;
   color: #e6d9a8;
-  letter-spacing: 0.02em;
 }
 .dash-alloc-points {
   flex: 1 1 auto;
