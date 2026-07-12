@@ -685,7 +685,7 @@ button { font-family: inherit; color: inherit; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
-#cardHotkey .slot-grid { grid-template-columns: repeat(2, 24px); gap: 3px; }
+#cardHotkey .slot-grid { grid-template-columns: repeat(3, 24px); gap: 3px; }
 .face-grid {
   grid-template-columns: repeat(6, 26px);
   gap: 3px;

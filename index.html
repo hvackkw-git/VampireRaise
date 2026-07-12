@@ -41,8 +41,12 @@
             <span id="hudHumans" class="hud-chip"></span>
             <span id="hudBlood" class="hud-chip">🩸 0</span>
           </header>
-          <!-- 웨이브 종료/대기 중에만 노출되는 중앙 큰 버튼: 좌=웨이브 시작, 우=재시작(Rebirth) -->
+          <!-- 웨이브 종료/대기 중에만 노출되는 중앙 큰 버튼: 좌=꾸미기, 가운데=웨이브 시작, 우=재시작(Rebirth) -->
           <div id="waveCenterControls" class="ui-overlay hidden">
+            <button id="btnDecorate" class="wave-center-btn" title="Decorate" data-i18n-title="controls.decorate">
+              <span class="wcb-glyph">🛠</span>
+              <span class="wcb-label" data-i18n="controls.decorate">Decorate</span>
+            </button>
             <button id="btnWave" class="wave-center-btn" title="Start wave" data-i18n-title="controls.startWave">
               <span class="wcb-glyph">▶</span>
               <span class="wcb-label" data-i18n="controls.startWave">Start wave</span>
@@ -103,7 +107,6 @@
                 <div class="slot-grid" id="hotkeyGrid">
                   <button id="btnSkillTree" class="hotkey-slot assigned" title="Skill Tree" aria-label="Skill Tree" data-i18n-title="controls.skillTree" data-i18n-aria-label="controls.skillTree"><span class="hotkey-glyph">✦</span></button>
                   <button id="btnAuto" class="hotkey-slot assigned" title="Auto wave" data-i18n-title="controls.autoWave">♻</button>
-                  <button id="btnDecorate" class="hotkey-slot assigned" title="Decorate" data-i18n-title="controls.decorate">🛠</button>
                   <button id="btnReset" class="hotkey-slot assigned hotkey-danger" title="Restart from scratch" data-i18n-title="controls.reset">🔄</button>
                 </div>
                 <div id="versionBadge">v0003</div>
