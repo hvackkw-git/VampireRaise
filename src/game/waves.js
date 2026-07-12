@@ -129,12 +129,33 @@ export function vampireCount(state) {
   return state.chars.items.filter((c) => c.side === "vampire").length;
 }
 
+/**
+ * 재시작 문턱(현재 마릿수의 요구 웨이브)에 도달했는가 — active 무관.
+ * 한 번 도달하면 state.wave.rebirthUnlocked로 래치되어, 게임오버로 웨이브가
+ * 1로 리셋돼도 재시작 가능 상태가 유지된다. (rebirth 실행 시 마릿수가 늘어
+ * 문턱이 올라가므로 래치는 해제된다.)
+ */
+export function rebirthUnlockable(state) {
+  const count = vampireCount(state);
+  if (count >= REBIRTH_MAX_VAMPIRES) return false;
+  return state.wave.current >= rebirthWaveRequirement(count);
+}
+
+/** 재시작 가능 여부를 래치에 반영 (한 번 켜지면 유지). @returns {boolean} 방금 켜졌는지 */
+export function updateRebirthUnlock(state) {
+  if (!state.wave.rebirthUnlocked && rebirthUnlockable(state)) {
+    state.wave.rebirthUnlocked = true;
+    return true;
+  }
+  return false;
+}
+
 /** 지금 재시작(웨이브 리셋 + Vamp Shrimp 1마리 증원)이 가능한가 */
 export function canRebirth(state) {
   if (state.wave.active) return false;
   const count = vampireCount(state);
   if (count >= REBIRTH_MAX_VAMPIRES) return false;
-  return state.wave.current >= rebirthWaveRequirement(count);
+  return state.wave.rebirthUnlocked || state.wave.current >= rebirthWaveRequirement(count);
 }
 
 /**
@@ -155,6 +176,8 @@ export function rebirth(state, rng = Math.random) {
   state.core.hp = state.core.max ?? BASE_CORE_HP;
   reviveVampires(state, rng);
   createCharacter(state, "vampire");
+  // 마릿수가 늘어 다음 문턱이 올라가므로 래치 해제 — 새 문턱에 다시 도달해야 활성
+  state.wave.rebirthUnlocked = false;
   return true;
 }
 
@@ -217,6 +240,9 @@ export function tickWaves(state, simDt, rng = Math.random, blockPowered = null) 
       events.push({ type: "routeblocked" });
     }
   }
+
+  // 재시작 문턱 도달 여부를 래치 (한 번 켜지면 게임오버 리셋에도 유지)
+  updateRebirthUnlock(state);
 
   return events;
 }

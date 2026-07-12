@@ -17,6 +17,7 @@ export function initHud(state, { onDecorate, onReset, getBlockPowered, isDecorat
   const btnRebirth = document.getElementById("btnRebirth");
   const btnDecorate = document.getElementById("btnDecorate");
   const elRebirthReq = document.getElementById("rebirthReq");
+  const waveCenterControls = document.getElementById("waveCenterControls");
 
   const showStartFailure = () => {
     if (state.wave.lastStartError === "noPath") showToast(t("hud.noRoute"));
@@ -97,15 +98,17 @@ export function initHud(state, { onDecorate, onReset, getBlockPowered, isDecorat
     const humans = humansAlive(state);
     elHumans.textContent = state.wave.active ? `🙍 ${humans}` : "";
     elBlood.textContent = `🩸 ${state.blood}`;
-    btnWave.disabled = state.wave.active;
-    btnWave.textContent = state.wave.active ? "⏳" : "▶";
+    // 중앙 버튼(시작·재시작)은 웨이브 종료/대기 중에만 통째로 노출
+    waveCenterControls.classList.toggle("hidden", state.wave.active);
     btnAuto.classList.toggle("on", state.wave.auto);
     btnAuto.disabled = !!isDecorating?.();
     btnDecorate.disabled = state.wave.active;
     const count = vampireCount(state);
     const maxed = count >= REBIRTH_MAX_VAMPIRES;
-    btnRebirth.disabled = state.wave.active;
-    btnRebirth.classList.toggle("ready", !maxed && canRebirth(state));
+    const rebirthReady = !maxed && canRebirth(state);
+    // 조건 미충족이면 비활성, 충족되면 활성(ready 강조)
+    btnRebirth.disabled = !rebirthReady;
+    btnRebirth.classList.toggle("ready", rebirthReady);
     elRebirthReq.textContent = maxed ? "" : String(rebirthWaveRequirement(count));
   }
   render();
