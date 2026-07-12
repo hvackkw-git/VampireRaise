@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Bake the swarthy blood-red vampire shrimp with crisp black shell/segment outlines.
+"""Bake the vivid-red vampire shrimp with crisp black shell/segment outlines.
 
-Remaps the bright cherry-red sheet so its two dominant deep tones collapse to
-near-black — the same trick that gives the zombie shrimp its outlined, jointed
-look — while the mid/light tones stay dark crimson so the vampire reads red,
-just darker and clearly segmented.
+The cherry-red sheet already paints its silhouette edge in one deep magenta
+tone and its shell/joint lines in another. Recolouring just those two tones to
+near-black — the same colours the zombie shrimp uses — gives the vampire clean
+black outlines and abdomen segments while the bright-red body fill is left
+untouched, so it stays as vivid as the original.
 """
 
 import argparse
@@ -14,13 +15,11 @@ from PIL import Image
 
 
 PALETTE = {
-    (180, 6, 83): (7, 4, 6),        # dominant body fill -> near-black (swarthy)
-    (200, 17, 70): (1, 1, 2),       # deep red -> black shell/segment outline
-    (243, 65, 63): (150, 26, 40),   # bright red -> dark blood-red mid tone
-    (250, 161, 148): (196, 70, 72), # pink -> muted crimson highlight
-    (248, 219, 206): (224, 150, 150),  # pale -> soft rose highlight
+    (180, 6, 83): (5, 4, 8),        # silhouette outline -> near-black shell
+    (200, 17, 70): (1, 1, 3),       # shell/joint lines -> black segments
     (31, 40, 35): (0, 0, 0),        # eye -> pure black
-    (255, 255, 255): (245, 235, 235),  # specular -> warm near-white
+    # (243,65,63) vivid red, (250,161,148) pink, (248,219,206) pale highlight,
+    # and (255,255,255) specular are left as-is to keep the body bright red.
 }
 
 
