@@ -41,20 +41,12 @@
             <span id="hudHumans" class="hud-chip"></span>
             <span id="hudBlood" class="hud-chip">🩸 0</span>
           </header>
-          <!-- 웨이브 종료/대기 중에만 노출되는 중앙 큰 버튼: 좌=꾸미기, 가운데=웨이브 시작, 우=재시작(Rebirth) -->
+          <!-- 웨이브 종료/대기 중에만 노출되는 중앙 픽셀 스프라이트 버튼: 좌=꾸미기(망치), 가운데=웨이브 시작(재생), 우=재시작(나비).
+               스프라이트 자체가 버튼(박스 없음). 스프라이트는 sprites.js에서 주입. -->
           <div id="waveCenterControls" class="ui-overlay hidden">
-            <button id="btnDecorate" class="wave-center-btn" title="Decorate" data-i18n-title="controls.decorate">
-              <span class="wcb-glyph">🛠</span>
-              <span class="wcb-label" data-i18n="controls.decorate">Decorate</span>
-            </button>
-            <button id="btnWave" class="wave-center-btn" title="Start wave" data-i18n-title="controls.startWave">
-              <span class="wcb-glyph">▶</span>
-              <span class="wcb-label" data-i18n="controls.startWave">Start wave</span>
-            </button>
-            <button id="btnRebirth" class="wave-center-btn wcb-rebirth" title="Rebirth" data-i18n-title="controls.rebirth">
-              <span class="wcb-glyph">🥚<i id="rebirthReq"></i></span>
-              <span class="wcb-label" data-i18n="controls.rebirth">Rebirth</span>
-            </button>
+            <button id="btnDecorate" class="sprite-btn" type="button" title="Decorate" aria-label="Decorate" data-i18n-title="controls.decorate" data-i18n-aria-label="controls.decorate"></button>
+            <button id="btnWave" class="sprite-btn" type="button" title="Start wave" aria-label="Start wave" data-i18n-title="controls.startWave" data-i18n-aria-label="controls.startWave"></button>
+            <button id="btnRebirth" class="sprite-btn" type="button" title="Rebirth" aria-label="Rebirth" data-i18n-title="controls.rebirth" data-i18n-aria-label="controls.rebirth"><i id="rebirthReq"></i></button>
           </div>
           <div id="testControls" class="test-controls ui-overlay" aria-label="Test tools" data-i18n-aria-label="controls.testTools">
             <button id="btnLanguage" class="test-control" type="button" aria-label="Switch to Korean" title="Switch to Korean">KO</button>

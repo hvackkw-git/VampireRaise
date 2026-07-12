@@ -777,63 +777,61 @@ button { font-family: inherit; color: inherit; }
 .hotkey-slot i:empty { display: none; }
 .hotkey-glyph { font-size: 13px; line-height: 1; }
 
-/* ── 웨이브 종료/대기 중 중앙 큰 버튼: 좌=시작, 우=재시작(Rebirth) ── */
+/* ── 중앙 픽셀 스프라이트 버튼: 좌=꾸미기(망치), 가운데=시작(재생), 우=재시작(나비) ──
+   박스 없음 — 스프라이트 자체가 버튼. color가 곧 스프라이트 색이다. */
 #waveCenterControls {
   left: 50%; top: 50%;
   transform: translate(-50%, -50%);
   display: flex;
-  gap: 16px;
+  gap: 26px;
   align-items: center;
   z-index: 25;
 }
-.wave-center-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  width: 84px; height: 84px;
-  padding: 0;
-  border-radius: 14px;
-  border: 2px solid #8b6b2a;
-  background: rgba(41, 33, 22, 0.92);
-  color: #f0d47a;
-  cursor: pointer;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45), inset 0 0 10px rgba(215, 180, 89, 0.18);
-}
-.wave-center-btn .wcb-glyph {
+.sprite-btn {
   position: relative;
-  font-size: 30px;
-  line-height: 1;
+  width: 54px; height: 54px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #565163; /* 비활성: 회색 */
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.08s ease, color 0.12s ease;
 }
-.wave-center-btn .wcb-label {
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1;
+.sprite-btn:not(:disabled) { color: #f2f2f6; } /* 활성: 흰색 */
+.sprite-btn:disabled { cursor: default; }
+.pixel-sprite {
+  display: block;
+  width: 100%; height: 100%;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.55));
 }
-.wave-center-btn:disabled {
-  opacity: 0.45;
-  cursor: default;
-  filter: grayscale(0.4);
+.sprite-btn:not(:disabled):hover { transform: translateY(-1px) scale(1.08); }
+.sprite-btn:not(:disabled):active { transform: scale(0.94); }
+
+/* armed(1탭): 스프라이트에 색이 들어오고 그 색으로 은은하게 발광 */
+#btnWave.armed    { color: #35d17a; } /* 재생 → 초록 */
+#btnRebirth.armed { color: #ff3b52; } /* 나비 → 빨강 */
+#btnDecorate.armed { color: #ffd23f; } /* 망치 → 노랑 */
+.sprite-btn.armed { transform: scale(1.12); }
+.sprite-btn.armed .pixel-sprite {
+  filter: drop-shadow(0 0 5px currentColor) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
 }
-/* 재시작 활성(조건 충족): 초록 강조 */
-.wave-center-btn.wcb-rebirth.ready {
-  border-color: #4fbea3;
-  background: rgba(23, 51, 45, 0.94);
-  color: #8de2ce;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 12px rgba(79, 190, 163, 0.45);
-}
-.wave-center-btn .wcb-glyph i {
+
+/* 재시작 잠김: 필요한 웨이브 수 배지 */
+#rebirthReq {
   position: absolute;
-  bottom: -4px; right: -8px;
+  bottom: -3px; right: -5px;
   font-style: normal;
-  font-size: 10px;
+  font-size: 9px;
+  font-weight: 700;
   color: #ffd0da;
   background: rgba(20, 10, 34, 0.9);
   border-radius: 6px;
   padding: 0 3px;
+  pointer-events: none;
 }
-.wave-center-btn .wcb-glyph i:empty { display: none; }
+#rebirthReq:empty { display: none; }
 
 /* ── 스킬 트리: 320×790 논리 화면 전체를 사용하는 세로 패널 ── */
 .skill-tree-panel {
