@@ -129,8 +129,10 @@ export function renderInfoPanel(char, account = null) {
 
 /**
  * 선택한 캐릭터가 없을 때(탭 해제 상태) 보여주는 화면 — 스탯/데미지/장착 스킬 자리에
- * 생존 Vamp Shrimp 얼굴 그리드(2행6열)를 대신 띄운다. 얼굴을 탭하면 그 캐릭터가 선택된다.
- * @param {object[]} vampires 생존 Vamp Shrimp 목록
+ * Vamp Shrimp 얼굴 그리드(2행6열)를 대신 띄운다. 얼굴을 탭하면 그 캐릭터가 선택된다.
+ * 사망한 Vamp Shrimp도 자기 순서 칸에 그대로 남아, 얼굴 위에 부활까지 남은 초를
+ * 카운트다운으로 겹쳐 보여준다(탭 불가). 전멸해도 이 그리드로 부활 시점을 알린다.
+ * @param {object[]} vampires Vamp Shrimp 목록(생존·사망 모두)
  * @param {{level:number, exp:number}|null} account 계정 성장 상태 (상단 levelBar)
  */
 export function renderSquadPanel(vampires, account = null) {
@@ -150,11 +152,22 @@ export function renderSquadPanel(vampires, account = null) {
   els.faceSlots.forEach((slot, i) => {
     const v = sorted[i];
     slot.classList.toggle("empty", !v);
-    slot.disabled = !v;
+    slot.classList.toggle("dead", !!v && !!v.dead);
+    slot.disabled = !v || !!v.dead;
     if (v) {
-      slot.innerHTML = `${SIDE_ICON.vampire}<small>${v.vampireOrder ?? i + 1}</small>`;
-      slot.title = `${t("info.numberedVamp", { number: v.vampireOrder ?? i + 1 })} Lv.${v.level}`;
-      slot.onclick = () => onSelectVampireCb?.(v.id);
+      const order = v.vampireOrder ?? i + 1;
+      if (v.dead) {
+        const secs = Math.max(0, Math.ceil(Number(v._reviveCd) || 0));
+        slot.innerHTML =
+          `<span class="face-ico">${SIDE_ICON.vampire}</span>` +
+          `<span class="revive-cd">${secs}</span><small>${order}</small>`;
+        slot.title = t("info.reviveIn", { number: order, secs });
+        slot.onclick = null;
+      } else {
+        slot.innerHTML = `${SIDE_ICON.vampire}<small>${order}</small>`;
+        slot.title = `${t("info.numberedVamp", { number: order })} Lv.${v.level}`;
+        slot.onclick = () => onSelectVampireCb?.(v.id);
+      }
     } else {
       slot.innerHTML = "";
       slot.title = "";
