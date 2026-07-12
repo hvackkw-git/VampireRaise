@@ -148,6 +148,31 @@ describe("핑 추적", () => {
     expect(vamp.state).toBe("JUMP");
     expect(vamp.vy).toBeLessThan(0);
   });
+
+  it("왔다갔다가 1초 넘게 띄엄띄엄이면(창 밖) 탈출하지 않고 계속 걷는다", () => {
+    const platform = { id: 1, x: 80, y: 500, blockType: "platform_block" };
+    state.platforms.items.push(platform);
+    const vamp = put("vampire", 90, { y: platform.y - CHAR_SIZE });
+    const human = put("human", 170);
+    vamp._platformId = platform.id;
+    vamp._dashCd = 999;
+    vamp._pingCd = 999;
+    vamp._ping = { targetId: human.id, x: human.x + human.w / 2, y: human.y + human.h / 2 };
+
+    // 1차 왔다갔다 한 번 (아직 3구간 미만 → 탈출 아님)
+    vamp.dir = -1;
+    tickAggro(state, 0.1, () => 0.9);
+    expect(vamp.state).toBe("CRAWL");
+
+    // 1초 넘게 목표 방향으로만 진행 → 1차 왔다갔다 구간이 창을 벗어난다
+    for (let i = 0; i < 6; i++) tickAggro(state, 0.2, () => 0.9);
+
+    // 2차 왔다갔다 — 1차와 1초 이상 떨어져 있으므로 창 안 구간은 다시 2개뿐, 탈출 안 함
+    vamp.dir = -1;
+    tickAggro(state, 0.1, () => 0.9);
+    expect(vamp.state).toBe("CRAWL");
+    expect(vamp._dropThroughId).toBeFalsy();
+  });
 });
 
 describe("뱀파이어 패시브: 혈귀 돌진", () => {

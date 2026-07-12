@@ -4,7 +4,10 @@
 // 적에게 핑을 찍고, 다음 갱신까지 그 대상을 향해 걷는다. 갱신 시점에 감지 원 안에
 // 적이 없으면 핑을 지우고 랜덤 배회로 돌아간다 (감지 범위는 향후 성장 요소).
 //
-// 기본 핑 추적은 경로 탐색 없이 수평으로 걷는다. 단, Vamp Shrimp 돌진은 중력을
+// 기본 핑 추적은 경로 탐색 없이 수평으로 걷는다. 이때 다른 높이의 핑을 쫓다 제자리에서
+// 왔다갔다(1초 안에 왼오왼/오왼오)만 하게 되면 — 벽·발판에 막혀 못 다가가는 상황 —
+// 핑이 아래면 발판을 통과해 내려가고, 위면 핑 쪽으로 점프해 교착을 스스로 푼다
+// (핑과 높이가 같으면 그대로 걷기만 한다). 단, Vamp Shrimp 돌진은 중력을
 // 무시하며, 플랫폼 블록을 장애물로 둔 20px 그리드 BFS 최단 경로가 감지범위×2
 // 예산 이내인 적에게 그 최단 경로의 웨이포인트를 따라 날아간다.
 // 지형 기준은 물리와 동일: 전원 ON(투명) 게이트는 벽이 아니고, up-가시·스프링·
@@ -38,8 +41,10 @@ import {
 /** 감지·추적이 동작하는 상태 (지상 행동 중일 때만 주변을 살핀다) */
 const AWARE_STATES = new Set(["CRAWL"]);
 const PING_VERTICAL_ESCAPE_GAP = 10;
-const PING_WOBBLE_ESCAPE_STEPS = 3;
-const PING_WOBBLE_MIN_INTERVAL_S = 0.08;
+// 제자리 왔다갔다 감지: 방향 구간이 왼오왼/오왼오 = 3개(WOBBLE_ESCAPE_SEGMENTS) 쌓이면
+// 1초(WOBBLE_WINDOW_S) 창 안에 몰려 있을 때만 탈출한다. 느긋한 방향 전환은 창을 벗어나 무시.
+const WOBBLE_WINDOW_S = 1.0;
+const WOBBLE_ESCAPE_SEGMENTS = 3;
 
 /**
  * 돌진 종료.
@@ -485,37 +490,45 @@ function pingTargetPoint(c, t) {
   };
 }
 
+/**
+ * 왔다갔다 누적기. 매 프레임 방향 후보들(직전 방향 c.dir, 이번에 가려는 desiredDir)을 넣으면
+ * 방향이 뒤집힐 때마다 그 시각(simDt 누적 clock)을 큐에 쌓는다. 큐에서 1초보다 오래된 구간은
+ * 버리므로, "1초 안에 방향 구간 3개(왼오왼/오왼오)"가 몰릴 때만 true를 돌려준다.
+ * clock을 simDt로 누적하므로 실시간(nowMs) 없이도 테스트/게임에서 똑같이 동작한다.
+ */
+function feedPingWobble(c, targetId, dirs, simDt) {
+  let w = c._pingWobble;
+  if (!w || w.targetId !== targetId) {
+    w = c._pingWobble = { targetId, clock: 0, dir: 0, times: [] };
+  }
+  w.clock += simDt;
+  let escaped = false;
+  for (const dir of dirs) {
+    if (dir !== 1 && dir !== -1) continue;
+    if (dir !== w.dir) {
+      w.dir = dir;
+      w.times.push(w.clock);
+    }
+    while (w.times.length && w.clock - w.times[0] > WOBBLE_WINDOW_S) w.times.shift();
+    if (w.times.length >= WOBBLE_ESCAPE_SEGMENTS) escaped = true;
+  }
+  return escaped;
+}
+
 function shouldEscapePingWobble(c, t, desiredDir, simDt) {
   const target = pingTargetPoint(c, t);
   const cy = c.y + c.h / 2;
+  // 핑과 높이(Y축)가 사실상 같으면 왔다갔다여도 아무 동작 안 함.
   if (Math.abs(target.y - cy) < PING_VERTICAL_ESCAPE_GAP) {
     resetPingWobble(c);
     return false;
   }
-
-  const key = `${c._ping?.targetId ?? t.id}:${Math.round(target.y)}`;
-  if (!c._pingWobble || c._pingWobble.key !== key) {
-    c._pingWobble = { key, steps: 0, lastDir: 0, elapsed: PING_WOBBLE_MIN_INTERVAL_S };
-  }
-  c._pingWobble.elapsed += simDt;
-
-  if (c._pingWobble.elapsed < PING_WOBBLE_MIN_INTERVAL_S) {
-    return false;
-  }
-
-  const noteDir = (dir) => {
-    if (dir !== 1 && dir !== -1) return false;
-    if (c._pingWobble.lastDir === dir) return false;
-    c._pingWobble.lastDir = dir;
-    c._pingWobble.steps += 1;
-    return c._pingWobble.steps >= PING_WOBBLE_ESCAPE_STEPS;
-  };
-
-  const escaped = noteDir(c.dir) || (desiredDir !== c.dir && noteDir(desiredDir));
-  if (desiredDir !== c.dir) c._pingWobble.elapsed = 0;
-  return escaped;
+  return feedPingWobble(c, c._ping?.targetId ?? t.id, [c.dir, desiredDir], simDt);
 }
 
+/**
+ * 왔다갔다 탈출 행동: 핑이 아래면 발판을 통과해 내려가고, 위(또는 옆)면 핑 x쪽으로 점프한다.
+ */
 function escapePingWobble(c, t, rng) {
   const target = pingTargetPoint(c, t);
   const cy = c.y + c.h / 2;
@@ -524,6 +537,8 @@ function escapePingWobble(c, t, rng) {
     startDrop(c);
     return true;
   }
+  const dx = target.x - (c.x + c.w / 2);
+  if (Math.abs(dx) > 1) c.dir = dx > 0 ? 1 : -1; // 핑 찍힌 곳을 향해 뛰도록 방향 정렬
   return startJump(c, rng, 40, 20);
 }
 
