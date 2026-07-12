@@ -114,7 +114,17 @@ describe("핑 추적", () => {
     expect(vamp._ping).toBeNull();
   });
 
-  it("다른 높이의 핑 목표를 쫓다 왼오왼 방향 시퀀스가 되면 아래로 드롭스루한다", () => {
+  // 실제 수평 이동(위치 변화)이 왼→오→왼으로 뒤집혀 3구간이 되면 탈출한다.
+  // 각 tickAggro 전에 vamp.x를 옮겨 화면상 '왔다리갔다리'를 그대로 재현.
+  const wobbleX = (vamp, xs, dt = 0.1) => {
+    for (const x of xs) {
+      vamp.x = x;
+      tickAggro(state, dt, () => 0.9);
+      if (vamp.state !== "CRAWL") break; // 탈출하면 중단
+    }
+  };
+
+  it("다른 높이의 핑 목표를 쫓다 왔다갔다(왼오왼)하면 아래로 드롭스루한다", () => {
     const platform = { id: 1, x: 80, y: 500, blockType: "platform_block" };
     state.platforms.items.push(platform);
     const vamp = put("vampire", 90, { y: platform.y - CHAR_SIZE });
@@ -124,29 +134,38 @@ describe("핑 추적", () => {
     vamp._pingCd = 999;
     vamp._ping = { targetId: human.id, x: human.x + human.w / 2, y: human.y + human.h / 2 };
 
-    for (let i = 0; i < 2; i++) {
-      vamp.dir = -1; // 물리 충돌이 목표 반대 방향으로 튕겨놓은 상태
-      tickAggro(state, 0.1, () => 0.9);
-    }
+    // 초기화 → 오른쪽 이동 → 왼쪽 → 오른쪽 = 방향 구간 3개
+    wobbleX(vamp, [90, 110, 90, 110]);
 
     expect(vamp.state).toBe("FALL");
     expect(vamp._dropThroughId).toBe(platform.id);
   });
 
-  it("다른 높이의 핑 목표가 위에 있으면 오왼오 방향 시퀀스 뒤 점프한다", () => {
+  it("다른 높이의 핑 목표가 위에 있으면 왔다갔다 뒤 핑 쪽으로 점프한다", () => {
     const vamp = put("vampire", 90);
     const human = put("human", 170, { y: FLOOR_Y - CHAR_SIZE - 80 });
     vamp._dashCd = 999;
     vamp._pingCd = 999;
     vamp._ping = { targetId: human.id, x: human.x + human.w / 2, y: human.y + human.h / 2 };
 
-    for (let i = 0; i < 2; i++) {
-      vamp.dir = i === 0 ? 1 : -1;
-      tickAggro(state, 0.1, () => 0.9);
-    }
+    wobbleX(vamp, [90, 70, 90, 70]);
 
     expect(vamp.state).toBe("JUMP");
     expect(vamp.vy).toBeLessThan(0);
+    expect(vamp.dir).toBe(1); // 핑(오른쪽 위)을 향해 뛴다
+  });
+
+  it("핑과 높이(Y축)가 같으면 왔다갔다해도 아무 동작 안 한다", () => {
+    const vamp = put("vampire", 90);
+    const human = put("human", 170); // 같은 바닥 높이
+    vamp._dashCd = 999;
+    vamp._pingCd = 999;
+    vamp._ping = { targetId: human.id, x: human.x + human.w / 2, y: human.y + human.h / 2 };
+
+    wobbleX(vamp, [90, 110, 90, 110, 90, 110]);
+
+    expect(vamp.state).toBe("CRAWL"); // 점프·드롭 없음
+    expect(vamp._dropThroughId).toBeFalsy();
   });
 
   it("왔다갔다가 1초 넘게 띄엄띄엄이면(창 밖) 탈출하지 않고 계속 걷는다", () => {
@@ -159,17 +178,9 @@ describe("핑 추적", () => {
     vamp._pingCd = 999;
     vamp._ping = { targetId: human.id, x: human.x + human.w / 2, y: human.y + human.h / 2 };
 
-    // 1차 왔다갔다 한 번 (아직 3구간 미만 → 탈출 아님)
-    vamp.dir = -1;
-    tickAggro(state, 0.1, () => 0.9);
-    expect(vamp.state).toBe("CRAWL");
+    // 방향 반전 사이 간격을 0.6초로 벌리면 3구간이 1초 창에 동시에 들어오지 못한다.
+    wobbleX(vamp, [90, 110, 90, 110, 90, 110], 0.6);
 
-    // 1초 넘게 목표 방향으로만 진행 → 1차 왔다갔다 구간이 창을 벗어난다
-    for (let i = 0; i < 6; i++) tickAggro(state, 0.2, () => 0.9);
-
-    // 2차 왔다갔다 — 1차와 1초 이상 떨어져 있으므로 창 안 구간은 다시 2개뿐, 탈출 안 함
-    vamp.dir = -1;
-    tickAggro(state, 0.1, () => 0.9);
     expect(vamp.state).toBe("CRAWL");
     expect(vamp._dropThroughId).toBeFalsy();
   });

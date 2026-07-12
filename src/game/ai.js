@@ -41,10 +41,12 @@ import {
 /** 감지·추적이 동작하는 상태 (지상 행동 중일 때만 주변을 살핀다) */
 const AWARE_STATES = new Set(["CRAWL"]);
 const PING_VERTICAL_ESCAPE_GAP = 10;
-// 제자리 왔다갔다 감지: 방향 구간이 왼오왼/오왼오 = 3개(WOBBLE_ESCAPE_SEGMENTS) 쌓이면
-// 1초(WOBBLE_WINDOW_S) 창 안에 몰려 있을 때만 탈출한다. 느긋한 방향 전환은 창을 벗어나 무시.
+// 제자리 왔다갔다 감지: 실제 수평 이동 방향(위치 변화)이 왼오왼/오왼오 = 방향 구간 3개
+// (WOBBLE_ESCAPE_SEGMENTS)가 1초(WOBBLE_WINDOW_S) 창 안에 몰릴 때만 탈출. 느긋한 방향
+// 전환은 창을 벗어나 무시한다. WOBBLE_MIN_TRAVEL보다 작은 이동은 미세 떨림으로 보고 안 센다.
 const WOBBLE_WINDOW_S = 1.0;
 const WOBBLE_ESCAPE_SEGMENTS = 3;
+const WOBBLE_MIN_TRAVEL = 0.3;
 
 /**
  * 돌진 종료.
@@ -491,39 +493,37 @@ function pingTargetPoint(c, t) {
 }
 
 /**
- * 왔다갔다 누적기. 매 프레임 방향 후보들(직전 방향 c.dir, 이번에 가려는 desiredDir)을 넣으면
+ * 제자리 왔다갔다 감지. 핑을 쫓는 매 프레임 호출되며, 캐릭터의 실제 수평 이동(위치 변화)
  * 방향이 뒤집힐 때마다 그 시각(simDt 누적 clock)을 큐에 쌓는다. 큐에서 1초보다 오래된 구간은
- * 버리므로, "1초 안에 방향 구간 3개(왼오왼/오왼오)"가 몰릴 때만 true를 돌려준다.
+ * 버리므로 "1초 안에 방향 구간 3개(왼오왼/오왼오)"가 몰일 때만 true를 돌려준다 — 화면에 보이는
+ * '왔다리갔다리' 그대로다. 핑 대상과 높이(Y축)가 사실상 같으면 왔다갔다여도 아무 동작 안 한다.
  * clock을 simDt로 누적하므로 실시간(nowMs) 없이도 테스트/게임에서 똑같이 동작한다.
  */
-function feedPingWobble(c, targetId, dirs, simDt) {
+function shouldEscapePingWobble(c, t, simDt) {
+  const target = pingTargetPoint(c, t);
+  const cx = c.x + c.w / 2;
+  const cy = c.y + c.h / 2;
+  if (Math.abs(target.y - cy) < PING_VERTICAL_ESCAPE_GAP) {
+    resetPingWobble(c);
+    return false;
+  }
+  const targetId = c._ping?.targetId ?? t.id;
   let w = c._pingWobble;
   if (!w || w.targetId !== targetId) {
-    w = c._pingWobble = { targetId, clock: 0, dir: 0, times: [] };
+    w = c._pingWobble = { targetId, clock: 0, dir: 0, times: [], lastX: cx };
   }
   w.clock += simDt;
-  let escaped = false;
-  for (const dir of dirs) {
-    if (dir !== 1 && dir !== -1) continue;
+  const delta = cx - w.lastX;
+  w.lastX = cx;
+  if (Math.abs(delta) >= WOBBLE_MIN_TRAVEL) {
+    const dir = delta > 0 ? 1 : -1;
     if (dir !== w.dir) {
       w.dir = dir;
       w.times.push(w.clock);
     }
     while (w.times.length && w.clock - w.times[0] > WOBBLE_WINDOW_S) w.times.shift();
-    if (w.times.length >= WOBBLE_ESCAPE_SEGMENTS) escaped = true;
   }
-  return escaped;
-}
-
-function shouldEscapePingWobble(c, t, desiredDir, simDt) {
-  const target = pingTargetPoint(c, t);
-  const cy = c.y + c.h / 2;
-  // 핑과 높이(Y축)가 사실상 같으면 왔다갔다여도 아무 동작 안 함.
-  if (Math.abs(target.y - cy) < PING_VERTICAL_ESCAPE_GAP) {
-    resetPingWobble(c);
-    return false;
-  }
-  return feedPingWobble(c, c._ping?.targetId ?? t.id, [c.dir, desiredDir], simDt);
+  return w.times.length >= WOBBLE_ESCAPE_SEGMENTS;
 }
 
 /**
@@ -712,7 +712,7 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null, 
     const pingPoint = pingTargetPoint(c, t);
     const dx = pingPoint.x - (c.x + c.w / 2);
     const desiredDir = Math.abs(dx) < 4 ? (c.dir === 1 || c.dir === -1 ? c.dir : (dx >= 0 ? 1 : -1)) : (dx > 0 ? 1 : -1);
-    if (c.side === "vampire" && shouldEscapePingWobble(c, t, desiredDir, simDt) && escapePingWobble(c, t, rng)) {
+    if (c.side === "vampire" && shouldEscapePingWobble(c, t, simDt) && escapePingWobble(c, t, rng)) {
       continue;
     }
     if (Math.abs(dx) < 4) {
