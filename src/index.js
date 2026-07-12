@@ -67,7 +67,8 @@ function updatePanel() {
   if (ui.selectedCharId != null) {
     renderInfoPanel(focus, state.account);
   } else {
-    const vampires = state.chars.items.filter((c) => !c.dead && c.side === "vampire");
+    // 사망한 Vamp Shrimp도 포함해 넘긴다 — 얼굴 그리드가 자기 칸에 부활 카운트다운을 띄운다.
+    const vampires = state.chars.items.filter((c) => c.side === "vampire");
     renderSquadPanel(vampires, state.account);
   }
   skillTreePanel?.render();

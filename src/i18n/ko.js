@@ -13,6 +13,7 @@ export default {
     noVampShrimp: "— Vamp Shrimp 없음 —", dash: "혈귀 돌진",
     vampShrimp: "Vamp Shrimp", holyShrimp: "Holy Shrimp", jombieShrimp: "Jombie Shrimp",
     numberedVamp: "{number}번 Vamp Shrimp", order: "{number}번 ",
+    reviveIn: "{number}번 Vamp Shrimp · 부활까지 {secs}초",
   },
   hud: {
     noRoute: "아래까지 이어지는 Holy Shrimp 이동 경로가 없습니다", finishDecorating: "꾸미기를 완료한 뒤 웨이브를 시작하세요",

@@ -15,6 +15,7 @@ export default {
     noVampShrimp: "— No Vamp Shrimp —", dash: "Bloodrush Dash",
     vampShrimp: "Vamp Shrimp", holyShrimp: "Holy Shrimp", jombieShrimp: "Jombie Shrimp",
     numberedVamp: "Vamp Shrimp #{number}", order: "#{number} ",
+    reviveIn: "Vamp Shrimp #{number} · revives in {secs}s",
   },
   hud: {
     noRoute: "No Holy Shrimp route reaches the bottom.", finishDecorating: "Finish decorating before starting a wave.",

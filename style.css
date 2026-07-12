@@ -712,6 +712,25 @@ button { font-family: inherit; color: inherit; }
   opacity: 0.45;
   cursor: default;
 }
+/* 사망 대기: 새우 얼굴은 흐리게 깔고, 그 위에 부활까지 남은 초를 겹쳐 카운트다운 */
+.face-slot.dead {
+  background: #2a1420;
+  border: 1px solid #6b3946;
+  cursor: default;
+}
+.face-slot.dead .face-ico { opacity: 0.3; filter: grayscale(0.6); }
+.face-slot .revive-cd {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffd7d7;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+}
 .face-slot small {
   position: absolute;
   right: 1px; bottom: 0;
