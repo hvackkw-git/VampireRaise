@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { grantExp } from "../game/combat.js";
 import { expToNext } from "../constants.js";
-import { createCharacter, createInitialState, serialize } from "../state/gameState.js";
+import { createCharacter, createInitialState, toSaveData } from "../state/gameState.js";
 import { infectToSlave } from "../game/combat.js";
 import {
   investZombieHp, investZombieTrait, zombieHpBonus, ZOMBIE_TRAIT_COST,
@@ -100,7 +100,7 @@ describe("스킬트리 데이터", () => {
     expect(human.maxHp).toBe(7);
     expect(human.hp).toBe(7);
 
-    const savedOwner = JSON.parse(serialize(state)).chars.items.find((c) => c.id === owner.id);
+    const savedOwner = toSaveData(state).chars.items.find((c) => c.id === owner.id);
     expect(savedOwner.zombieHpPoints).toBe(2);
   });
 

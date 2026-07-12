@@ -1,5 +1,7 @@
 // src/state/gameState.js
-// 게임 상태 생성·저장·복원 (localStorage)
+// 게임 상태 생성 + 순수 직렬화/복원.
+// 저장소 I/O는 saveLoad.js가 담당합니다 — 여기의 toSaveData/fromSaveData는
+// 로컬(localStorage)과 클라우드 세이브가 동일한 페이로드를 공유하도록 순수 함수로 유지합니다.
 
 import {
   TANK_W, FLOOR_Y, CHAR_SIZE, CHAR_SPRITES, VAMPIRE_BASE, SLAVE_BASE, HUMAN_BASE_MP,
@@ -7,8 +9,6 @@ import {
   VAMPIRE_SPAWN_ZONE, spawnXInZone, BASE_CORE_HP,
 } from "../constants.js";
 import { defaultDashColors } from "../skills/dashColors.js";
-
-export const SAVE_KEY = "vampireraise.save.v1";
 
 /** 캐릭터 레코드 생성 */
 function nextVampireOrder(state) {
@@ -134,9 +134,9 @@ export function createInitialState() {
   return state;
 }
 
-/** 저장 대상만 추린 직렬화 (일시적 _필드 제외) */
-export function serialize(state) {
-  return JSON.stringify({
+/** 저장 대상만 추린 세이브 페이로드 생성 (일시적 _필드 제외) */
+export function toSaveData(state) {
+  return {
     version: state.version,
     blood: state.blood,
     account: state.account,
@@ -168,12 +168,11 @@ export function serialize(state) {
           dead: c.dead,
         })),
     },
-  });
+  };
 }
 
-/** 처음부터 재시작: 저장 삭제 + 상태를 초기값으로 제자리 교체 (참조 유지) */
-export function resetState(state, storage = globalThis.localStorage) {
-  try { storage?.removeItem(SAVE_KEY); } catch { /* 무시 */ }
+/** 처음부터 재시작: 상태를 초기값으로 제자리 교체 (참조 유지). 저장 삭제는 saveLoad.clearSave() 담당 */
+export function resetState(state) {
   const fresh = createInitialState();
   state.blood = fresh.blood;
   state.account = fresh.account;
@@ -184,17 +183,8 @@ export function resetState(state, storage = globalThis.localStorage) {
   state.chars = fresh.chars;
 }
 
-export function saveState(state, storage = globalThis.localStorage) {
-  try { storage?.setItem(SAVE_KEY, serialize(state)); } catch { /* 저장 실패 무시 */ }
-}
-
-/** 저장본 → 상태 복원. 저장본이 없거나 손상 시 null */
-export function loadState(storage = globalThis.localStorage) {
-  let raw = null;
-  try { raw = storage?.getItem(SAVE_KEY); } catch { return null; }
-  if (!raw) return null;
-  let data;
-  try { data = JSON.parse(raw); } catch { return null; }
+/** 세이브 페이로드 → 상태 복원. 페이로드가 없거나 스키마 불일치 시 null */
+export function fromSaveData(data) {
   if (!data || data.version !== 1) return null;
 
   const state = createInitialState();
