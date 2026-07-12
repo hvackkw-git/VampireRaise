@@ -60,7 +60,7 @@ export function spawnXInZone(zone, size, rng = Math.random) {
  *   (가로는 getCharHitbox가 중앙 14px 몸통으로 자동 캡) 기본 방향은 왼쪽.
  */
 export const CHAR_SPRITES = {
-  vampire: { src: "assets/shrimp_variants/shrimp-4frame-cherry_red.png", size: 32, frames: 8, topPad: 18 },
+  vampire: { src: "assets/shrimp_variants/shrimp-4frame-vampire-dark.png", size: 32, frames: 8, topPad: 18 },
   human:   { src: "assets/shrimp_variants/shrimp-4frame-blue_velvet.png", size: 32, frames: 8, topPad: 18 },
   slave:   { src: "assets/shrimp_variants/shrimp-4frame-black_king.png", size: 32, frames: 8, topPad: 18 },
 };
