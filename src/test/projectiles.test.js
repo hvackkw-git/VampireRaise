@@ -11,6 +11,7 @@ let state;
 beforeEach(() => {
   state = createInitialState();
   state.chars.items = [];
+  state.platforms.items = [];
   state.projectiles = { nextId: 1, items: [] };
 });
 
