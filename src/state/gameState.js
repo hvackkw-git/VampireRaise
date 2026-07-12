@@ -9,6 +9,39 @@ import {
   VAMPIRE_SPAWN_ZONE, spawnXInZone, BASE_CORE_HP,
 } from "../constants.js";
 import { defaultDashColors } from "../skills/dashColors.js";
+import { getPlatformYRange, PLATFORM_W, PLATFORM_H, PLATFORM_STEP } from "../platform/platformBlockRenderer.js";
+
+/** 초기 플랫폼 상단 행(위쪽) 블록 후보 — 별 테마. */
+const INITIAL_TOP_ROW_BLOCK_TYPES = ["seonggwang_block", "seongjwa_block", "wolgwang_block"];
+/** 초기 플랫폼 하단 행 블록 후보 — 숲 테마. */
+const INITIAL_BOTTOM_ROW_BLOCK_TYPES = ["forest_1_block", "forest_2_block", "forest_3_block"];
+
+function pickRandomBlockType(blockTypes) {
+  return blockTypes[Math.floor(Math.random() * blockTypes.length)];
+}
+
+/** 바닥 y에서 좌측 count칸 + 우측 count칸 좌표를 반환. */
+function computeInitialPlatformRow(y, count) {
+  const positions = [];
+  for (let i = 0; i < count; i++) positions.push({ x: i * PLATFORM_STEP, y });
+  for (let i = 0; i < count; i++) positions.push({ x: TANK_W - PLATFORM_W - i * PLATFORM_STEP, y });
+  return positions;
+}
+
+/** 초기 플랫폼 블록 배치: 하단 행(좌5+우5, 숲 테마)과 그 위 행(좌4+우4, 별 테마)을 칸마다 독립 랜덤으로 채운다. */
+function createInitialPlatforms() {
+  const items = [];
+  let nextId = 1;
+  const bottomY = getPlatformYRange().maxY;
+  const topY = bottomY - PLATFORM_H;
+  for (const pos of computeInitialPlatformRow(bottomY, 5)) {
+    items.push({ id: nextId++, x: pos.x, y: pos.y, blockType: pickRandomBlockType(INITIAL_BOTTOM_ROW_BLOCK_TYPES) });
+  }
+  for (const pos of computeInitialPlatformRow(topY, 4)) {
+    items.push({ id: nextId++, x: pos.x, y: pos.y, blockType: pickRandomBlockType(INITIAL_TOP_ROW_BLOCK_TYPES) });
+  }
+  return { nextId, items };
+}
 
 /** 캐릭터 레코드 생성 */
 function nextVampireOrder(state) {
@@ -123,7 +156,7 @@ export function createInitialState() {
       lastStartError: null,
     },
     prestige: { count: 0 }, // 향후 프리스티지 훅
-    platforms: { nextId: 1, items: [] },
+    platforms: createInitialPlatforms(),
     chars: { nextId: 1, items: [] },
     projectiles: { nextId: 1, items: [] },
   };

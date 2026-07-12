@@ -14,6 +14,7 @@ let state;
 beforeEach(() => {
   state = createInitialState();
   state.chars.items = []; // 빈 전장에서 직접 배치
+  state.platforms.items = []; // 기본 플랫폼 없이 직접 배치
 });
 
 const put = (side, x, over = {}) => {
