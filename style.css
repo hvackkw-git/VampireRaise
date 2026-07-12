@@ -131,9 +131,11 @@ button { font-family: inherit; color: inherit; }
 }
 .tank-bg {
   position: absolute; inset: 0;
+  /* 밤하늘·숲 실루엣 일러스트(320×640, 수조와 1:1). 위에 기존 보라/적색 글로우를 얹어 분위기 유지 */
   background:
     radial-gradient(ellipse 90% 30% at 50% 0%, rgba(120, 60, 160, 0.18), transparent 70%),
-    radial-gradient(ellipse 60% 20% at 20% 100%, rgba(200, 40, 60, 0.10), transparent);
+    radial-gradient(ellipse 60% 20% at 20% 100%, rgba(200, 40, 60, 0.10), transparent),
+    url("assets/background/night_forest_320x640.png") center / cover no-repeat;
 }
 .tank-floor {
   position: absolute;
