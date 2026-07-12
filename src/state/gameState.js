@@ -6,43 +6,49 @@
 import {
   TANK_W, FLOOR_Y, CHAR_SIZE, CHAR_SPRITES, VAMPIRE_BASE, SLAVE_BASE, HUMAN_BASE_MP,
   INITIAL_VAMPIRE_COUNT, INITIAL_VAMPIRE_LEVEL, vampireStatsForLevel,
-  VAMPIRE_SPAWN_ZONE, HUMAN_SPAWN_ZONE, spawnXInZone, BASE_CORE_HP,
+  VAMPIRE_SPAWN_ZONE, spawnXInZone, BASE_CORE_HP,
 } from "../constants.js";
 import { defaultDashColors } from "../skills/dashColors.js";
-import { getPlatformYRange, PLATFORM_W, PLATFORM_STEP } from "../platform/platformBlockRenderer.js";
+import { getPlatformYRange, PLATFORM_W, PLATFORM_H, PLATFORM_STEP } from "../platform/platformBlockRenderer.js";
 
 /** 초기 플랫폼 상단 행(위쪽) 블록 후보 — 별 테마. */
 const INITIAL_TOP_ROW_BLOCK_TYPES = ["seonggwang_block", "seongjwa_block", "wolgwang_block"];
 /** 초기 플랫폼 하단 행 블록 후보 — 숲 테마. */
 const INITIAL_BOTTOM_ROW_BLOCK_TYPES = ["forest_1_block", "forest_2_block", "forest_3_block"];
+/** 참고 스크린샷대로 각 행 가장자리에 남기는 빈 칸 수. */
+const EDGE_GAP_COLS = 2;
+/** 참고 스크린샷대로 그리드 맨 위 두 칸은 비워두고 그 아래 행에 별 블록을 배치한다. */
+const TOP_ROW_OFFSET_ROWS = 2;
 
 function pickRandomBlockType(blockTypes) {
   return blockTypes[Math.floor(Math.random() * blockTypes.length)];
 }
 
 /**
- * y에서 가로 전체(TANK_W)를 채우는 칸 좌표를 반환하되, excludeZone과 겹치는 칸은 비워둔다.
- * Holy Shrimp 하강 경로(startWave)와 Vamp Shrimp 부활 지점이 완전히 막히지 않도록,
- * 스폰 존 칸은 항상 비워야 한다.
+ * y에서 가로 전체(TANK_W)를 채우되, 왼쪽 gapLeftCols칸 또는 오른쪽 gapRightCols칸은 비워둔다.
+ * 두 행 모두 완전히 막히면 Holy Shrimp 하강 경로(startWave)가 끊기므로, 각 행의 구멍을
+ * 반대쪽에 둬 지그재그로 바닥까지 내려올 수 있게 한다.
  */
-function computeFullWidthRow(y, excludeZone) {
+function computeFullWidthRow(y, gapLeftCols, gapRightCols) {
+  const totalCols = Math.floor(TANK_W / PLATFORM_STEP);
   const positions = [];
-  for (let x = 0; x + PLATFORM_W <= TANK_W; x += PLATFORM_STEP) {
-    if (excludeZone && x + PLATFORM_W > excludeZone.x && x < excludeZone.x + excludeZone.w) continue;
-    positions.push({ x, y });
+  for (let col = 0; col < totalCols; col++) {
+    if (col < gapLeftCols || col >= totalCols - gapRightCols) continue;
+    positions.push({ x: col * PLATFORM_STEP, y });
   }
   return positions;
 }
 
-/** 초기 플랫폼 블록 배치: 맨 위 행(별 테마)과 맨 아래 행(숲 테마)을 가로 전체·칸마다 독립 랜덤으로 채운다. */
+/** 초기 플랫폼 블록 배치: 맨 위 행(별 테마, 왼쪽에 구멍)과 맨 아래 행(숲 테마, 오른쪽에 구멍)을 칸마다 독립 랜덤으로 채운다. */
 function createInitialPlatforms() {
   const items = [];
   let nextId = 1;
   const { minY, maxY } = getPlatformYRange();
-  for (const pos of computeFullWidthRow(minY, HUMAN_SPAWN_ZONE)) {
+  const topY = minY + TOP_ROW_OFFSET_ROWS * PLATFORM_H;
+  for (const pos of computeFullWidthRow(topY, EDGE_GAP_COLS, 0)) {
     items.push({ id: nextId++, x: pos.x, y: pos.y, blockType: pickRandomBlockType(INITIAL_TOP_ROW_BLOCK_TYPES) });
   }
-  for (const pos of computeFullWidthRow(maxY, VAMPIRE_SPAWN_ZONE)) {
+  for (const pos of computeFullWidthRow(maxY, 0, EDGE_GAP_COLS)) {
     items.push({ id: nextId++, x: pos.x, y: pos.y, blockType: pickRandomBlockType(INITIAL_BOTTOM_ROW_BLOCK_TYPES) });
   }
   return { nextId, items };
