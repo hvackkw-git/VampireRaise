@@ -165,6 +165,7 @@ export function createInitialState() {
       clock: 0,           // 웨이브 경과 시계(초) — 스폰 스케줄용
       nextAutoAt: null,   // 자동 웨이브 예약 시각(clock 기준)
       lastStartError: null,
+      rebirthUnlocked: false, // 재시작 문턱 도달 래치 — 게임오버 리셋에도 유지
     },
     prestige: { count: 0 }, // 향후 프리스티지 훅
     platforms: createInitialPlatforms(),
@@ -188,6 +189,7 @@ export function toSaveData(state) {
     wave: {
       current: state.wave.current,
       auto: state.wave.auto,
+      rebirthUnlocked: state.wave.rebirthUnlocked,
       // 진행 중 웨이브는 저장하지 않음 — 복원 시 비전투 상태로 시작
     },
     prestige: state.prestige,
@@ -245,6 +247,7 @@ export function fromSaveData(data) {
   };
   state.wave.current = Math.max(1, Number(data.wave?.current) || 1);
   state.wave.auto = !!data.wave?.auto;
+  state.wave.rebirthUnlocked = !!data.wave?.rebirthUnlocked;
   state.prestige = data.prestige ?? { count: 0 };
   if (data.platforms?.items) {
     state.platforms.nextId = Number(data.platforms.nextId) || 1;

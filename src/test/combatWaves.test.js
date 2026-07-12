@@ -7,7 +7,7 @@ import {
 } from "../game/combat.js";
 import {
   startWave, tickWaves, vampireSideAlive, humansAlive, grantAccountExp, reviveVampires,
-  vampireCount, canRebirth, rebirth,
+  vampireCount, canRebirth, rebirth, updateRebirthUnlock,
 } from "../game/waves.js";
 import {
   humanCountForWave, humanStatsForWave, expToNext, SLAVE_BASE,
@@ -495,5 +495,30 @@ describe("재시작(Rebirth)", () => {
     startWave(state);
     expect(canRebirth(state)).toBe(false);
     expect(rebirth(state)).toBe(false);
+  });
+
+  it("문턱 도달 후 게임오버로 웨이브가 1로 리셋돼도 재시작 활성이 유지된다", () => {
+    // 문턱(웨이브 10) 도달 → 래치 켜짐
+    state.wave.current = 10;
+    updateRebirthUnlock(state);
+    expect(state.wave.rebirthUnlocked).toBe(true);
+    expect(canRebirth(state)).toBe(true);
+
+    // 다음 웨이브에서 죽음(게임오버) → 웨이브 1로 리셋됐다고 가정
+    state.wave.current = 1;
+    // 문턱 미달이지만 래치가 유지되어 여전히 재시작 가능
+    expect(canRebirth(state)).toBe(true);
+  });
+
+  it("재시작을 실행하면 래치가 풀려 새 문턱에 다시 도달해야 활성화된다", () => {
+    state.wave.current = 10;
+    updateRebirthUnlock(state);
+    expect(rebirth(state)).toBe(true); // 마릿수 1→2, 문턱 20
+    expect(state.wave.rebirthUnlocked).toBe(false);
+    expect(canRebirth(state)).toBe(false);
+
+    state.wave.current = 20;
+    updateRebirthUnlock(state);
+    expect(canRebirth(state)).toBe(true);
   });
 });
