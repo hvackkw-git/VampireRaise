@@ -114,7 +114,7 @@ describe("핑 추적", () => {
     expect(vamp._ping).toBeNull();
   });
 
-  it("다른 높이의 핑 목표를 쫓다 세 번 튕기면 아래로 드롭스루한다", () => {
+  it("다른 높이의 핑 목표를 쫓다 왼오왼 방향 시퀀스가 되면 아래로 드롭스루한다", () => {
     const platform = { id: 1, x: 80, y: 500, blockType: "platform_block" };
     state.platforms.items.push(platform);
     const vamp = put("vampire", 90, { y: platform.y - CHAR_SIZE });
@@ -124,7 +124,7 @@ describe("핑 추적", () => {
     vamp._pingCd = 999;
     vamp._ping = { targetId: human.id, x: human.x + human.w / 2, y: human.y + human.h / 2 };
 
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 2; i++) {
       vamp.dir = -1; // 물리 충돌이 목표 반대 방향으로 튕겨놓은 상태
       tickAggro(state, 0.1, () => 0.9);
     }
@@ -133,15 +133,15 @@ describe("핑 추적", () => {
     expect(vamp._dropThroughId).toBe(platform.id);
   });
 
-  it("다른 높이의 핑 목표가 위에 있으면 세 번 튕긴 뒤 점프한다", () => {
+  it("다른 높이의 핑 목표가 위에 있으면 오왼오 방향 시퀀스 뒤 점프한다", () => {
     const vamp = put("vampire", 90);
     const human = put("human", 170, { y: FLOOR_Y - CHAR_SIZE - 80 });
     vamp._dashCd = 999;
     vamp._pingCd = 999;
     vamp._ping = { targetId: human.id, x: human.x + human.w / 2, y: human.y + human.h / 2 };
 
-    for (let i = 0; i < 3; i++) {
-      vamp.dir = -1;
+    for (let i = 0; i < 2; i++) {
+      vamp.dir = i === 0 ? 1 : -1;
       tickAggro(state, 0.1, () => 0.9);
     }
 

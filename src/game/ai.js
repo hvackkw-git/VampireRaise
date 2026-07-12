@@ -38,7 +38,7 @@ import {
 /** 감지·추적이 동작하는 상태 (지상 행동 중일 때만 주변을 살핀다) */
 const AWARE_STATES = new Set(["CRAWL"]);
 const PING_VERTICAL_ESCAPE_GAP = 10;
-const PING_WOBBLE_ESCAPE_TURNS = 3;
+const PING_WOBBLE_ESCAPE_STEPS = 3;
 const PING_WOBBLE_MIN_INTERVAL_S = 0.08;
 
 /**
@@ -495,15 +495,25 @@ function shouldEscapePingWobble(c, t, desiredDir, simDt) {
 
   const key = `${c._ping?.targetId ?? t.id}:${Math.round(target.y)}`;
   if (!c._pingWobble || c._pingWobble.key !== key) {
-    c._pingWobble = { key, turns: 0, elapsed: PING_WOBBLE_MIN_INTERVAL_S };
+    c._pingWobble = { key, steps: 0, lastDir: 0, elapsed: PING_WOBBLE_MIN_INTERVAL_S };
   }
   c._pingWobble.elapsed += simDt;
 
-  if (desiredDir && c.dir === -desiredDir && c._pingWobble.elapsed >= PING_WOBBLE_MIN_INTERVAL_S) {
-    c._pingWobble.turns += 1;
-    c._pingWobble.elapsed = 0;
+  if (c._pingWobble.elapsed < PING_WOBBLE_MIN_INTERVAL_S) {
+    return false;
   }
-  return c._pingWobble.turns >= PING_WOBBLE_ESCAPE_TURNS;
+
+  const noteDir = (dir) => {
+    if (dir !== 1 && dir !== -1) return false;
+    if (c._pingWobble.lastDir === dir) return false;
+    c._pingWobble.lastDir = dir;
+    c._pingWobble.steps += 1;
+    return c._pingWobble.steps >= PING_WOBBLE_ESCAPE_STEPS;
+  };
+
+  const escaped = noteDir(c.dir) || (desiredDir !== c.dir && noteDir(desiredDir));
+  if (desiredDir !== c.dir) c._pingWobble.elapsed = 0;
+  return escaped;
 }
 
 function escapePingWobble(c, t, rng) {
