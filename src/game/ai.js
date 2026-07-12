@@ -26,7 +26,7 @@ import { dashCdManaMult } from "../skills/dashColors.js";
 
 /** Holy Shrimp가 행군하는 베이스(Vamp Shrimp 스폰 존) 중심 x */
 const BASE_GOAL_X = VAMPIRE_SPAWN_ZONE.x + VAMPIRE_SPAWN_ZONE.w / 2;
-import { startJump, NON_PLATFORM_BLOCK_TYPES } from "../engine/physics.js";
+import { startDrop, startJump, NON_PLATFORM_BLOCK_TYPES } from "../engine/physics.js";
 import { isLogicLayerBlock, getSpikeDir, PLATFORM_W, PLATFORM_H } from "../platform/platformBlockRenderer.js";
 import { findNearestEnemy, aliveChars } from "./combat.js";
 import { createHumanDescentNavigator } from "./descentNavigation.js";
@@ -37,6 +37,9 @@ import {
 
 /** 감지·추적이 동작하는 상태 (지상 행동 중일 때만 주변을 살핀다) */
 const AWARE_STATES = new Set(["CRAWL"]);
+const PING_VERTICAL_ESCAPE_GAP = 10;
+const PING_WOBBLE_ESCAPE_TURNS = 3;
+const PING_WOBBLE_MIN_INTERVAL_S = 0.08;
 
 /**
  * 돌진 종료.
@@ -471,6 +474,49 @@ function findNearestJumpDashRoute(c, chars, platforms, blockPowered = null) {
   return best;
 }
 
+function resetPingWobble(c) {
+  c._pingWobble = null;
+}
+
+function pingTargetPoint(c, t) {
+  return {
+    x: Number.isFinite(c._ping?.x) ? c._ping.x : t.x + t.w / 2,
+    y: Number.isFinite(c._ping?.y) ? c._ping.y : t.y + t.h / 2,
+  };
+}
+
+function shouldEscapePingWobble(c, t, desiredDir, simDt) {
+  const target = pingTargetPoint(c, t);
+  const cy = c.y + c.h / 2;
+  if (Math.abs(target.y - cy) < PING_VERTICAL_ESCAPE_GAP) {
+    resetPingWobble(c);
+    return false;
+  }
+
+  const key = `${c._ping?.targetId ?? t.id}:${Math.round(target.y)}`;
+  if (!c._pingWobble || c._pingWobble.key !== key) {
+    c._pingWobble = { key, turns: 0, elapsed: PING_WOBBLE_MIN_INTERVAL_S };
+  }
+  c._pingWobble.elapsed += simDt;
+
+  if (desiredDir && c.dir === -desiredDir && c._pingWobble.elapsed >= PING_WOBBLE_MIN_INTERVAL_S) {
+    c._pingWobble.turns += 1;
+    c._pingWobble.elapsed = 0;
+  }
+  return c._pingWobble.turns >= PING_WOBBLE_ESCAPE_TURNS;
+}
+
+function escapePingWobble(c, t, rng) {
+  const target = pingTargetPoint(c, t);
+  const cy = c.y + c.h / 2;
+  resetPingWobble(c);
+  if (target.y > cy + PING_VERTICAL_ESCAPE_GAP && c._platformId != null) {
+    startDrop(c);
+    return true;
+  }
+  return startJump(c, rng, 40, 20);
+}
+
 /**
  * 매 프레임 감지 틱.
  * @param {object} state
@@ -630,15 +676,20 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null, 
         }
       } else {
         c._ping = null; // 감지 원을 벗어남 → 랜덤 배회 복귀
+        resetPingWobble(c);
       }
     }
 
     // ── 핑 대상을 향해 걷기 ──
     if (!c._ping) continue;
     const t = byId.get(c._ping.targetId);
-    if (!t || t.dead) { c._ping = null; continue; }
-    const pingX = Number.isFinite(c._ping.x) ? c._ping.x : t.x + t.w / 2;
-    const dx = pingX - (c.x + c.w / 2);
+    if (!t || t.dead) { c._ping = null; resetPingWobble(c); continue; }
+    const pingPoint = pingTargetPoint(c, t);
+    const dx = pingPoint.x - (c.x + c.w / 2);
+    const desiredDir = Math.abs(dx) < 4 ? (c.dir === 1 || c.dir === -1 ? c.dir : (dx >= 0 ? 1 : -1)) : (dx > 0 ? 1 : -1);
+    if (c.side === "vampire" && shouldEscapePingWobble(c, t, desiredDir, simDt) && escapePingWobble(c, t, rng)) {
+      continue;
+    }
     if (Math.abs(dx) < 4) {
       // 수평으로 겹쳐도 멈추지 않는다. 교전 가능하면 combat 틱이 FIGHT로 전환한다.
       c.state = "CRAWL";
