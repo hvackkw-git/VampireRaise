@@ -130,8 +130,8 @@ export function initHud(state, { onDecorate, onReset, getBlockPowered, isDecorat
     const rebirthReady = !maxed && canRebirth(state);
     // 조건 미충족이면 비활성(회색), 충족되면 활성(흰색)
     btnRebirth.disabled = !rebirthReady;
-    // 잠겨 있을 때만 필요한 웨이브 수를 배지로 표시
-    elRebirthReq.textContent = (!rebirthReady && !maxed) ? String(rebirthWaveRequirement(count)) : "";
+    // 우하단 요구 웨이브 배지는 표시하지 않음 (추후 사양 확정 예정)
+    elRebirthReq.textContent = "";
     // 숨겨졌거나 비활성이 된 버튼의 armed 상태는 해제
     if (clusterHidden
       || (armed === "rebirth" && btnRebirth.disabled)
