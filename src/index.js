@@ -11,7 +11,9 @@ import {
   tickTimers, tickRepeaters, tickGates, tickSensors, tickPistons,
 } from "./platform/logicBlocks.js";
 import { TANK_W, TANK_H, MP_REGEN_PER_S, VAMPIRE_SPAWN_ZONE } from "./constants.js";
-import { createInitialState, loadState, saveState } from "./state/gameState.js";
+import { createInitialState } from "./state/gameState.js";
+import { loadState, saveState } from "./state/saveLoad.js";
+import { initStorageAdapter, localStorageImpl } from "./storage/storageAdapter.js";
 import { tickCharacter, tickSeparation } from "./engine/physics.js";
 import { tickAggro } from "./game/ai.js";
 import { tickCombat, aliveChars } from "./game/combat.js";
@@ -30,7 +32,8 @@ import { applyDocumentTranslations, getLocale, setLocale, t } from "./i18n/index
 
 applyDocumentTranslations();
 
-const state = loadState() ?? createInitialState();
+initStorageAdapter(localStorageImpl);
+const state = (await loadState()) ?? createInitialState();
 const ui = {
   decorateMode: false,
   selectedBlockId: null,

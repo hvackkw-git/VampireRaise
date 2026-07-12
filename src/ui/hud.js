@@ -4,6 +4,7 @@
 import { rebirthWaveRequirement, REBIRTH_MAX_VAMPIRES } from "../constants.js";
 import { startWave, humansAlive, vampireCount, canRebirth, rebirth } from "../game/waves.js";
 import { resetState } from "../state/gameState.js";
+import { clearSave } from "../state/saveLoad.js";
 import { showToast } from "./tankView.js";
 import { t } from "../i18n/index.js";
 
@@ -83,6 +84,7 @@ export function initHud(state, { onDecorate, onReset, getBlockPowered, isDecorat
       return;
     }
     resetArmedUntil = 0;
+    clearSave();
     resetState(state);
     onReset?.();
     render();

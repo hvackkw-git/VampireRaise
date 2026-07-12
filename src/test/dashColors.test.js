@@ -6,16 +6,10 @@ import {
   BASE_DETECT_RANGE, effectiveDetectRange, revengeAttackMult, dashDistanceMult,
   detectRangeMult, investDetect, investDashCdMana, dashCdManaMult,
 } from "../skills/dashColors.js";
-import { createInitialState, saveState, loadState } from "../state/gameState.js";
-
-function memoryStorage() {
-  const values = new Map();
-  return {
-    getItem: (k) => values.get(k) ?? null,
-    setItem: (k, v) => values.set(k, v),
-    removeItem: (k) => values.delete(k),
-  };
-}
+import { createInitialState } from "../state/gameState.js";
+import { saveState, loadState } from "../state/saveLoad.js";
+import { initStorageAdapter } from "../storage/storageAdapter.js";
+import { memoryStorageImpl } from "./memoryStorage.js";
 
 /** 사이클을 n개까지 타일링 */
 function tiled(cycle, n) {
@@ -82,16 +76,16 @@ describe("Dash 잔상 색 로직", () => {
     );
   });
 
-  it("뱀파이어 기본 dashColors는 복수 1포인트, 저장·복원된다", () => {
-    const storage = memoryStorage();
+  it("뱀파이어 기본 dashColors는 복수 1포인트, 저장·복원된다", async () => {
+    initStorageAdapter(memoryStorageImpl());
     const state = createInitialState();
     const vamp = state.chars.items.find((c) => c.side === "vampire");
     expect(vamp.dashColors).toEqual({ red: 1 });
     vamp.dashColors = { red: 2, orange: 1, blue: 1 };
     vamp.skillPoints = 12;
     vamp.detectPoints = 3;
-    saveState(state, storage);
-    const restored = loadState(storage);
+    await saveState(state);
+    const restored = await loadState();
     const rv = restored.chars.items.find((c) => c.side === "vampire");
     expect(rv.dashColors).toEqual({ red: 2, orange: 1, blue: 1 });
     expect(rv.skillPoints).toBe(12);
