@@ -6,10 +6,10 @@
 import {
   TANK_W, FLOOR_Y, CHAR_SIZE, CHAR_SPRITES, VAMPIRE_BASE, SLAVE_BASE, HUMAN_BASE_MP,
   INITIAL_VAMPIRE_COUNT, INITIAL_VAMPIRE_LEVEL, vampireStatsForLevel,
-  VAMPIRE_SPAWN_ZONE, spawnXInZone, BASE_CORE_HP,
+  VAMPIRE_SPAWN_ZONE, HUMAN_SPAWN_ZONE, spawnXInZone, BASE_CORE_HP,
 } from "../constants.js";
 import { defaultDashColors } from "../skills/dashColors.js";
-import { getPlatformYRange, PLATFORM_W, PLATFORM_H, PLATFORM_STEP } from "../platform/platformBlockRenderer.js";
+import { getPlatformYRange, PLATFORM_W, PLATFORM_STEP } from "../platform/platformBlockRenderer.js";
 
 /** 초기 플랫폼 상단 행(위쪽) 블록 후보 — 별 테마. */
 const INITIAL_TOP_ROW_BLOCK_TYPES = ["seonggwang_block", "seongjwa_block", "wolgwang_block"];
@@ -20,25 +20,30 @@ function pickRandomBlockType(blockTypes) {
   return blockTypes[Math.floor(Math.random() * blockTypes.length)];
 }
 
-/** 바닥 y에서 좌측 count칸 + 우측 count칸 좌표를 반환. */
-function computeInitialPlatformRow(y, count) {
+/**
+ * y에서 가로 전체(TANK_W)를 채우는 칸 좌표를 반환하되, excludeZone과 겹치는 칸은 비워둔다.
+ * Holy Shrimp 하강 경로(startWave)와 Vamp Shrimp 부활 지점이 완전히 막히지 않도록,
+ * 스폰 존 칸은 항상 비워야 한다.
+ */
+function computeFullWidthRow(y, excludeZone) {
   const positions = [];
-  for (let i = 0; i < count; i++) positions.push({ x: i * PLATFORM_STEP, y });
-  for (let i = 0; i < count; i++) positions.push({ x: TANK_W - PLATFORM_W - i * PLATFORM_STEP, y });
+  for (let x = 0; x + PLATFORM_W <= TANK_W; x += PLATFORM_STEP) {
+    if (excludeZone && x + PLATFORM_W > excludeZone.x && x < excludeZone.x + excludeZone.w) continue;
+    positions.push({ x, y });
+  }
   return positions;
 }
 
-/** 초기 플랫폼 블록 배치: 하단 행(좌5+우5, 숲 테마)과 그 위 행(좌4+우4, 별 테마)을 칸마다 독립 랜덤으로 채운다. */
+/** 초기 플랫폼 블록 배치: 맨 위 행(별 테마)과 맨 아래 행(숲 테마)을 가로 전체·칸마다 독립 랜덤으로 채운다. */
 function createInitialPlatforms() {
   const items = [];
   let nextId = 1;
-  const bottomY = getPlatformYRange().maxY;
-  const topY = bottomY - PLATFORM_H;
-  for (const pos of computeInitialPlatformRow(bottomY, 5)) {
-    items.push({ id: nextId++, x: pos.x, y: pos.y, blockType: pickRandomBlockType(INITIAL_BOTTOM_ROW_BLOCK_TYPES) });
-  }
-  for (const pos of computeInitialPlatformRow(topY, 4)) {
+  const { minY, maxY } = getPlatformYRange();
+  for (const pos of computeFullWidthRow(minY, HUMAN_SPAWN_ZONE)) {
     items.push({ id: nextId++, x: pos.x, y: pos.y, blockType: pickRandomBlockType(INITIAL_TOP_ROW_BLOCK_TYPES) });
+  }
+  for (const pos of computeFullWidthRow(maxY, VAMPIRE_SPAWN_ZONE)) {
+    items.push({ id: nextId++, x: pos.x, y: pos.y, blockType: pickRandomBlockType(INITIAL_BOTTOM_ROW_BLOCK_TYPES) });
   }
   return { nextId, items };
 }
