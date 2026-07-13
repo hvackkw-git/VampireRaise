@@ -41,12 +41,12 @@ import {
 /** 감지·추적이 동작하는 상태 (지상 행동 중일 때만 주변을 살핀다) */
 const AWARE_STATES = new Set(["CRAWL"]);
 const PING_VERTICAL_ESCAPE_GAP = 10;
-// 제자리 왔다갔다 감지: 실제 수평 이동 방향(위치 변화)이 왼오왼/오왼오 = 방향 구간 3개
-// (WOBBLE_ESCAPE_SEGMENTS)가 1초(WOBBLE_WINDOW_S) 창 안에 몰릴 때만 탈출. 느긋한 방향
-// 전환은 창을 벗어나 무시한다. WOBBLE_MIN_TRAVEL보다 작은 이동은 미세 떨림으로 보고 안 센다.
-const WOBBLE_WINDOW_S = 1.0;
-const WOBBLE_ESCAPE_SEGMENTS = 3;
-const WOBBLE_MIN_TRAVEL = 0.3;
+// 다른 높이의 핑을 쫓을 때: 걸어서는 절대 높이를 못 좁힌다. 그래서 핑 x에 가로로
+// 어느 정도 정렬(|dx| < PING_CLIMB_ALIGN_X)된 채 PING_CLIMB_CONFIRM_S초가 지나면
+// (= 밑/위에 서서 못 다가가는 상황) 핑이 아래면 발판을 통과해 내려가고, 위면 핑 쪽으로
+// 점프한다. 짧은 확인 시간을 두어 스쳐 지나가는 순간에는 발동하지 않게 한다.
+const PING_CLIMB_ALIGN_X = 24;
+const PING_CLIMB_CONFIRM_S = 0.35;
 
 /**
  * 돌진 종료.
@@ -481,8 +481,8 @@ function findNearestJumpDashRoute(c, chars, platforms, blockPowered = null) {
   return best;
 }
 
-function resetPingWobble(c) {
-  c._pingWobble = null;
+function resetPingClimb(c) {
+  c._pingClimbT = 0;
 }
 
 function pingTargetPoint(c, t) {
@@ -493,52 +493,48 @@ function pingTargetPoint(c, t) {
 }
 
 /**
- * 제자리 왔다갔다 감지. 핑을 쫓는 매 프레임 호출되며, 캐릭터의 실제 수평 이동(위치 변화)
- * 방향이 뒤집힐 때마다 그 시각(simDt 누적 clock)을 큐에 쌓는다. 큐에서 1초보다 오래된 구간은
- * 버리므로 "1초 안에 방향 구간 3개(왼오왼/오왼오)"가 몰일 때만 true를 돌려준다 — 화면에 보이는
- * '왔다리갔다리' 그대로다. 핑 대상과 높이(Y축)가 사실상 같으면 왔다갔다여도 아무 동작 안 한다.
- * clock을 simDt로 누적하므로 실시간(nowMs) 없이도 테스트/게임에서 똑같이 동작한다.
+ * 다른 높이의 적을 쫓는 뱀파이어가 걸어서는 못 다가가는 상황을 풀어준다.
+ * 핑(수평 걷기 경유점)은 뱀파이어 자기 높이에 찍혀 "그냥 걸으면 된다"고 착각하게 만들기
+ * 때문에, 여기서는 핑이 아니라 적의 실제 위치로 높이 차를 판단한다.
+ *   - 적이 아래(+Y)이고 발판 위면 → 발판 가장자리로 걸어가 떨어지는 하강 경로(인간 하강과
+ *     동일 로직)로 조향한다. 통짜 발판이라 제자리 드롭이 옆 블록에 막히는 경우도, 가장자리까지
+ *     걸어가 확실히 아래층/바닥으로 내려간다.
+ *   - 적이 위(-Y)면 → 적 x에 가로로 정렬(|Δx| < PING_CLIMB_ALIGN_X)된 채 확인 시간이
+ *     지나면 적 쪽으로 점프한다(이어서 공중 돌진이 이어질 수 있음).
+ *   - 적과 높이가 사실상 같으면 → 아무 것도 안 하고 계속 걷는다.
+ * @returns {boolean} 탈출 조향/행동을 했으면 true (이번 프레임 걷기 로직을 건너뛴다).
  */
-function shouldEscapePingWobble(c, t, simDt) {
-  const target = pingTargetPoint(c, t);
-  const cx = c.x + c.w / 2;
-  const cy = c.y + c.h / 2;
-  if (Math.abs(target.y - cy) < PING_VERTICAL_ESCAPE_GAP) {
-    resetPingWobble(c);
+function tryEscapePingHeight(c, t, platforms, blockPowered, simDt, rng) {
+  const cx = c.x + c.w / 2, cy = c.y + c.h / 2;
+  const ex = t.x + t.w / 2, ey = t.y + t.h / 2;
+  const dyGap = ey - cy;
+
+  if (Math.abs(dyGap) < PING_VERTICAL_ESCAPE_GAP) {
+    c._pingClimbT = 0; // 같은 높이 — 걸어서 접근하면 됨
     return false;
   }
-  const targetId = c._ping?.targetId ?? t.id;
-  let w = c._pingWobble;
-  if (!w || w.targetId !== targetId) {
-    w = c._pingWobble = { targetId, clock: 0, dir: 0, times: [], lastX: cx };
-  }
-  w.clock += simDt;
-  const delta = cx - w.lastX;
-  w.lastX = cx;
-  if (Math.abs(delta) >= WOBBLE_MIN_TRAVEL) {
-    const dir = delta > 0 ? 1 : -1;
-    if (dir !== w.dir) {
-      w.dir = dir;
-      w.times.push(w.clock);
-    }
-    while (w.times.length && w.clock - w.times[0] > WOBBLE_WINDOW_S) w.times.shift();
-  }
-  return w.times.length >= WOBBLE_ESCAPE_SEGMENTS;
-}
 
-/**
- * 왔다갔다 탈출 행동: 핑이 아래면 발판을 통과해 내려가고, 위(또는 옆)면 핑 x쪽으로 점프한다.
- */
-function escapePingWobble(c, t, rng) {
-  const target = pingTargetPoint(c, t);
-  const cy = c.y + c.h / 2;
-  resetPingWobble(c);
-  if (target.y > cy + PING_VERTICAL_ESCAPE_GAP && c._platformId != null) {
-    startDrop(c);
+  if (dyGap > 0) {
+    // 적이 아래 → 가장자리로 내려가는 하강 경로로 조향
+    c._pingClimbT = 0;
+    if (c._platformId == null) return false; // 이미 바닥 — 더 내려갈 곳 없음
+    const step = createHumanDescentNavigator(platforms, blockPowered, ex).findStep(c);
+    if (!step) return false; // 내려갈 가장자리가 없음(막힌 지형) — 평소대로 걷기
+    c.dir = step.dir;
+    c.state = "CRAWL";
+    c.timer = Math.max(c.timer, 0.4);
     return true;
   }
-  const dx = target.x - (c.x + c.w / 2);
-  if (Math.abs(dx) > 1) c.dir = dx > 0 ? 1 : -1; // 핑 찍힌 곳을 향해 뛰도록 방향 정렬
+
+  // 적이 위 → 적 아래에 가로 정렬될 때까지 걷다가, 정렬되면 잠깐 뒤 적 쪽으로 점프
+  if (Math.abs(ex - cx) >= PING_CLIMB_ALIGN_X) {
+    c._pingClimbT = 0;
+    return false;
+  }
+  c._pingClimbT = (c._pingClimbT ?? 0) + simDt;
+  if (c._pingClimbT < PING_CLIMB_CONFIRM_S) return false;
+  c._pingClimbT = 0;
+  c.dir = ex >= cx ? 1 : -1; // 적 쪽을 향해 뛴다
   return startJump(c, rng, 40, 20);
 }
 
@@ -701,18 +697,17 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null, 
         }
       } else {
         c._ping = null; // 감지 원을 벗어남 → 랜덤 배회 복귀
-        resetPingWobble(c);
+        resetPingClimb(c);
       }
     }
 
     // ── 핑 대상을 향해 걷기 ──
     if (!c._ping) continue;
     const t = byId.get(c._ping.targetId);
-    if (!t || t.dead) { c._ping = null; resetPingWobble(c); continue; }
+    if (!t || t.dead) { c._ping = null; resetPingClimb(c); continue; }
     const pingPoint = pingTargetPoint(c, t);
     const dx = pingPoint.x - (c.x + c.w / 2);
-    const desiredDir = Math.abs(dx) < 4 ? (c.dir === 1 || c.dir === -1 ? c.dir : (dx >= 0 ? 1 : -1)) : (dx > 0 ? 1 : -1);
-    if (c.side === "vampire" && shouldEscapePingWobble(c, t, simDt) && escapePingWobble(c, t, rng)) {
+    if (c.side === "vampire" && tryEscapePingHeight(c, t, state.platforms.items, blockPowered, simDt, rng)) {
       continue;
     }
     if (Math.abs(dx) < 4) {

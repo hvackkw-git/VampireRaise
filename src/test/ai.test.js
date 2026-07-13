@@ -114,75 +114,68 @@ describe("핑 추적", () => {
     expect(vamp._ping).toBeNull();
   });
 
-  // 실제 수평 이동(위치 변화)이 왼→오→왼으로 뒤집혀 3구간이 되면 탈출한다.
-  // 각 tickAggro 전에 vamp.x를 옮겨 화면상 '왔다리갔다리'를 그대로 재현.
-  const wobbleX = (vamp, xs, dt = 0.1) => {
-    for (const x of xs) {
-      vamp.x = x;
-      tickAggro(state, dt, () => 0.9);
-      if (vamp.state !== "CRAWL") break; // 탈출하면 중단
+  // 다른 높이의 적을 쫓는 상황을 풀 프레임(감지 틱 + 물리)으로 돌려 실제 결과를 관찰.
+  // 인간은 매 프레임 제자리에 고정하고(전투 미실행), 뱀파이어만 물리 적분한다.
+  const runChase = (state, vamp, human, frames = 220) => {
+    const bp = new Map();
+    let nowMs = 0; const dt = 0.016;
+    const hx = human.x, hy = human.y;
+    let everJump = false, minY = vamp.y, maxY = vamp.y;
+    for (let i = 0; i < frames; i++) {
+      nowMs += dt * 1000;
+      human.x = hx; human.y = hy; human.vx = 0; human.state = "CRAWL"; human.timer = 99;
+      vamp._pingCd = 0; // 매 프레임 핑 갱신 강제
+      tickAggro(state, dt, () => 0.5, bp, nowMs);
+      if (vamp.state === "JUMP") everJump = true;
+      tickCharacter(vamp, { platforms: state.platforms.items, blockPowered: bp, now: nowMs, rng: () => 0.5 }, dt);
+      minY = Math.min(minY, vamp.y); maxY = Math.max(maxY, vamp.y);
     }
+    return { everJump, minY, maxY };
   };
 
-  it("다른 높이의 핑 목표를 쫓다 왔다갔다(왼오왼)하면 아래로 드롭스루한다", () => {
-    const platform = { id: 1, x: 80, y: 500, blockType: "platform_block" };
-    state.platforms.items.push(platform);
-    const vamp = put("vampire", 90, { y: platform.y - CHAR_SIZE });
-    const human = put("human", 170);
-    vamp._platformId = platform.id;
-    vamp._dashCd = 999;
-    vamp._pingCd = 999;
-    vamp._ping = { targetId: human.id, x: human.x + human.w / 2, y: human.y + human.h / 2 };
+  it("적이 아래에 있으면 발판 가장자리로 걸어가 바닥까지 내려간다", () => {
+    const py = FLOOR_Y - 60;
+    for (let x = 40; x <= 240; x += 20) {
+      state.platforms.items.push({ id: x, x, y: py, blockType: "platform_block" });
+    }
+    const vamp = put("vampire", 120, { y: py - CHAR_SIZE });
+    vamp._platformId = 120;
+    vamp._dashCd = 999; // 돌진 배제 — 하강 조향만 검증
+    const human = put("human", 130); // 통짜 발판 아래 바닥
+    human._platformId = null;
 
-    // 초기화 → 오른쪽 이동 → 왼쪽 → 오른쪽 = 방향 구간 3개
-    wobbleX(vamp, [90, 110, 90, 110]);
+    const startY = vamp.y;
+    runChase(state, vamp, human);
 
-    expect(vamp.state).toBe("FALL");
-    expect(vamp._dropThroughId).toBe(platform.id);
+    // 통짜 발판(제자리 드롭 불가)이라도 가장자리로 걸어가 떨어져 바닥층까지 내려온다.
+    expect(vamp.y).toBeGreaterThan(startY + 40);
+    expect(vamp.y).toBeCloseTo(FLOOR_Y - CHAR_SIZE, 0);
   });
 
-  it("다른 높이의 핑 목표가 위에 있으면 왔다갔다 뒤 핑 쪽으로 점프한다", () => {
+  it("적이 위에 있으면 그 아래로 정렬한 뒤 적 쪽으로 점프한다", () => {
+    const py = FLOOR_Y - 56;
+    state.platforms.items.push({ id: 1, x: 120, y: py, blockType: "platform_block" });
+    const human = put("human", 120, { y: py - CHAR_SIZE }); // 위 발판 위 (감지 원 안)
+    human._platformId = 1;
+    const vamp = put("vampire", 122); // 바닥, 적 바로 아래쯤
+    vamp._dashCd = 999; // 돌진 배제 — 점프 탈출만 검증
+
+    const startY = vamp.y;
+    const { everJump, minY } = runChase(state, vamp, human, 120);
+
+    expect(everJump).toBe(true);            // 위 적을 향해 점프한다
+    expect(minY).toBeLessThan(startY - 5);  // 시작보다 위로 떠오른다
+  });
+
+  it("적과 높이(Y축)가 같으면 점프·드롭 없이 걸어서 접근만 한다", () => {
     const vamp = put("vampire", 90);
-    const human = put("human", 170, { y: FLOOR_Y - CHAR_SIZE - 80 });
+    const human = put("human", 200); // 같은 바닥 높이, 옆
     vamp._dashCd = 999;
-    vamp._pingCd = 999;
-    vamp._ping = { targetId: human.id, x: human.x + human.w / 2, y: human.y + human.h / 2 };
 
-    wobbleX(vamp, [90, 70, 90, 70]);
+    const { everJump } = runChase(state, vamp, human, 120);
 
-    expect(vamp.state).toBe("JUMP");
-    expect(vamp.vy).toBeLessThan(0);
-    expect(vamp.dir).toBe(1); // 핑(오른쪽 위)을 향해 뛴다
-  });
-
-  it("핑과 높이(Y축)가 같으면 왔다갔다해도 아무 동작 안 한다", () => {
-    const vamp = put("vampire", 90);
-    const human = put("human", 170); // 같은 바닥 높이
-    vamp._dashCd = 999;
-    vamp._pingCd = 999;
-    vamp._ping = { targetId: human.id, x: human.x + human.w / 2, y: human.y + human.h / 2 };
-
-    wobbleX(vamp, [90, 110, 90, 110, 90, 110]);
-
-    expect(vamp.state).toBe("CRAWL"); // 점프·드롭 없음
-    expect(vamp._dropThroughId).toBeFalsy();
-  });
-
-  it("왔다갔다가 1초 넘게 띄엄띄엄이면(창 밖) 탈출하지 않고 계속 걷는다", () => {
-    const platform = { id: 1, x: 80, y: 500, blockType: "platform_block" };
-    state.platforms.items.push(platform);
-    const vamp = put("vampire", 90, { y: platform.y - CHAR_SIZE });
-    const human = put("human", 170);
-    vamp._platformId = platform.id;
-    vamp._dashCd = 999;
-    vamp._pingCd = 999;
-    vamp._ping = { targetId: human.id, x: human.x + human.w / 2, y: human.y + human.h / 2 };
-
-    // 방향 반전 사이 간격을 0.6초로 벌리면 3구간이 1초 창에 동시에 들어오지 못한다.
-    wobbleX(vamp, [90, 110, 90, 110, 90, 110], 0.6);
-
-    expect(vamp.state).toBe("CRAWL");
-    expect(vamp._dropThroughId).toBeFalsy();
+    expect(everJump).toBe(false);              // 같은 높이 → 점프 안 함
+    expect(vamp.y).toBeCloseTo(FLOOR_Y - CHAR_SIZE, 0); // 계속 바닥에서 걷기만
   });
 });
 
