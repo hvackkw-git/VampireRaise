@@ -27,7 +27,7 @@ export default {
     allMaxLevel: "모든 Vamp Shrimp가 최고 레벨입니다", levelAll: "Vamp Shrimp {count}마리 LV +1",
     waveClear: "✅ 웨이브 클리어! +🩸 {reward}",
     accountLevel: "🌟 계정 레벨 {level} 달성!", routeBlocked: "자동 웨이브 중지: Holy Shrimp 이동 경로가 막혔습니다",
-    gameOver: "☠️ 베이스 함락! 게임오버 — 웨이브 1부터 다시 시작합니다", recall: "리콜!",
+    gameOver: "☠️ 베이스 함락! 게임오버 — 이전 웨이브부터 다시 시작합니다", recall: "리콜!",
     infect: "감염!", multiHit: "연타!", revive: "부활!", poison: "독!",
   },
   decorate: {

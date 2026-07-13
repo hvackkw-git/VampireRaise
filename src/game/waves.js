@@ -72,12 +72,22 @@ export function startWave(state, blockPowered = null) {
   return true;
 }
 
-/** 죽은 Vamp Shrimp 전원 부활 (풀피, 왼쪽 아래 스폰 존 바닥에서 재시작) */
+/** 베이스 코어를 최대 체력까지 회복한다. */
+function restoreBaseCore(state) {
+  state.core.hp = state.core.max ?? BASE_CORE_HP;
+}
+
+/**
+ * 모든 Vamp Shrimp를 풀피로 회복한다.
+ * 죽은 Vamp Shrimp는 왼쪽 아래 스폰 존 바닥에서 부활시키고,
+ * 살아있는 Vamp Shrimp는 위치를 유지한 채 체력만 회복한다.
+ */
 export function reviveVampires(state, rng = Math.random) {
   for (const c of state.chars.items) {
-    if (c.side !== "vampire" || !c.dead) continue;
-    c.dead = false;
+    if (c.side !== "vampire") continue;
     c.hp = c.maxHp;
+    if (!c.dead) continue;
+    c.dead = false;
     // 상단 낙하가 아니라 왼쪽 아래 스폰 존(바닥)에서 바로 걷기 시작
     c.state = "CRAWL";
     c.x = spawnXInZone(VAMPIRE_SPAWN_ZONE, c.w, rng);
@@ -112,15 +122,15 @@ export function tickBaseSiege(state, simDt) {
   return events;
 }
 
-/** 게임오버(코어 소진): 웨이브 1로 리셋·Holy Shrimp 제거·코어 회복·Vamp Shrimp 부활 */
+/** 게임오버(코어 소진): 이전 웨이브로 후퇴·Holy Shrimp 제거·코어 회복·Vamp Shrimp 부활 */
 function triggerGameOver(state, rng) {
   state.chars.items = state.chars.items.filter((c) => c.side !== "human");
   const w = state.wave;
   w.active = false;
   w.pendingSpawns = [];
-  w.current = 1;
+  w.current = Math.max(1, w.current - 1);
   w.nextAutoAt = null;
-  state.core.hp = state.core.max ?? BASE_CORE_HP;
+  restoreBaseCore(state);
   reviveVampires(state, rng);
 }
 
@@ -132,7 +142,7 @@ export function vampireCount(state) {
 /**
  * 재시작 문턱(현재 마릿수의 요구 웨이브)에 도달했는가 — active 무관.
  * 한 번 도달하면 state.wave.rebirthUnlocked로 래치되어, 게임오버로 웨이브가
- * 1로 리셋돼도 재시작 가능 상태가 유지된다. (rebirth 실행 시 마릿수가 늘어
+ * 이전 웨이브로 후퇴해도 재시작 가능 상태가 유지된다. (rebirth 실행 시 마릿수가 늘어
  * 문턱이 올라가므로 래치는 해제된다.)
  */
 export function rebirthUnlockable(state) {
@@ -173,7 +183,7 @@ export function rebirth(state, rng = Math.random) {
   w.clock = 0;
   w.nextAutoAt = null;
   w.lastStartError = null;
-  state.core.hp = state.core.max ?? BASE_CORE_HP;
+  restoreBaseCore(state);
   reviveVampires(state, rng);
   createCharacter(state, "vampire");
   // 마릿수가 늘어 다음 문턱이 올라가므로 래치 해제 — 새 문턱에 다시 도달해야 활성
@@ -208,7 +218,7 @@ export function tickWaves(state, simDt, rng = Math.random, blockPowered = null) 
 
     // 베이스 침입: Vamp Shrimp 존에 도달한 Holy Shrimp 처리 → 코어 감소
     events.push(...tickBaseSiege(state, simDt));
-    // 게임오버: 코어 소진 → 웨이브 1로 리셋, 코어 회복, Vamp Shrimp 부활
+    // 게임오버: 코어 소진 → 이전 웨이브로 후퇴, 코어 회복, Vamp Shrimp 부활
     if (state.core.hp <= 0) {
       triggerGameOver(state, rng);
       events.push({ type: "gameover" });
@@ -226,6 +236,7 @@ export function tickWaves(state, simDt, rng = Math.random, blockPowered = null) 
       grantAccountExp(state, accountExpForWave(w.current), events);
       w.active = false;
       w.current += 1;
+      restoreBaseCore(state);
       reviveVampires(state, rng);
       events.push({ type: "clear", reward, nextWave: w.current });
       if (w.auto) w.nextAutoAt = w.clock + AUTO_WAVE_DELAY_S;

@@ -115,7 +115,7 @@ describe("베이스 코어 (뱀파이어 존 침입)", () => {
     expect(state.core.hp).toBe(before);
   });
 
-  it("코어가 0이 되면 게임오버: 웨이브 리셋·코어 회복·뱀파이어 부활", () => {
+  it("코어가 0이 되면 게임오버: 이전 웨이브로 후퇴·코어 회복·뱀파이어 부활", () => {
     state.core.hp = 1;
     state.wave.current = 5;
     state.wave.active = true;
@@ -129,7 +129,7 @@ describe("베이스 코어 (뱀파이어 존 침입)", () => {
     const events = tickWaves(state, 0.1, () => 0.5);
     expect(events.some((e) => e.type === "gameover")).toBe(true);
     expect(state.core.hp).toBe(state.core.max);
-    expect(state.wave.current).toBe(1);
+    expect(state.wave.current).toBe(4);
     expect(state.wave.active).toBe(false);
     expect(humansAlive(state)).toBe(0);
     expect(vamp.dead).toBe(false); // 부활
