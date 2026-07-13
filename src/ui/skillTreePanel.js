@@ -61,14 +61,63 @@ function dashEffectAt(char, dash, invested) {
   return "-";
 }
 
-function renderSkillDetail(detail, lines) {
-  detail.replaceChildren(...lines.map((line, index) => {
-    const row = document.createElement("span");
-    row.className = "skill-tree-detail-line";
-    if (index === 0) row.classList.add("skill-tree-detail-title");
-    row.textContent = line;
+function appendDetailText(row, text, className = "") {
+  const span = document.createElement("span");
+  if (className) span.className = className;
+  span.textContent = text;
+  row.appendChild(span);
+}
+
+function appendHighlightedValue(row, value, className) {
+  const valueText = String(value);
+  const matches = [...valueText.matchAll(/[+−-]?\d+(?:\.\d+)?%?|x\d+(?:\.\d+)?|×\d+(?:\.\d+)?|\b(?:SP|HP|px|s)\b/gi)];
+  let cursor = 0;
+  for (const match of matches) {
+    if (match.index > cursor) appendDetailText(row, valueText.slice(cursor, match.index));
+    appendDetailText(row, match[0], className);
+    cursor = match.index + match[0].length;
+  }
+  if (cursor < valueText.length) appendDetailText(row, valueText.slice(cursor));
+}
+
+function renderDetailLine(line, index) {
+  const row = document.createElement("span");
+  row.className = "skill-tree-detail-line";
+  if (index === 0) {
+    row.classList.add("skill-tree-detail-title");
+    const [name, level] = String(line).split(" | ");
+    appendDetailText(row, name);
+    if (level) {
+      appendDetailText(row, " | ", "skill-tree-detail-separator");
+      appendHighlightedValue(row, level, "skill-tree-detail-value");
+    }
     return row;
-  }));
+  }
+
+  const text = String(line);
+  const colon = text.indexOf(":");
+  const label = colon >= 0 ? text.slice(0, colon) : "";
+  const currentLabel = t("skillTree.current");
+  const nextLabel = t("skillTree.next");
+  const costLabel = t("skillTree.cost", { cost: "" }).split(":")[0];
+  if ([currentLabel, nextLabel, costLabel].includes(label)) {
+    const isNext = label === nextLabel;
+    const isCost = label === costLabel;
+    appendDetailText(row, `${label}: `, isNext ? "skill-tree-detail-label next" : "skill-tree-detail-label");
+    appendHighlightedValue(
+      row,
+      text.slice(colon + 1).trimStart(),
+      isNext ? "skill-tree-detail-value next" : isCost ? "skill-tree-detail-value cost" : "skill-tree-detail-value",
+    );
+    return row;
+  }
+
+  appendHighlightedValue(row, text, "skill-tree-detail-value");
+  return row;
+}
+
+function renderSkillDetail(detail, lines) {
+  detail.replaceChildren(...lines.map(renderDetailLine));
 }
 
 function skillDetailLines(char, skill) {
