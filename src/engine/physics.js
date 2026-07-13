@@ -134,6 +134,21 @@ export function startDrop(c) {
 }
 
 /**
+ * 다이브 드롭: 지금 서 있는 발판 '한 줄 전체'를 뚫고 곧장 아래층/바닥으로 떨어진다.
+ * 일반 드롭스루가 떠난 블록 1개만 통과해 통짜(연속) 발판에선 바로 옆 블록에 다시 얹히는
+ * 문제를 피한다 — 현재 발 높이보다 아래에 있는 발판/바닥에만 착지하도록 _diveDropMinLandY를
+ * 걸어 그 줄을 통째로 통과시킨다. (뱀파이어가 바로 아래 적을 쫓아 내려꽂을 때 사용)
+ */
+export function startDiveDrop(c) {
+  c._diveDropMinLandY = c.y + c.h + 2; // 이 아래 높이의 발판부터 착지 허용(현재 줄은 통과)
+  c._dropThroughId = null;
+  c._platformId = null;
+  c.state = "FALL";
+  c.vx = 0; c.vy = 0;
+  c._jumpApexY = null;
+}
+
+/**
  * 착지 판정: 이번 프레임 스윕 구간에서 캐릭터가 내려앉을 플랫폼을 찾아 처리.
  * @returns {boolean} 착지(또는 워프/기믹 발동) 여부
  */
@@ -151,6 +166,8 @@ function tryLand(c, ctx, simDt) {
     if (plat.blockType !== "black_hole_block" && now < (c._spikeIgnoreUntil ?? 0)) continue;
     const landY = plat.blockType === "slide_block"
       ? getSlopeTopY(plat, c.x + c.w / 2) : plat.y;
+    // 다이브 드롭: 출발한 줄(및 그보다 위)은 통과, 아래층부터 착지
+    if (c._diveDropMinLandY != null && landY < c._diveDropMinLandY) continue;
     if (c.y + c.h <= landY && nextY + c.h >= landY) {
       candidates.push({ plat, landY });
     }
@@ -165,6 +182,7 @@ function tryLand(c, ctx, simDt) {
   c.y = landY - c.h;
   c._platformId = plat.id;
   c._dropThroughId = null; // 아래 발판에 안착 → 드롭스루 종료
+  c._diveDropMinLandY = null; // 다이브 드롭 종료
   c.vy = 0; c.vx = 0; c._jumpApexY = null;
   if (plat.blockType === "spike_block" && getSpikeDir(plat.rotation ?? 0) === "up") {
     triggerSpike(c, now);
@@ -192,6 +210,7 @@ function landOnFloor(c, ctx) {
   const groundY = FLOOR_Y - c.h;
   if (c.y >= groundY && c.vy > 0) {
     c.y = groundY; c.vy = 0; c.vx = 0; c._jumpApexY = null; c._dropThroughId = null;
+    c._diveDropMinLandY = null; // 다이브 드롭 종료
     c.state = c.state === "STUN" ? "STUN" : "CRAWL";
     if (c.state === "CRAWL") c.timer = 0.8 + (ctx.rng?.() ?? Math.random()) * 1.4;
     return true;
@@ -260,10 +279,11 @@ export function tickCharacter(c, ctx, simDt) {
   }
 
   // Holy Shrimp는 전방 블록에 처음 막힌 시점부터 5초 동안 방향을 바꿔 걷는다.
-  // 재충돌이나 플랫폼 이동으로 예약을 갱신하지 않고, 만료 순간 밟고 있는 발판에서 드롭한다.
+  // 재충돌이나 플랫폼 이동으로 예약을 갱신하지 않고, 만료 순간 밟고 있는 발판 한 줄을
+  // 다이브 드롭으로 통째로 뚫고 아래층으로 내려간다(통짜 발판이어도 확실히 내려가도록).
   if (c.side === "human" && c._obstacleDropAt != null && now >= c._obstacleDropAt) {
     c._obstacleDropAt = null;
-    if (c._platformId != null) startDrop(c);
+    if (c._platformId != null) startDiveDrop(c);
   }
 
   // ── 스턴 만료 ──

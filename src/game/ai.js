@@ -29,7 +29,7 @@ import { dashCdManaMult } from "../skills/dashColors.js";
 
 /** Holy Shrimp가 행군하는 베이스(Vamp Shrimp 스폰 존) 중심 x */
 const BASE_GOAL_X = VAMPIRE_SPAWN_ZONE.x + VAMPIRE_SPAWN_ZONE.w / 2;
-import { startDrop, startJump, NON_PLATFORM_BLOCK_TYPES } from "../engine/physics.js";
+import { startDiveDrop, startJump, NON_PLATFORM_BLOCK_TYPES } from "../engine/physics.js";
 import { isLogicLayerBlock, getSpikeDir, PLATFORM_W, PLATFORM_H } from "../platform/platformBlockRenderer.js";
 import { findNearestEnemy, aliveChars } from "./combat.js";
 import { createHumanDescentNavigator } from "./descentNavigation.js";
@@ -495,16 +495,15 @@ function pingTargetPoint(c, t) {
 /**
  * 다른 높이의 적을 쫓는 뱀파이어가 걸어서는 못 다가가는 상황을 풀어준다.
  * 핑(수평 걷기 경유점)은 뱀파이어 자기 높이에 찍혀 "그냥 걸으면 된다"고 착각하게 만들기
- * 때문에, 여기서는 핑이 아니라 적의 실제 위치로 높이 차를 판단한다.
- *   - 적이 아래(+Y)이고 발판 위면 → 발판 가장자리로 걸어가 떨어지는 하강 경로(인간 하강과
- *     동일 로직)로 조향한다. 통짜 발판이라 제자리 드롭이 옆 블록에 막히는 경우도, 가장자리까지
- *     걸어가 확실히 아래층/바닥으로 내려간다.
- *   - 적이 위(-Y)면 → 적 x에 가로로 정렬(|Δx| < PING_CLIMB_ALIGN_X)된 채 확인 시간이
- *     지나면 적 쪽으로 점프한다(이어서 공중 돌진이 이어질 수 있음).
+ * 때문에, 여기서는 핑이 아니라 적의 실제 위치로 높이 차를 판단한다. 공통 절차는
+ * "적 x 바로 위/아래로 걸어 정렬 → 잠깐(PING_CLIMB_CONFIRM_S) 확인 → 수직 이동":
+ *   - 적이 아래(+Y)이고 발판 위면 → 다이브 드롭으로 그 줄을 통째로 뚫고 아래층/바닥으로 내려간다.
+ *     (통짜 발판이라 일반 드롭이 옆 블록에 막히는 경우도 확실히 내려감)
+ *   - 적이 위(-Y)면 → 적 쪽으로 점프한다(이어서 공중 돌진이 이어질 수 있음).
  *   - 적과 높이가 사실상 같으면 → 아무 것도 안 하고 계속 걷는다.
  * @returns {boolean} 탈출 조향/행동을 했으면 true (이번 프레임 걷기 로직을 건너뛴다).
  */
-function tryEscapePingHeight(c, t, platforms, blockPowered, simDt, rng) {
+function tryEscapePingHeight(c, t, simDt, rng) {
   const cx = c.x + c.w / 2, cy = c.y + c.h / 2;
   const ex = t.x + t.w / 2, ey = t.y + t.h / 2;
   const dyGap = ey - cy;
@@ -513,29 +512,29 @@ function tryEscapePingHeight(c, t, platforms, blockPowered, simDt, rng) {
     c._pingClimbT = 0; // 같은 높이 — 걸어서 접근하면 됨
     return false;
   }
+  if (dyGap > 0 && c._platformId == null) {
+    c._pingClimbT = 0; // 적이 아래인데 이미 바닥 — 더 내려갈 곳 없음
+    return false;
+  }
 
-  if (dyGap > 0) {
-    // 적이 아래 → 가장자리로 내려가는 하강 경로로 조향
-    c._pingClimbT = 0;
-    if (c._platformId == null) return false; // 이미 바닥 — 더 내려갈 곳 없음
-    const step = createHumanDescentNavigator(platforms, blockPowered, ex).findStep(c);
-    if (!step) return false; // 내려갈 가장자리가 없음(막힌 지형) — 평소대로 걷기
-    c.dir = step.dir;
-    c.state = "CRAWL";
-    c.timer = Math.max(c.timer, 0.4);
+  // 적 x 쪽으로 걸어 정렬한다(정렬 전에도, 확인 대기 중에도 계속 적 x로 수렴시켜 드리프트 방지).
+  c.dir = ex >= cx ? 1 : -1;
+  c.state = "CRAWL";
+  c.timer = Math.max(c.timer, 0.2);
+  if (Math.abs(ex - cx) >= PING_CLIMB_ALIGN_X) {
+    c._pingClimbT = 0; // 아직 정렬 전 — 걸어서 접근
     return true;
   }
 
-  // 적이 위 → 적 아래에 가로 정렬될 때까지 걷다가, 정렬되면 잠깐 뒤 적 쪽으로 점프
-  if (Math.abs(ex - cx) >= PING_CLIMB_ALIGN_X) {
-    c._pingClimbT = 0;
-    return false;
-  }
+  // 정렬됨 → 잠깐(확인) 유지 후 수직 이동
   c._pingClimbT = (c._pingClimbT ?? 0) + simDt;
-  if (c._pingClimbT < PING_CLIMB_CONFIRM_S) return false;
+  if (c._pingClimbT < PING_CLIMB_CONFIRM_S) return true;
   c._pingClimbT = 0;
-  c.dir = ex >= cx ? 1 : -1; // 적 쪽을 향해 뛴다
-  return startJump(c, rng, 40, 20);
+  if (dyGap > 0) {
+    startDiveDrop(c); // 적이 아래 → 발판 한 줄 뚫고 내려꽂기
+    return true;
+  }
+  return startJump(c, rng, 40, 20); // 적이 위 → 적 쪽으로 점프
 }
 
 /**
@@ -707,7 +706,7 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null, 
     if (!t || t.dead) { c._ping = null; resetPingClimb(c); continue; }
     const pingPoint = pingTargetPoint(c, t);
     const dx = pingPoint.x - (c.x + c.w / 2);
-    if (c.side === "vampire" && tryEscapePingHeight(c, t, state.platforms.items, blockPowered, simDt, rng)) {
+    if (c.side === "vampire" && tryEscapePingHeight(c, t, simDt, rng)) {
       continue;
     }
     if (Math.abs(dx) < 4) {
