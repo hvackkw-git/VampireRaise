@@ -1353,3 +1353,35 @@ button,
   from { transform: translateY(-8px); opacity: 0; }
   to   { transform: translateY(0); opacity: 1; }
 }
+
+/* Vamp Shrimp slam 공격 모션/FX */
+.char-sprite,
+.char-pattern {
+  transform-origin: 24px 100%;
+}
+.char.side-vampire .char-sprite,
+.char.side-vampire .char-pattern {
+  transform-origin: 24px 100%;
+}
+.fx-burst.fx-slam,
+.fx-burst.fx-slam-miss {
+  width: 22px;
+  height: 12px;
+  margin-left: -11px;
+  margin-top: -6px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(255, 236, 149, 0.95) 0%, rgba(255, 86, 72, 0.75) 45%, rgba(255, 86, 72, 0) 72%);
+  box-shadow: 0 0 10px rgba(255, 86, 72, 0.85);
+  animation: fx-slam-pop 0.22s ease-out forwards;
+}
+.fx-burst.fx-slam-miss {
+  opacity: 0.5;
+  filter: grayscale(0.35);
+  background: radial-gradient(ellipse at center, rgba(230, 230, 230, 0.55) 0%, rgba(160, 160, 160, 0.35) 48%, rgba(160, 160, 160, 0) 74%);
+  box-shadow: 0 0 6px rgba(230, 230, 230, 0.35);
+}
+@keyframes fx-slam-pop {
+  from { transform: translate(-50%, -50%) scale(0.35) rotate(-12deg); opacity: 1; }
+  to   { transform: translate(-50%, -50%) scale(1.7) rotate(10deg); opacity: 0; }
+}

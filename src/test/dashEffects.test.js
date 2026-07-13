@@ -1,3 +1,4 @@
+import { ATTACK_RAISE_S, ATTACK_SLAM_S } from "../constants.js";
 import { describe, it, expect } from "vitest";
 import {
   pathDamageMult, multiHitChance, explosionDamageMult, shieldHpMult, stunSeconds,
@@ -149,7 +150,8 @@ describe("combat 통합", () => {
     v.dashColors = { green: 10 }; // 연타 확률 100%
     const h = createCharacter(state, "human", { x: 118, y: v.y, maxHp: 500, atk: 1 });
     h.hp = 500; h._atkCd = 5;
-    const events = tickCombat(state, 0.016);
+    tickCombat(state, 0.016);
+    const events = tickCombat(state, ATTACK_RAISE_S + ATTACK_SLAM_S);
     expect(h.hp).toBe(480); // 10 × 2회
     expect(events.some((e) => e.type === "multiHit")).toBe(true);
   });

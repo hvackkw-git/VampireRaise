@@ -31,7 +31,7 @@ import { dashCdManaMult } from "../skills/dashColors.js";
 const BASE_GOAL_X = VAMPIRE_SPAWN_ZONE.x + VAMPIRE_SPAWN_ZONE.w / 2;
 import { startDiveDrop, startJump, NON_PLATFORM_BLOCK_TYPES } from "../engine/physics.js";
 import { isLogicLayerBlock, getSpikeDir, PLATFORM_W, PLATFORM_H } from "../platform/platformBlockRenderer.js";
-import { findNearestEnemy, aliveChars } from "./combat.js";
+import { findNearestEnemy, aliveChars, resetSwing } from "./combat.js";
 import { createHumanDescentNavigator } from "./descentNavigation.js";
 import { dashColorCycle, effectiveDetectRange } from "../skills/dashColors.js";
 import {
@@ -101,6 +101,7 @@ function dashPathLength(path) {
  * 지상(CRAWL)·원거리 반격·점프(공중) 모두 같은 방식으로 비행에 진입한다.
  */
 function beginDash(c, found) {
+  resetSwing(c);
   c.state = "DASH";
   c.mp = Math.max(0, (c.mp ?? 0) - DASH_MP_COST * dashCdManaMult(c.dashCdManaPoints));
   c._dashTargetId = found.char.id;

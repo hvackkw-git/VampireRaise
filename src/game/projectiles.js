@@ -8,7 +8,7 @@ import {
   HUMAN_PROJECTILE_COOLDOWN_S, HUMAN_PROJECTILE_DAMAGE, HUMAN_PROJECTILE_HIT_RADIUS,
   HUMAN_PROJECTILE_MAX_S, TANK_W, TANK_H, isEnemySide,
 } from "../constants.js";
-import { aliveChars, findNearestEnemy } from "./combat.js";
+import { aliveChars, findNearestEnemy, resetSwing } from "./combat.js";
 import { requestRangedDash } from "./ai.js";
 import { absorbWithShield } from "./dashEffects.js";
 
@@ -113,6 +113,7 @@ export function tickHumanProjectiles(state, simDt) {
       hit.dead = true;
       hit.state = "DEAD";
       hit._fightTargetId = null;
+      resetSwing(hit);
       events.push({ type: "kill", target: hit, projectile: true });
     }
   }

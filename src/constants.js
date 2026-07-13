@@ -105,6 +105,11 @@ export const ENGAGE_RANGE = 34;       // 교전 시작 거리 (중심 간 px)
 export const FIGHT_BREAK_RANGE = 48;  // 이 거리보다 멀어지면 교전 해제
 export const ENGAGE_MAX_DY = 26;      // 교전 가능한 최대 높이 차 (중심 기준)
 export const ATTACK_COOLDOWN_S = 1.0; // 공격 주기(초)
+export const ATTACK_RAISE_S = 0.22;       // Vamp Shrimp가 머리를 들어올리는 시간
+export const ATTACK_SLAM_S = 0.12;        // 내려치는 시간 (끝나는 순간 = slam)
+export const ATTACK_RAISE_DEG = 30;       // 최대 들어올림 각도
+export const SLAM_REACH = 30;             // slam 정면 유효 거리 (중심 간 px)
+export const SLAM_MAX_DY = ENGAGE_MAX_DY; // slam 세로 허용차
 /** 베이스 코어를 공격하는 주기(초) — 일반 공격 주기와 동일하게 맞춘다 */
 export const BASE_SIEGE_COOLDOWN_S = ATTACK_COOLDOWN_S;
 

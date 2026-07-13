@@ -4,7 +4,8 @@
 // 공격 쿨다운마다 타격을 주고받는다. 대상이 죽거나 멀어지면 교전이 풀린다.
 
 import {
-  ENGAGE_RANGE, FIGHT_BREAK_RANGE, ENGAGE_MAX_DY, ATTACK_COOLDOWN_S, isEnemySide,
+  ENGAGE_RANGE, FIGHT_BREAK_RANGE, ENGAGE_MAX_DY, ATTACK_COOLDOWN_S,
+  ATTACK_RAISE_S, ATTACK_SLAM_S, SLAM_REACH, SLAM_MAX_DY, isEnemySide,
   expToNext, expForKill, LEVELUP_HP_GAIN, LEVELUP_ATK_GAIN, KILL_BLOOD_REWARD,
   CHAR_SPRITES, SLAVE_BASE, vampireReviveCooldown,
   FLOOR_Y, VAMPIRE_SPAWN_ZONE, spawnXInZone,
@@ -22,6 +23,20 @@ const dist = (a, b) => {
   return Math.hypot(bc.x - ac.x, bc.y - ac.y);
 };
 const dy = (a, b) => Math.abs((a.y + a.h / 2) - (b.y + b.h / 2));
+
+export function resetSwing(c) {
+  if (!c) return;
+  c._swinging = false;
+  c._swingT = 0;
+  c._slamFired = false;
+}
+
+function isInSlamArea(a, t) {
+  const ax = a.x + a.w / 2, ay = a.y + a.h / 2;
+  const tx = t.x + t.w / 2, ty = t.y + t.h / 2;
+  const dxFront = (tx - ax) * a.dir;
+  return dxFront > -a.w / 2 && dxFront <= SLAM_REACH && Math.abs(ty - ay) <= SLAM_MAX_DY;
+}
 
 /** 교전을 시작할 수 있는(지상에 서 있는) 상태 */
 const GROUND_STATES = new Set(["CRAWL", "FIGHT"]);
@@ -81,6 +96,7 @@ export function infectToSlave(c, ownerVampire = null, {
   c.vx = 0; c.vy = 0;
   c._fightTargetId = null;
   c._ping = null;
+  resetSwing(c);
 }
 
 /** 부활 특성 Jombie Shrimp를 한 번 되살리고 소모된 RILI 패턴을 제거한다. */
@@ -96,6 +112,7 @@ export function reviveZombieOnce(c, events = []) {
   c.vy = 0;
   c._fightTargetId = null;
   c._ping = null;
+  resetSwing(c);
   events.push({ type: "zombieRevive", char: c });
   return true;
 }
@@ -181,12 +198,14 @@ function tickVampireAutoRevive(state, simDt, events, rng = Math.random) {
     c.vx = 0; c.vy = 0;
     c._platformId = null;
     c._fightTargetId = null;
+    resetSwing(c);
     events.push({ type: "vampireRevive", char: c });
   }
 }
 
 /** 교전 진입: 멈춰서 대상을 마주본다 (핑 추적 종료) */
 function engage(c, target) {
+  resetSwing(c);
   c.state = "FIGHT";
   c._fightTargetId = target.id;
   c._ping = null;
@@ -198,6 +217,7 @@ function engage(c, target) {
 function disengage(c) {
   if (c.state === "FIGHT") { c.state = "CRAWL"; c.timer = 0.3; }
   c._fightTargetId = null;
+  resetSwing(c);
 }
 
 /**
@@ -249,24 +269,41 @@ export function tickCombat(state, simDt) {
     if (!valid) { disengage(c); continue; }
     // 항상 대상을 마주본다
     c.dir = t.x + t.w / 2 >= c.x + c.w / 2 ? 1 : -1;
+    if (c.side === "vampire") {
+      if (c._atkCd <= 0 && !c._swinging) {
+        c._swinging = true;
+        c._swingT = 0;
+        c._slamFired = false;
+        c._atkCd = ATTACK_COOLDOWN_S;
+      }
+      if (!c._swinging) continue;
+      c._swingT = (Number(c._swingT) || 0) + simDt;
+      const slamAt = ATTACK_RAISE_S + ATTACK_SLAM_S;
+      if (c._swingT >= slamAt && !c._slamFired) {
+        if (isInSlamArea(c, t)) {
+          let dmg = c.atk;
+          if (c._revengePending) {
+            dmg = Math.round(dmg * revengeAttackMult(c.dashColors));
+            c._revengePending = false;
+          }
+          hitRecords.push({ attacker: c, target: t, dmg });
+          const p = multiHitChance(c.dashColors);
+          if (p > 0 && Math.random() < p) {
+            hitRecords.push({ attacker: c, target: t, dmg });
+            events.push({ type: "multiHit", attacker: c, target: t });
+          }
+          events.push({ type: "slam", attacker: c, target: t, hit: true });
+        } else {
+          events.push({ type: "slam", attacker: c, target: t, hit: false });
+        }
+        c._slamFired = true;
+      }
+      if (c._swingT >= slamAt) c._swinging = false;
+      continue;
+    }
     if (c._atkCd > 0) continue;
     c._atkCd = ATTACK_COOLDOWN_S;
-    // TODO(dash색상 효과·미구현): 초록=연타확률(0~10%)로 이 공격이 한 번 더 hitRecords에 추가되는 훅.
-    // 빨강=복수: 피격으로 쌓인 버프가 있으면 이번 공격력에 배율 적용 후 소모(1회 반격).
-    let dmg = c.atk;
-    if (c.side === "vampire" && c._revengePending) {
-      dmg = Math.round(dmg * revengeAttackMult(c.dashColors));
-      c._revengePending = false;
-    }
-    hitRecords.push({ attacker: c, target: t, dmg });
-    // 초록=연타: 확률로 같은 피해가 한 번 더 나간다.
-    if (c.side === "vampire") {
-      const p = multiHitChance(c.dashColors);
-      if (p > 0 && Math.random() < p) {
-        hitRecords.push({ attacker: c, target: t, dmg });
-        events.push({ type: "multiHit", attacker: c, target: t });
-      }
-    }
+    hitRecords.push({ attacker: c, target: t, dmg: c.atk });
   }
 
   // 돌진 색상 효과(노랑 경로·파랑 폭발)로 예약된 피해를 합류시켜 처치·전염을 일괄 처리
@@ -318,6 +355,7 @@ export function tickCombat(state, simDt) {
       t.dead = true;
       t.state = "DEAD";
       t._fightTargetId = null;
+      resetSwing(t);
       if (t.side === "vampire") t._reviveCd = vampireReviveCooldown(t.level);
       events.push({ type: "kill", target: t });
     }
