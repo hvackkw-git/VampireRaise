@@ -61,6 +61,16 @@ function dashEffectAt(char, dash, invested) {
   return "-";
 }
 
+function renderSkillDetail(detail, lines) {
+  detail.replaceChildren(...lines.map((line, index) => {
+    const row = document.createElement("span");
+    row.className = "skill-tree-detail-line";
+    if (index === 0) row.classList.add("skill-tree-detail-title");
+    row.textContent = line;
+    return row;
+  }));
+}
+
 function skillDetailLines(char, skill) {
   if (skill.dash) {
     const current = dashInvested(char, skill.dash);
@@ -171,7 +181,7 @@ export function initSkillTreePanel({ getCharacter, getCharacters, onChange, onOp
       owner.textContent = t("skillTree.noShrimp");
       level.textContent = "-";
       points.textContent = "0";
-      detail.textContent = t("skillTree.unavailable");
+      renderSkillDetail(detail, [t("skillTree.unavailable")]);
       if (dashGhostN) dashGhostN.textContent = "0";
       if (dashResetBtn) dashResetBtn.disabled = true;
       if (levelUpButton) levelUpButton.disabled = true;
@@ -224,7 +234,7 @@ export function initSkillTreePanel({ getCharacter, getCharacters, onChange, onOp
 
     const selected = SKILL_BY_ID.get(selectedSkillId) ?? SKILL_TREE[0];
     const canUpgrade = canUpgradeSkill(char, selected);
-    detail.textContent = skillDetailLines(char, selected).join("\n");
+    renderSkillDetail(detail, skillDetailLines(char, selected));
     if (levelUpButton) {
       levelUpButton.disabled = !canUpgrade;
       levelUpButton.title = canUpgrade ? t("controls.skillLevelUp") : t("skillTree.cannotUpgrade");
