@@ -34,6 +34,12 @@ function visualBounds(c) {
   };
 }
 
+/** Vamp Shrimp(빨간새우)는 Holy/Jombie Shrimp보다 항상 앞에 보이도록 별도 z 밴드를 쓴다. */
+function charZIndex(c) {
+  const yOrder = Math.max(0, Math.min(9999, Math.round(Number(c?.y) || 0)));
+  return (c?.side === "vampire" ? 20000 : 10000) + yOrder;
+}
+
 let layerLogic, layerPlatform, layerChars, layerFx, rgbTintEl, tankEl, canvasEl, canvasWrapperEl;
 let uiScale = 1;
 
@@ -312,6 +318,7 @@ export function renderChars(state, nowMs, ui) {
     }
     entry.el.style.left = `${c.x}px`;
     entry.el.style.top = `${c.y}px`;
+    entry.el.style.zIndex = String(charZIndex(c));
     // 스프라이트 기본 방향: 왼쪽 → 오른쪽 이동 시 좌우 반전
     entry.sprite.style.transform = c.dir > 0 ? "scaleX(-1)" : "";
     entry.pattern.style.transform = entry.sprite.style.transform;
