@@ -9,6 +9,7 @@ import {
 import {
   SKILL_TREE, DASH_SKILL_DEFS, ZOMBIE_SKILL_DEFS, normalizeSkillProgress,
 } from "../skills/skillTree.js";
+import { canUpgradeSkill, upgradeSkill } from "../ui/skillTreePanel.js";
 
 describe("스킬트리 데이터", () => {
   it("세로 화면용 8행 40개 슬롯, 레벨 제한·선행 없음", () => {
@@ -57,6 +58,38 @@ describe("스킬트리 데이터", () => {
     grantExp(char, expToNext(char.level), []);
     expect(char.level).toBe(level + 1);
     expect(char.skillPoints).toBe(skillPoints + 1);
+  });
+
+  it("선택한 스킬은 명시적인 레벨업 동작에서만 SP를 사용한다", () => {
+    const char = createInitialState().chars.items[0];
+    const redSkill = SKILL_TREE.find((skill) => skill.dash?.key === "red");
+    char.skillPoints = 2;
+    const before = char.dashColors.red;
+
+    expect(canUpgradeSkill(char, redSkill)).toBe(true);
+    expect(char.dashColors.red).toBe(before);
+    expect(char.skillPoints).toBe(2);
+
+    expect(upgradeSkill(char, redSkill)).toBe(true);
+    expect(char.dashColors.red).toBe(before + 1);
+    expect(char.skillPoints).toBe(1);
+  });
+
+  it("포인트 부족·미구현·이미 선택한 좀비 스킬은 레벨업할 수 없다", () => {
+    const char = createInitialState().chars.items[0];
+    const revive = SKILL_TREE.find((skill) => skill.zombie?.key === "zombie-yellow-revive");
+    const poison = SKILL_TREE.find((skill) => skill.zombie?.key === "zombie-red-poison");
+    const black = SKILL_TREE.find((skill) => skill.zombie?.key === "zombie-black");
+
+    char.skillPoints = ZOMBIE_TRAIT_COST - 1;
+    expect(canUpgradeSkill(char, revive)).toBe(false);
+    expect(upgradeSkill(char, revive)).toBe(false);
+
+    char.skillPoints = ZOMBIE_TRAIT_COST * 2;
+    expect(canUpgradeSkill(char, black)).toBe(false);
+    expect(upgradeSkill(char, revive)).toBe(true);
+    expect(canUpgradeSkill(char, poison)).toBe(false);
+    expect(upgradeSkill(char, poison)).toBe(false);
   });
 
   it("normalizeSkillProgress: 잘못된 learnedSkills 정리", () => {

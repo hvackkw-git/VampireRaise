@@ -6,7 +6,7 @@ export default {
     skillTree: "스킬 트리", stats: "능력치", startWave: "웨이브 시작", autoWave: "자동 웨이브",
     rebirth: "재시작", decorate: "꾸미기", reset: "처음부터 재시작",
     closeSkillTree: "스킬 트리 닫기", closeStats: "스탯 닫기", close: "닫기", dashSummary: "Dash 스킬 요약",
-    testLevelUp: "테스트 레벨 +1", switchKorean: "한국어로 전환", switchEnglish: "영어로 전환",
+    testLevelUp: "테스트 레벨 +1", skillLevelUp: "스킬 +1", switchKorean: "한국어로 전환", switchEnglish: "영어로 전환",
   },
   info: {
     attack: "공격력", emptySlot: "빈 슬롯", noEquippedSkills: "장착 스킬 없음",
@@ -55,9 +55,12 @@ export default {
   },
   skillTree: {
     title: "스킬 트리", dashSkills: "Dash 스킬", ghosts: "잔상",
-    reset: "초기화", investHint: "슬롯을 눌러 투자", noShrimp: "선택된 새우 없음",
+    reset: "초기화", investHint: "스킬을 선택하면 상세 정보가 표시됩니다", noShrimp: "선택된 새우 없음",
     unavailable: "스킬 트리 사용 불가", shrimpNumber: "{number}번 새우", shrimp: "새우",
-    current: "현재", choiceCost: "비용 {cost}SP · 2~4 중 택1", choice: "{cost}SP · 택1", emptySlot: "빈 슬롯",
+    current: "현재", next: "다음", level: "Lv.", cost: "비용: {cost}SP",
+    learned: "습득함", notLearned: "미습득", learn: "습득", maxed: "최대",
+    choiceLocked: "다른 선택 스킬로 잠김", cannotUpgrade: "이 스킬은 올릴 수 없습니다",
+    choiceCost: "비용 {cost}SP · 2~4 중 택1", choice: "{cost}SP · 택1", emptySlot: "빈 슬롯",
   },
   statPanel: {
     title: "스탯", noShrimp: "선택한 새우 없음", shrimpNumber: "{number}번 새우", shrimp: "새우",

@@ -475,11 +475,17 @@ export function spawnFloatText(x, y, text, cls = "") {
   span.addEventListener("animationend", () => span.remove());
 }
 
+/** 내부 피해 정밀도는 유지하고 전투 텍스트만 최대 소수점 한 자리로 표시한다. */
+export function formatDamage(value) {
+  const rounded = Math.round(Math.max(0, Number(value) || 0) * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
 export function renderCombatEvents(events) {
   for (const ev of events) {
     if (ev.type === "hit" || ev.type === "projectileHit") {
       const v = visualBounds(ev.target);
-      spawnFloatText(v.x - 6, v.top - 8, `-${ev.dmg}`);
+      spawnFloatText(v.x - 6, v.top - 8, `-${formatDamage(ev.dmg)}`);
     } else if (ev.type === "levelup") {
       const v = visualBounds(ev.char);
       spawnFloatText(ev.char.x, v.top - 12, "LEVEL UP!", "fx-levelup");
@@ -510,7 +516,7 @@ export function renderCombatEvents(events) {
       spawnFloatText(v.x - 8, v.top - 18, t("events.multiHit"), "fx-multihit");
     } else if (ev.type === "shieldBlock") {
       const v = visualBounds(ev.target);
-      spawnFloatText(v.x - 6, v.top - 8, `🛡${ev.absorbed}`, "fx-shieldblock");
+      spawnFloatText(v.x - 6, v.top - 8, `🛡${formatDamage(ev.absorbed)}`, "fx-shieldblock");
     } else if (ev.type === "zombieRevive" || ev.type === "vampireRevive") {
       const v = visualBounds(ev.char);
       spawnFloatText(ev.char.x, v.top - 14, t("events.revive"), "fx-infect");
@@ -520,7 +526,7 @@ export function renderCombatEvents(events) {
       spawnFloatText(ev.char.x, v.top - 14, t("events.poison"), "fx-poison");
     } else if (ev.type === "poisonTick") {
       const v = visualBounds(ev.target);
-      spawnFloatText(v.x - 6, v.top - 8, `-${ev.dmg.toFixed(1)}`, "fx-poison");
+      spawnFloatText(v.x - 6, v.top - 8, `-${formatDamage(ev.dmg)}`, "fx-poison");
     }
   }
 }

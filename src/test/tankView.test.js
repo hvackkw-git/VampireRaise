@@ -1,6 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { ATTACK_RAISE_S, ATTACK_RAISE_DEG } from "../constants.js";
-import { spriteAttackTransform } from "../ui/tankView.js";
+import { formatDamage, spriteAttackTransform } from "../ui/tankView.js";
+
+describe("tank view damage text", () => {
+  it("shows at most one decimal place without changing integer labels", () => {
+    expect(formatDamage(9.94)).toBe("9.9");
+    expect(formatDamage(9.96)).toBe("10");
+    expect(formatDamage(4)).toBe("4");
+  });
+});
 
 describe("tank view attack transforms", () => {
   it("keeps the right-facing slam rotation outside the horizontal flip", () => {

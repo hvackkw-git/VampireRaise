@@ -369,9 +369,13 @@ function rangedDashRouteMultiplier(c) {
 }
 
 export function requestRangedDash(vampire, attackerId) {
-  if (!vampire || vampire.dead || vampire.side !== "vampire") return;
-  vampire._rangedRetaliation = { targetId: attackerId, routeMult: rangedDashRouteMultiplier(vampire) };
+  if (!vampire || vampire.dead || vampire.side !== "vampire" || vampire.state !== "CRAWL") return;
   vampire._ping = { targetId: attackerId, ranged: true };
+  if (vampire._dashCd > 0) {
+    vampire._rangedRetaliation = null;
+    return;
+  }
+  vampire._rangedRetaliation = { targetId: attackerId, routeMult: rangedDashRouteMultiplier(vampire) };
 }
 
 /**
@@ -552,7 +556,12 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null, 
   const dashEvents = []; // 색상 효과 연출용 시각 이벤트
   let descentNavigator = null;
   for (const c of chars) {
-    if (c._dashCd > 0) c._dashCd -= simDt;
+    const dashWasCooling = c._dashCd > 0;
+    if (dashWasCooling) {
+      c._dashCd -= simDt;
+      c._rangedRetaliation = null;
+    }
+    if (c.state !== "CRAWL") c._rangedRetaliation = null;
     updateRangedBrace(c, chars); // Holy Shrimp: 원거리 사거리 안 적 감지 → 이속 감속 플래그
 
     // ── 돌진 조향: BFS 경로 웨이포인트를 따라 비행 ──
@@ -646,7 +655,7 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null, 
 
 
     // ── 원거리 피격 반격: 공격자에게 핑을 찍고 더 넓은 예산(감지×2.5×스킬배율)으로 돌진 ──
-    if (c.side === "vampire" && c._rangedRetaliation) {
+    if (c.side === "vampire" && c._rangedRetaliation && !(c._dashCd > 0)) {
       const t = byId.get(c._rangedRetaliation.targetId);
       const routeMult = c._rangedRetaliation.routeMult ?? rangedDashRouteMultiplier(c);
       const found = t && !t.dead && isEnemySide(c.side, t.side)

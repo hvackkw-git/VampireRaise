@@ -5,7 +5,7 @@
 // (스프라이트/아트는 아직 굽지 않음. 색·이름·효과 텍스트만.)
 
 const COLUMN_X = [14, 32, 50, 68, 86];
-const ROW_Y = [10, 21.43, 32.86, 44.29, 55.71, 67.14, 78.57, 90];
+const ROW_Y = [12, 22.86, 33.71, 44.57, 55.43, 66.29, 77.14, 88];
 const NUM_COLS = COLUMN_X.length;
 const NUM_ROWS = ROW_Y.length;
 

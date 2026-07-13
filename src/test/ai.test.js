@@ -3,7 +3,7 @@
 // 범위 이탈 시 배회 복귀, 노예는 감지 반경이 작다, 플랫폼 위에서는 그냥 걷다 떨어진다.
 import { describe, it, expect, beforeEach } from "vitest";
 import { createInitialState, createCharacter } from "../state/gameState.js";
-import { tickAggro, estimateRouteDist, findDashRoute } from "../game/ai.js";
+import { tickAggro, estimateRouteDist, findDashRoute, requestRangedDash } from "../game/ai.js";
 import { tickCharacter } from "../engine/physics.js";
 import {
   DETECT_RANGE, PING_REFRESH_S, FLOOR_Y, CHAR_SIZE,
@@ -180,6 +180,57 @@ describe("핑 추적", () => {
 });
 
 describe("뱀파이어 패시브: 혈귀 돌진", () => {
+  it("쿨다운 중 원거리 반격 요청은 보관하지 않는다", () => {
+    const vamp = put("vampire", 100);
+    const human = put("human", 100 + DETECT_RANGE.vampire + 20);
+    state.platforms.items.push({ id: 1, x: human.x, y: human.y + human.h, blockType: "platform_block" });
+    vamp._dashCd = 5;
+    vamp._pingCd = 999;
+    requestRangedDash(vamp, human.id);
+
+    expect(vamp._rangedRetaliation).toBeNull();
+    expect(vamp._ping).toMatchObject({ targetId: human.id, ranged: true });
+
+    tickAggro(state, 5, () => 0.9);
+    expect(vamp.state).toBe("CRAWL");
+    expect(vamp._dashTargetId).toBeNull();
+    expect(vamp._rangedRetaliation).toBeNull();
+    expect(vamp._ping).toMatchObject({ targetId: human.id, ranged: true });
+    expect(vamp.dir).toBe(1);
+  });
+
+  it("다른 적과 교전 중에는 원거리 피격이 반격 핑과 타깃을 바꾸지 않는다", () => {
+    const vamp = put("vampire", 100);
+    const engaged = put("human", 120);
+    const rangedAttacker = put("human", 180);
+    vamp.state = "FIGHT";
+    vamp._fightTargetId = engaged.id;
+    vamp._dashCd = 0;
+
+    requestRangedDash(vamp, rangedAttacker.id);
+
+    expect(vamp._fightTargetId).toBe(engaged.id);
+    expect(vamp._ping).toBeNull();
+    expect(vamp._rangedRetaliation).toBeUndefined();
+  });
+
+  it("걷는 중 만든 반격 요청도 실행 전에 교전 상태가 되면 폐기한다", () => {
+    const vamp = put("vampire", 100);
+    const rangedAttacker = put("human", 180);
+    vamp._dashCd = 0;
+    requestRangedDash(vamp, rangedAttacker.id);
+    expect(vamp._rangedRetaliation?.targetId).toBe(rangedAttacker.id);
+
+    vamp.state = "FIGHT";
+    vamp._fightTargetId = rangedAttacker.id;
+    tickAggro(state, 0.016, () => 0.9);
+
+    expect(vamp.state).toBe("FIGHT");
+    expect(vamp._dashTargetId).toBeNull();
+    expect(vamp._rangedRetaliation).toBeNull();
+    expect(vamp._ping).toBeNull();
+  });
+
   it("감지 원 안의 적 + 우회 거리가 예산(×2) 이내면 돌진(DASH)한다", () => {
     const vamp = put("vampire", 100);
     const human = put("human", 100 + DETECT_RANGE.vampire - 20); // 감지 원 안, 평지 (우회 = 직선)

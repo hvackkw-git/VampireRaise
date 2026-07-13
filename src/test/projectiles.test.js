@@ -52,7 +52,7 @@ describe("인간 투사체", () => {
   it("뱀파이어가 투사체에 맞으면 공격자에게 원거리 반격 핑을 찍고 감지×2.5×1.1 예산으로 돌진한다", () => {
     const human = put("human", 40);
     const vamp = put("vampire", 40 + DETECT_RANGE.vampire * 2.4);
-    vamp._dashCd = 999; // 일반 감지 돌진은 꺼둔다.
+    vamp._dashCd = 0; // 대시 준비 완료 — 피격 즉시 장거리 반격이 가능하다.
     state.platforms.items.push({ id: 1, x: human.x, y: human.y + human.h, blockType: "platform_block" });
     state.projectiles.items.push({
       id: 1,
@@ -74,7 +74,6 @@ describe("인간 투사체", () => {
     expect(vamp._ping).toMatchObject({ targetId: human.id, ranged: true });
     expect(vamp._rangedRetaliation.routeMult).toBe(DASH_RANGED_ROUTE_MULT * DASH_RANGED_SKILL_MULT);
 
-    vamp._dashCd = 0;
     tickAggro(state, 0.016, () => 0.9);
     expect(vamp.state).toBe("DASH");
     expect(vamp._dashTargetId).toBe(human.id);

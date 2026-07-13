@@ -4,7 +4,8 @@ import {
 import {
   DASH_COLOR_HEX, dashGhostCount, investDashColor, investDetect, investDashCdMana,
   normalizeDashPoints, resetDashColors, effectiveDetectRange,
-  revengeAttackMult, dashDistanceMult, detectRangeMult, dashCdManaMult,
+  revengeAttackMult, dashDistanceMult, pathDamageMult, multiHitChance,
+  explosionDamageMult, shieldHpMult, stunSeconds, detectRangeMult, dashCdManaMult,
 } from "../skills/dashColors.js";
 import {
   investZombieHp, investZombieTrait, zombieHpPoints, ZOMBIE_TRAIT_COST,
@@ -14,7 +15,6 @@ import { t } from "../i18n/index.js";
 const skillName = (skill) => t(skill.nameKey, skill.nameVars ?? {});
 const skillEffect = (skill) => t((skill.dash ?? skill.zombie)?.effectKey ?? "");
 
-/** dash 스킬의 현재 투자 포인트 */
 function dashInvested(char, dash) {
   if (!dash) return 0;
   if (dash.kind === "detect") return char.detectPoints || 0;
@@ -22,18 +22,89 @@ function dashInvested(char, dash) {
   return char.dashColors[dash.key] || 0;
 }
 
-/** dash 스킬의 현재 효과값 문자열(구현된 것만 수치, 나머지는 빈 문자열) */
-function dashEffectValue(char, dash) {
-  if (!dash) return "";
-  if (dash.key === "red") return ` · ${t("skillTree.current")} ×${revengeAttackMult(char.dashColors).toFixed(1)}`;
-  if (dash.key === "orange") return ` · ${t("skillTree.current")} ×${dashDistanceMult(char.dashColors).toFixed(1)}`;
+function skillUpgradeCost(skill) {
+  return skill?.zombie?.trait ? ZOMBIE_TRAIT_COST : 1;
+}
+
+export function canUpgradeSkill(char, skill) {
+  const points = Math.max(0, Math.floor(Number(char?.skillPoints) || 0));
+  if (!char || !skill || points < skillUpgradeCost(skill)) return false;
+  if (skill.dash || skill.zombie?.key === "zombie-hp") return true;
+  if (skill.zombie?.trait) return !!skill.zombie.implemented && !char.zombieTrait;
+  return false;
+}
+
+export function upgradeSkill(char, skill, chars = []) {
+  if (!canUpgradeSkill(char, skill)) return false;
+  if (skill.dash?.kind === "detect") return investDetect(char);
+  if (skill.dash?.kind === "passive") return investDashCdMana(char);
+  if (skill.dash) return investDashColor(char, skill.dash.key);
+  if (skill.zombie?.key === "zombie-hp") return investZombieHp(char, chars);
+  if (skill.zombie?.trait) return investZombieTrait(char, skill.zombie.key);
+  return false;
+}
+
+function dashEffectAt(char, dash, invested) {
+  const colors = { ...char.dashColors, [dash.key]: invested };
+  if (dash.key === "red") return `x${revengeAttackMult(colors).toFixed(1)}`;
+  if (dash.key === "orange") return `x${dashDistanceMult(colors).toFixed(1)}`;
+  if (dash.key === "yellow") return `x${pathDamageMult(colors).toFixed(1)}`;
+  if (dash.key === "green") return `${Math.round(multiHitChance(colors) * 100)}%`;
+  if (dash.key === "blue") return `x${explosionDamageMult(colors).toFixed(1)}`;
+  if (dash.key === "purple") return `x${shieldHpMult(colors).toFixed(1)} HP`;
+  if (dash.key === "white") return `${stunSeconds(colors).toFixed(1)}s`;
   if (dash.kind === "detect") {
-    return ` · ${t("skillTree.current")} ×${detectRangeMult(char.detectPoints).toFixed(1)} (${Math.round(effectiveDetectRange(char))}px)`;
+    const range = effectiveDetectRange({ ...char, detectPoints: invested });
+    return `x${detectRangeMult(invested).toFixed(1)} (${Math.round(range)}px)`;
   }
-  if (dash.kind === "passive") {
-    return ` · ${t("skillTree.current")} ×${dashCdManaMult(char.dashCdManaPoints).toFixed(1)}`;
+  if (dash.kind === "passive") return `x${dashCdManaMult(invested).toFixed(1)}`;
+  return "-";
+}
+
+function skillDetailLines(char, skill) {
+  if (skill.dash) {
+    const current = dashInvested(char, skill.dash);
+    return [
+      `${skillName(skill)} | ${t("skillTree.level")} ${current}`,
+      `${t("skillTree.current")}: ${dashEffectAt(char, skill.dash, current)}`,
+      `${t("skillTree.next")}: ${dashEffectAt(char, skill.dash, current + 1)}`,
+      skillEffect(skill),
+      t("skillTree.cost", { cost: 1 }),
+    ];
   }
-  return "";
+  if (skill.zombie?.key === "zombie-hp") {
+    const current = zombieHpPoints(char);
+    return [
+      `${skillName(skill)} | ${t("skillTree.level")} ${current}`,
+      `${t("skillTree.current")}: +${current} HP`,
+      `${t("skillTree.next")}: +${current + 1} HP`,
+      skillEffect(skill),
+      t("skillTree.cost", { cost: 1 }),
+    ];
+  }
+  if (skill.zombie?.trait) {
+    const learned = char.zombieTrait === skill.zombie.key;
+    const locked = !!char.zombieTrait && !learned;
+    const next = learned ? t("skillTree.maxed")
+      : locked ? t("skillTree.choiceLocked")
+        : skill.zombie.implemented ? t("skillTree.learn") : t("skillTree.unavailable");
+    return [
+      `${skillName(skill)} | ${t("skillTree.level")} ${learned ? 1 : 0}`,
+      `${t("skillTree.current")}: ${learned ? t("skillTree.learned") : t("skillTree.notLearned")}`,
+      `${t("skillTree.next")}: ${next}`,
+      skillEffect(skill),
+      t("skillTree.cost", { cost: ZOMBIE_TRAIT_COST }),
+    ];
+  }
+  if (skill.zombie) {
+    return [
+      skillName(skill),
+      `${t("skillTree.current")}: ${t("skillTree.unavailable")}`,
+      `${t("skillTree.next")}: ${t("skillTree.unavailable")}`,
+      skillEffect(skill),
+    ];
+  }
+  return [t("skillTree.emptySlot")];
 }
 
 export function initSkillTreePanel({ getCharacter, getCharacters, onChange, onOpenChange } = {}) {
@@ -48,24 +119,24 @@ export function initSkillTreePanel({ getCharacter, getCharacters, onChange, onOp
   const dashGhostN = document.getElementById("dashGhostN");
   const dashResetBtn = document.getElementById("btnDashReset");
   const nodeEls = new Map();
-  let selectedSkillId = SKILL_TREE.find((s) => s.dash)?.id ?? SKILL_TREE[0].id;
+  let selectedSkillId = SKILL_TREE.find((skill) => skill.dash)?.id ?? SKILL_TREE[0].id;
 
   dashResetBtn?.addEventListener("click", () => {
     const char = getCharacter?.();
-    if (char) { resetDashColors(char); onChange?.(char); render(); }
-  });
-
-  levelUpButton?.addEventListener("click", () => {
-    const char = getCharacter?.();
-    if (!char || char.level >= 50) return;
-    char.level = Math.min(50, Math.max(1, Number(char.level) || 1) + 1);
-    char.skillPoints = Math.max(0, Number(char.skillPoints) || 0) + 1;
-    char.statPoints = Math.max(0, Number(char.statPoints) || 0) + 1;
+    if (!char) return;
+    resetDashColors(char);
     onChange?.(char);
     render();
   });
 
-  // 노드 생성: dash 슬롯은 색/개수 표시 + 클릭 투자, Jombie Shrimp 슬롯은 표시용, 빈 슬롯은 비활성.
+  levelUpButton?.addEventListener("click", () => {
+    const char = getCharacter?.();
+    const selected = SKILL_BY_ID.get(selectedSkillId);
+    if (!upgradeSkill(char, selected, getCharacters?.() ?? [])) return;
+    onChange?.(char);
+    render();
+  });
+
   for (const skill of SKILL_TREE) {
     const button = document.createElement("button");
     button.type = "button";
@@ -75,9 +146,7 @@ export function initSkillTreePanel({ getCharacter, getCharacters, onChange, onOp
     button.style.top = `${skill.y}%`;
     if (skill.dash) {
       button.classList.add("dash-node", `dash-node-${skill.dash.kind}`);
-      if (skill.dash.kind === "color") {
-        button.style.setProperty("--dash-color", DASH_COLOR_HEX[skill.dash.key]);
-      }
+      if (skill.dash.kind === "color") button.style.setProperty("--dash-color", DASH_COLOR_HEX[skill.dash.key]);
       const icon = skill.dash.icon ? `<img class="skill-node-icon" src="${skill.dash.icon}" alt="" draggable="false">` : "";
       button.innerHTML = `${icon}<span class="skill-node-count">0</span>`;
     } else if (skill.zombie) {
@@ -89,19 +158,6 @@ export function initSkillTreePanel({ getCharacter, getCharacters, onChange, onOp
     }
     button.addEventListener("click", () => {
       selectedSkillId = skill.id;
-      const char = getCharacter?.();
-      if (char && skill.dash) {
-        const ok = skill.dash.kind === "detect" ? investDetect(char)
-          : skill.dash.kind === "passive" ? investDashCdMana(char)
-          : investDashColor(char, skill.dash.key);
-        if (ok) onChange?.(char);
-      } else if (char && skill.zombie?.key === "zombie-hp") {
-        const ok = investZombieHp(char, getCharacters?.() ?? []);
-        if (ok) onChange?.(char);
-      } else if (char && skill.zombie?.trait && skill.zombie.implemented) {
-        const ok = investZombieTrait(char, skill.zombie.key);
-        if (ok) onChange?.(char);
-      }
       render();
     });
     nodes.appendChild(button);
@@ -113,7 +169,7 @@ export function initSkillTreePanel({ getCharacter, getCharacters, onChange, onOp
     const char = getCharacter?.();
     if (!char) {
       owner.textContent = t("skillTree.noShrimp");
-      level.textContent = "—";
+      level.textContent = "-";
       points.textContent = "0";
       detail.textContent = t("skillTree.unavailable");
       if (dashGhostN) dashGhostN.textContent = "0";
@@ -130,57 +186,48 @@ export function initSkillTreePanel({ getCharacter, getCharacters, onChange, onOp
     owner.textContent = order;
     level.textContent = String(char.level);
     points.textContent = String(char.skillPoints);
-    const noPoints = char.skillPoints <= 0;
     if (dashGhostN) dashGhostN.textContent = String(dashGhostCount(char.dashColors, effectiveDetectRange(char)));
     if (dashResetBtn) dashResetBtn.disabled = false;
-    if (levelUpButton) levelUpButton.disabled = char.level >= 50;
 
     for (const skill of SKILL_TREE) {
       const button = nodeEls.get(skill.id);
       button.classList.toggle("selected", selectedSkillId === skill.id);
+      button.classList.toggle("available", canUpgradeSkill(char, skill));
       if (skill.dash) {
-        const cur = dashInvested(char, skill.dash);
+        const current = dashInvested(char, skill.dash);
         const countEl = button.querySelector(".skill-node-count");
-        if (countEl) countEl.textContent = String(cur);
-        button.classList.toggle("invested", cur > 0);
-        button.disabled = noPoints; // 레벨 제한 없음 — 남은 포인트가 없을 때만 비활성
-        button.title = `${skillName(skill)} · ${cur}p · ${skillEffect(skill)}`;
+        if (countEl) countEl.textContent = String(current);
+        button.classList.toggle("invested", current > 0);
+        button.classList.remove("locked");
+        button.disabled = false;
+        button.title = `${skillName(skill)} | ${current}p | ${skillEffect(skill)}`;
         button.setAttribute("aria-label", button.title);
       } else if (skill.zombie) {
         const hpSkill = skill.zombie.key === "zombie-hp";
         const trait = !!skill.zombie.trait;
         const learnedTrait = trait && char.zombieTrait === skill.zombie.key;
-        const cur = hpSkill ? zombieHpPoints(char) : learnedTrait ? 1 : 0;
+        const current = hpSkill ? zombieHpPoints(char) : learnedTrait ? 1 : 0;
         const countEl = button.querySelector(".skill-node-count");
-        if (countEl) countEl.textContent = String(cur);
-        if (hpSkill) button.disabled = char.skillPoints <= 0;
-        else if (trait) {
-          button.disabled = !skill.zombie.implemented || !!char.zombieTrait
-            || char.skillPoints < ZOMBIE_TRAIT_COST;
-        } else button.disabled = false;
-        button.classList.toggle("invested", cur > 0);
-        button.classList.toggle("locked", trait && !!char.zombieTrait && !learnedTrait);
-        const cost = trait ? ` · ${t("skillTree.choiceCost", { cost: ZOMBIE_TRAIT_COST })}` : "";
-        button.title = `${skillName(skill)} · ${cur}p${cost} · ${skillEffect(skill)}`;
+        if (countEl) countEl.textContent = String(current);
+        button.disabled = false;
+        button.classList.toggle("invested", current > 0);
+        button.classList.toggle("locked", (trait && !!char.zombieTrait && !learnedTrait) || (trait && !skill.zombie.implemented));
+        const cost = trait ? ` | ${t("skillTree.choiceCost", { cost: ZOMBIE_TRAIT_COST })}` : "";
+        button.title = `${skillName(skill)} | ${current}p${cost} | ${skillEffect(skill)}`;
         button.setAttribute("aria-label", button.title);
       } else {
         button.disabled = true;
+        button.classList.remove("available", "invested", "locked");
         button.title = t("skillTree.emptySlot");
       }
     }
 
     const selected = SKILL_BY_ID.get(selectedSkillId) ?? SKILL_TREE[0];
-    if (selected.dash) {
-      const cur = dashInvested(char, selected.dash);
-      detail.textContent = `${skillName(selected)} · ${cur}p${dashEffectValue(char, selected.dash)} — ${skillEffect(selected)}`;
-    } else if (selected.zombie) {
-      const hpSkill = selected.zombie.key === "zombie-hp";
-      const learned = selected.zombie.trait && char.zombieTrait === selected.zombie.key;
-      const cur = hpSkill ? zombieHpPoints(char) : learned ? 1 : 0;
-      const cost = selected.zombie.trait ? ` · ${t("skillTree.choice", { cost: ZOMBIE_TRAIT_COST })}` : "";
-      detail.textContent = `${skillName(selected)} · ${cur}p${cost} — ${skillEffect(selected)}`;
-    } else {
-      detail.textContent = t("skillTree.emptySlot");
+    const canUpgrade = canUpgradeSkill(char, selected);
+    detail.textContent = skillDetailLines(char, selected).join("\n");
+    if (levelUpButton) {
+      levelUpButton.disabled = !canUpgrade;
+      levelUpButton.title = canUpgrade ? t("controls.skillLevelUp") : t("skillTree.cannotUpgrade");
     }
   }
 

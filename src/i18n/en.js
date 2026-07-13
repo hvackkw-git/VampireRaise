@@ -8,7 +8,7 @@ export default {
     skillTree: "Skill Tree", stats: "Stats", startWave: "Start wave", autoWave: "Auto wave",
     rebirth: "Rebirth", decorate: "Decorate", reset: "Restart from scratch",
     closeSkillTree: "Close Skill Tree", closeStats: "Close Stats", close: "Close", dashSummary: "Dash skill summary",
-    testLevelUp: "Test level +1", switchKorean: "Switch to Korean", switchEnglish: "Switch to English",
+    testLevelUp: "Test level +1", skillLevelUp: "Skill +1", switchKorean: "Switch to Korean", switchEnglish: "Switch to English",
   },
   info: {
     attack: "ATK", emptySlot: "Empty slot", noEquippedSkills: "No equipped skills",
@@ -60,9 +60,12 @@ export default {
   },
   skillTree: {
     title: "Skill Tree", dashSkills: "Dash Skills", ghosts: "Ghosts",
-    reset: "Reset", investHint: "Select a slot to invest", noShrimp: "No shrimp selected",
+    reset: "Reset", investHint: "Select a skill to view its details", noShrimp: "No shrimp selected",
     unavailable: "Skill Tree unavailable", shrimpNumber: "Shrimp #{number}", shrimp: "Shrimp",
-    current: "Current", choiceCost: "Cost {cost} SP · Choose 1 of 2–4", choice: "{cost} SP · Choose 1", emptySlot: "Empty slot",
+    current: "Current", next: "Next", level: "Lv.", cost: "Cost: {cost} SP",
+    learned: "Learned", notLearned: "Not learned", learn: "Learn", maxed: "Max",
+    choiceLocked: "Locked by another choice", cannotUpgrade: "This skill cannot be upgraded",
+    choiceCost: "Cost {cost} SP · Choose 1 of 2–4", choice: "{cost} SP · Choose 1", emptySlot: "Empty slot",
   },
   statPanel: {
     title: "Stats", noShrimp: "No shrimp selected", shrimpNumber: "Shrimp #{number}", shrimp: "Shrimp",

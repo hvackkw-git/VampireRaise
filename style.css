@@ -1170,7 +1170,7 @@ button,
   z-index: 80;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
   padding: 7px;
   overflow: hidden;
   background: #0e1114;
@@ -1261,7 +1261,7 @@ button,
 .skill-tree-node {
   position: absolute;
   transform: translate(-50%, -50%);
-  width: 34px; height: 34px;
+  width: 32px; height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1310,8 +1310,8 @@ button,
 .skill-tree-node.empty-node::before { border-style: dotted; }
 .skill-tree-node.dash-node::before { display: none; }
 .skill-node-icon {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   image-rendering: pixelated;
   pointer-events: none;
 }
@@ -1357,7 +1357,7 @@ button,
 }
 .skill-tree-node.zombie-node.locked { opacity: 0.35; }
 .skill-tree-footer {
-  flex: 0 0 52px;
+  flex: 0 0 96px;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -1365,32 +1365,32 @@ button,
 .skill-tree-detail {
   flex: 1 1 auto;
   min-width: 0;
-  height: 52px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  height: 96px;
+  display: block;
   overflow: hidden;
-  padding: 3px 9px;
+  padding: 4px 6px;
   border: 1px solid #465258;
   border-radius: 4px;
   background: #192024;
   color: #bdc8cb;
-  font-size: 10px;
-  line-height: 1.35;
+  font-size: 9px;
+  line-height: 1.3;
   text-align: center;
-  white-space: normal;
+  white-space: pre-line;
 }
 .skill-tree-level-up {
-  flex: 0 0 52px;
-  width: 52px;
-  height: 52px;
-  padding: 0;
+  flex: 0 0 62px;
+  width: 62px;
+  height: 96px;
+  padding: 4px;
   border: 1px solid #8b6b2a;
   border-radius: 4px;
   background: #302817;
   color: #f0d47a;
   font-size: 10px;
+  line-height: 1.3;
   font-weight: 700;
+  white-space: normal;
   cursor: pointer;
 }
 .skill-tree-level-up:hover { background: #44371d; }
