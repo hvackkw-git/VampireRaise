@@ -8,6 +8,7 @@ import {
 import {
   TANK_W, TANK_H, PANEL_H, CHAR_SPRITES, HUMAN_PROJECTILE_RADIUS,
   HUMAN_SPAWN_ZONE, VAMPIRE_SPAWN_ZONE,
+  ATTACK_RAISE_S, ATTACK_SLAM_S, ATTACK_RAISE_DEG,
 } from "../constants.js";
 import { t } from "../i18n/index.js";
 import { DASH_COLOR_HEX, effectiveDetectRange } from "../skills/dashColors.js";
@@ -35,6 +36,14 @@ function visualBounds(c) {
 }
 
 /** Vamp Shrimp(빨간새우)는 Holy/Jombie Shrimp보다 항상 앞에 보이도록 별도 z 밴드를 쓴다. */
+function swingAngle(c) {
+  if (c.side !== "vampire" || !c._swinging) return 0;
+  const t = Math.max(0, Number(c._swingT) || 0);
+  if (t <= ATTACK_RAISE_S) return (t / ATTACK_RAISE_S) * ATTACK_RAISE_DEG;
+  const slamT = Math.min(1, (t - ATTACK_RAISE_S) / ATTACK_SLAM_S);
+  return (1 - slamT) * ATTACK_RAISE_DEG;
+}
+
 function charZIndex(c) {
   const yOrder = Math.max(0, Math.min(9999, Math.round(Number(c?.y) || 0)));
   return (c?.side === "vampire" ? 20000 : 10000) + yOrder;
@@ -319,8 +328,11 @@ export function renderChars(state, nowMs, ui) {
     entry.el.style.left = `${c.x}px`;
     entry.el.style.top = `${c.y}px`;
     entry.el.style.zIndex = String(charZIndex(c));
-    // 스프라이트 기본 방향: 왼쪽 → 오른쪽 이동 시 좌우 반전
-    entry.sprite.style.transform = c.dir > 0 ? "scaleX(-1)" : "";
+    // 스프라이트 기본 방향: 왼쪽 → 오른쪽 이동 시 좌우 반전. Vamp Shrimp는 slam 스윙 회전을 합성한다.
+    const ang = swingAngle(c);
+    const flip = c.dir > 0 ? "scaleX(-1) " : "";
+    const signedAng = c.dir > 0 ? -ang : ang;
+    entry.sprite.style.transform = `${flip}rotate(${signedAng}deg)`.trim();
     entry.pattern.style.transform = entry.sprite.style.transform;
     entry.el.classList.toggle("stunned", c.state === "STUN");
     // 보라 실드 오라: 지속(_shieldT>0) 동안 표시, 남은 흡수량을 세기로 반영
@@ -469,6 +481,11 @@ export function renderCombatEvents(events) {
     } else if (ev.type === "infect") {
       const v = visualBounds(ev.char);
       spawnFloatText(ev.char.x - 2, v.top - 12, t("events.infect"), "fx-infect");
+    } else if (ev.type === "slam") {
+      const c = ev.attacker;
+      const cx = c.x + (c.dir > 0 ? c.w : 0);
+      const cy = c.y + c.h / 2;
+      spawnDashFx(cx, cy, ev.hit ? "fx-slam" : "fx-slam-miss");
     } else if (ev.type === "dashZap") {
       const v = ev.target ? visualBounds(ev.target) : { x: ev.x, y: ev.y };
       spawnDashFx(v.x, v.y, "fx-zap", "⚡");

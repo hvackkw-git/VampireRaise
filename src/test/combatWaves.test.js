@@ -14,8 +14,13 @@ import {
   accountExpForWave, accountExpToNext, FLOOR_Y, VAMPIRE_SPAWN_ZONE,
   REBIRTH_MAX_VAMPIRES, rebirthWaveRequirement,
   INITIAL_VAMPIRE_COUNT, INITIAL_VAMPIRE_LEVEL, vampireStatsForLevel,
-  vampireReviveCooldown,
+  vampireReviveCooldown, ATTACK_RAISE_S, ATTACK_SLAM_S,
 } from "../constants.js";
+
+const SLAM_TIME = ATTACK_RAISE_S + ATTACK_SLAM_S;
+function tickUntilSlam(state) {
+  return tickCombat(state, SLAM_TIME);
+}
 
 let state;
 beforeEach(() => {
@@ -85,7 +90,8 @@ describe("교전 (마주보고 싸우기)", () => {
     human._stunUntil = 10000;
     human._atkCd = 0;
 
-    const events = tickCombat(state, 0.016);
+    tickCombat(state, 0.016);
+    const events = tickUntilSlam(state);
 
     expect(vamp.state).toBe("FIGHT");
     expect(vamp._fightTargetId).toBe(human.id);
@@ -125,6 +131,7 @@ describe("빨강 · 복수 스킬 (피격 시 다음 공격력 증가)", () => {
     vamp._atkCd = 0; // 이제 뱀파이어가 반격
     const before = human.hp;
     tickCombat(state, 0.016);
+    tickUntilSlam(state);
     expect(before - human.hp).toBe(11); // 10 × 1.1 = 11
     expect(vamp._revengePending).toBe(false); // 1회 소모
   });
@@ -135,6 +142,7 @@ describe("빨강 · 복수 스킬 (피격 시 다음 공격력 증가)", () => {
     vamp._atkCd = 0;
     const before = human.hp;
     tickCombat(state, 0.016);
+    tickUntilSlam(state);
     expect(before - human.hp).toBe(10); // 배율 없음
   });
 });
@@ -146,9 +154,24 @@ describe("전투와 전염", () => {
     const human = createCharacter(state, "human", {
       x: vamp.x + 10, y: vamp.y, maxHp: 100, atk: 1, level: 1,
     });
-    const events = tickCombat(state, 0.1);
+    tickCombat(state, 0.1);
+    const events = tickUntilSlam(state);
     expect(human.hp).toBeLessThan(100);
     expect(events.some((e) => e.type === "hit")).toBe(true);
+  });
+
+  it("뱀파이어 slam 윈드업 중 타깃이 정면 영역을 벗어나면 헛스윙한다", () => {
+    const vamp = state.chars.items[0];
+    state.chars.items = [vamp];
+    vamp.x = 100; vamp.y = FLOOR_Y - vamp.h; vamp.state = "CRAWL"; vamp._atkCd = 0; vamp.atk = 50;
+    const human = createCharacter(state, "human", { x: vamp.x + 10, y: vamp.y, maxHp: 100, atk: 1 });
+    human._atkCd = 5;
+    tickCombat(state, ATTACK_RAISE_S);
+    human.y = vamp.y + 30;
+    const events = tickCombat(state, ATTACK_SLAM_S);
+    expect(human.hp).toBe(100);
+    expect(events.some((e) => e.type === "slam" && e.hit === false)).toBe(true);
+    expect(events.some((e) => e.type === "hit" && e.attacker === vamp)).toBe(false);
   });
 
   it("인간이 뱀파이어에게 막타를 맞으면 소유 노예로 전염된다", () => {
@@ -158,7 +181,8 @@ describe("전투와 전염", () => {
     const human = createCharacter(state, "human", {
       x: vamp.x + 10, y: vamp.y, maxHp: 10, atk: 1, level: 1,
     });
-    const events = tickCombat(state, 0.1);
+    tickCombat(state, 0.1);
+    const events = tickUntilSlam(state);
     expect(human.side).toBe("slave");
     expect(human.ownerVampireId).toBe(vamp.id);
     expect(human.maxHp).toBe(SLAVE_BASE.maxHp);
@@ -188,6 +212,7 @@ describe("전투와 전염", () => {
     late._atkCd = 0;
     early._atkCd = 0;
     tickCombat(state, 0.1);
+    tickUntilSlam(state);
     expect(human.side).toBe("slave");
     expect(human.ownerVampireId).toBe(early.id);
   });
@@ -199,6 +224,7 @@ describe("전투와 전염", () => {
     vamp._atkCd = 0;
     const human = createCharacter(state, "human", { x: 110, y: 100, maxHp: 5, hp: 5, atk: 1 });
     tickCombat(state, 0.1);
+    tickUntilSlam(state);
     expect(human.side).toBe("slave");
     expect(human.ownerVampireId).toBe(vamp.id);
     expect(human.zombiePattern).toBe("RILI_YELLOW");
@@ -233,6 +259,7 @@ describe("전투와 전염", () => {
     vamp._atkCd = 0;
     const human = createCharacter(state, "human", { x: 110, y: 100, maxHp: 5, hp: 5, atk: 1 });
     tickCombat(state, 0.1);
+    tickUntilSlam(state);
     expect(human.side).toBe("slave");
     expect(human.zombiePattern).toBe("RILI_RED_POISON");
     expect(human.zombieRevivesLeft).toBe(0);
