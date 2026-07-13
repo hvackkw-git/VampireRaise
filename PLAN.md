@@ -179,3 +179,99 @@ VampireRaise/
 3. **MVP 블록 경제**: 팔레트에서 무제한 배치 (상점/인벤 수량은 추후).
 4. **패배 처리**: 베이스 코어 소진 시 웨이브 1부터 재도전. Vamp Shrimp 전멸은 더 이상 패배가 아니다
    (개체별 자동 부활 쿨타임으로 대체).
+
+## 8. Vamp Shrimp 근접 slam 공격 모션 (확정)
+
+**대상: 빨간 새우(Vamp Shrimp, `side === "vampire"`)의 근접 FIGHT 공격만.**
+Holy/Jombie Shrimp의 근접 공격은 현재의 즉발 데미지 그대로 유지한다.
+
+### 8-1. 개념 / 타임라인
+
+즉발 데미지를 **스윙 상태머신**으로 바꾼다. `_atkCd` 주기(`ATTACK_COOLDOWN_S` = 1.0s)는
+그대로 두고, 그 안에 스윙이 들어간다.
+
+```
+_atkCd<=0 → 스윙 시작
+  [0 → RAISE_S]        새우 앞쪽(head) 0° → +30° 로 들어올림 (윈드업)
+  [RAISE_S → +SLAM_S]  +30° → 0° 로 내려치며 원위치 복귀
+  각도 0° 복귀 순간 = SLAM 시점 → 데미지 판정 + slam FX
+스윙 종료 후 _atkCd 잔여 시간 대기 → 다음 스윙
+```
+
+- **데미지는 "들어올렸다가 내려쳐 원위치로 돌아온 순간"(내려치는 타격의 끝)에 들어간다.**
+- 총 스윙 길이(RAISE_S+SLAM_S ≈ 0.34s) < ATTACK_COOLDOWN_S(1.0s) → 공격 주기 유지.
+
+### 8-2. 상수 (`src/constants.js`)
+
+```js
+export const ATTACK_RAISE_S = 0.22;       // 들어올리는 시간
+export const ATTACK_SLAM_S  = 0.12;       // 내려치는 시간 (끝나는 순간 = slam)
+export const ATTACK_RAISE_DEG = 30;       // 최대 들어올림 각도
+export const SLAM_REACH = 30;             // slam 정면 유효 거리 (중심 간 px)
+export const SLAM_MAX_DY = ENGAGE_MAX_DY; // slam 세로 허용차 재사용
+```
+
+### 8-3. 전투 로직 (`src/game/combat.js`)
+
+- char 스윙 필드(기본 falsy): `_swinging`, `_swingT`, `_slamFired`.
+- `engage`/`disengage`, `infectToSlave`, `reviveZombieOnce`, 돌진 진입(`ai.js beginDash`) 등
+  **FIGHT를 떠나는 모든 지점에서 스윙 리셋**(`_swinging=false; _swingT=0; _slamFired=false`).
+- "2) 교전 유지·공격" 루프를 2갈래로 분기:
+  - `c.side === "vampire"` → **스윙 상태머신**
+    - `_atkCd<=0 && !_swinging` → 스윙 시작만(`_swinging=true; _swingT=0; _slamFired=false; _atkCd=ATTACK_COOLDOWN_S`). 데미지 없음.
+    - `_swinging` → `_swingT += simDt`. `_swingT >= RAISE_S+SLAM_S && !_slamFired` → **SLAM**:
+      - `isInSlamArea(c, t)`로 **현재** 타깃이 정면 slam 영역에 있는지 재판정.
+      - 안 → 기존 데미지 계산(빨강 복수 `revengeAttackMult`, 초록 연타 `multiHitChance` 로직을 여기로 이동)으로 `hitRecords` push + `slam`(connect) 이벤트.
+      - 밖 → 데미지 없이 `slam`(miss/whiff) 이벤트만.
+      - `_slamFired=true`.
+    - `_swingT`가 더 지나면 `_swinging=false`.
+  - 그 외 진영 → **기존 즉발 데미지 (변경 없음)**.
+- slam 영역 판정:
+
+```js
+function isInSlamArea(a, t) {
+  const ax=a.x+a.w/2, ay=a.y+a.h/2, tx=t.x+t.w/2, ty=t.y+t.h/2;
+  const dxFront = (tx-ax) * a.dir;            // 정면이면 양수
+  return dxFront > -a.w/2 && dxFront <= SLAM_REACH && Math.abs(ty-ay) <= SLAM_MAX_DY;
+}
+```
+
+- **회피 창 = 윈드업+내려침(≈0.34s)**. 이 창 동안 타깃이 정면 영역을 벗어나면(돌진/넉백/`tickSeparation` 밀림/스턴 해제 이동 등) 헛스윙.
+
+### 8-4. 렌더: 기울기 모션 (`src/ui/tankView.js`)
+
+`renderChars`의 sprite transform을 스윙 각도와 합성 (vampire만):
+
+```js
+const ang = c.side === "vampire" ? swingAngle(c) : 0;  // _swinging이면 0→30→0, 아니면 0
+const flip = c.dir > 0 ? "scaleX(-1) " : "";
+entry.sprite.style.transform = `${flip}rotate(${ang}deg)`;
+entry.pattern.style.transform = entry.sprite.style.transform;
+```
+
+- `swingAngle`: `_swingT`을 RAISE_S/SLAM_S 구간으로 나눠 `ATTACK_RAISE_DEG`까지 보간.
+- `.char-sprite`에 `transform-origin`을 몸통 뒤쪽-하단(rearing)으로. scaleX(-1) 좌표 뒤집힘 때문에
+  각도 부호/origin은 구현 시 양방향 눈으로 확인해 "새우 앞쪽이 들리도록" 확정.
+
+### 8-5. slam FX (`src/ui/tankView.js` + `style.css`)
+
+- `renderCombatEvents`에 `slam` 케이스 추가: 새우 **정면 좌표**(`c.x + (dir>0? c.w : 0)` 부근, 몸통 중심 y)에
+  slam FX 스폰(`spawnDashFx` 계열). connect/miss 클래스 구분(`fx-slam` / `fx-slam-miss` 옅게).
+- `style.css`에 `.fx-slam` 키프레임 추가. connect 시엔 기존 `hit`의 `-dmg` 플로팅과 자연히 겹침.
+
+### 8-6. 테스트 (`src/test/combatWaves.test.js`)
+
+- Holy/Jombie 즉발 케이스는 손대지 않음.
+- **vampire가 공격자인 케이스만** 슬램 타이밍(RAISE_S+SLAM_S)만큼 시뮬 진행 후 검증하도록 수정
+  (예: vamp→human hp, 빨강 복수 배율).
+- 신규: vampire **슬램 회피 테스트**(윈드업 중 타깃을 slam 영역 밖으로 → 데미지 0 + miss 이벤트).
+
+### 8-7. 변경 파일 요약
+
+| 파일 | 변경 |
+|---|---|
+| `src/constants.js` | slam 타이밍/각도/영역 상수 |
+| `src/game/combat.js` | vampire 스윙 상태머신, slam 시점 데미지, `isInSlamArea`, `slam` 이벤트, 스윙 리셋 |
+| `src/ui/tankView.js` | vampire 스윙 각도 회전 합성, `slam` FX |
+| `style.css` | `.char-sprite` transform-origin, `.fx-slam` 애니메이션 |
+| `src/test/combatWaves.test.js` | vampire 이연 데미지 반영 + 회피 테스트 추가 |
