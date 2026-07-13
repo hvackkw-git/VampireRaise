@@ -8,22 +8,72 @@
 import { expToNext, accountExpToNext } from "../constants.js";
 import { getLocale, t } from "../i18n/index.js";
 import { effectiveArmor, effectiveMoveSpeed } from "../stats/characterStats.js";
+import {
+  BACKFLIP_ICON, BACKFLIP_SKILL_KEY, backflipCooldown,
+  canActivateBackflip, hasBackflipSkill,
+} from "../skills/backflip.js";
 
-const SIDE_ICON = { vampire: "🦐", human: "🦐", slave: "🦐" };
 const SIDE_NAME_KEY = { vampire: "info.vampShrimp", human: "info.holyShrimp", slave: "info.jombieShrimp" };
+const FACE_PORTRAIT_SRC = "assets/ui/vampire-shrimp-portrait.png";
 
 /** 스킬 도감 — 장착 스킬 슬롯에 표시할 이름·스프라이트 */
 const SKILL_BOOK = {
   dash: { nameKey: "info.dash", icon: "assets/skills/skill_dash.png" },
+  [BACKFLIP_SKILL_KEY]: { nameKey: "info.backflip", icon: BACKFLIP_ICON, active: true },
 };
 const SKILL_SLOT_COUNT = 4;  // 2×2
 const FACE_SLOT_COUNT = 5;
 
+const THERMAL_STOPS = [
+  { at: 0, hot: [57, 53, 120], core: [22, 23, 61], shadow: [8, 10, 31], rim: [80, 63, 139] },
+  { at: 0.2, hot: [107, 73, 166], core: [42, 31, 92], shadow: [15, 16, 48], rim: [128, 82, 176] },
+  { at: 0.34, hot: [224, 60, 93], core: [102, 25, 66], shadow: [31, 15, 43], rim: [231, 70, 105] },
+  { at: 0.68, hot: [248, 102, 70], core: [157, 37, 52], shadow: [48, 18, 39], rim: [250, 112, 72] },
+  { at: 1, hot: [255, 228, 112], core: [238, 63, 39], shadow: [70, 24, 39], rim: [255, 184, 66] },
+];
+
 let els = null;
 let lastSkillKey = null; // 장착 스킬 재구성 최소화용 캐시 키
 let onSelectVampireCb = null;
+let onActivateSkillCb = null;
 
-export function initInfoPanel({ onStats, onSkillTree, onSelectVampire } = {}) {
+function clamp01(value) {
+  return Math.max(0, Math.min(1, value));
+}
+
+function mixRgb(from, to, amount) {
+  return from.map((channel, i) => Math.round(channel + (to[i] - channel) * amount));
+}
+
+function cssRgb(channels) {
+  return `rgb(${channels.join(", ")})`;
+}
+
+/** HP를 열화상 팔레트로 변환한다. 고체력은 금빛/적색, 저체력은 어두운 남보라다. */
+export function faceThermalPalette(hp, maxHp, dead = false) {
+  const safeMax = Number(maxHp);
+  const ratio = dead || !(safeMax > 0) ? 0 : clamp01((Number(hp) || 0) / safeMax);
+  const upperIndex = THERMAL_STOPS.findIndex((stop) => stop.at >= ratio);
+  const upper = THERMAL_STOPS[Math.max(0, upperIndex)];
+  const lower = THERMAL_STOPS[Math.max(0, upperIndex - 1)] ?? upper;
+  const span = upper.at - lower.at;
+  const amount = span > 0 ? (ratio - lower.at) / span : 0;
+  const hot = mixRgb(lower.hot, upper.hot, amount);
+  const core = mixRgb(lower.core, upper.core, amount);
+  const shadow = mixRgb(lower.shadow, upper.shadow, amount);
+  const rim = mixRgb(lower.rim, upper.rim, amount);
+
+  return {
+    ratio,
+    hot: cssRgb(hot),
+    core: cssRgb(core),
+    shadow: cssRgb(shadow),
+    rim: cssRgb(rim),
+    glow: `rgba(${rim.join(", ")}, 0.38)`,
+  };
+}
+
+export function initInfoPanel({ onStats, onSkillTree, onSelectVampire, onActivateSkill } = {}) {
   const $ = (id) => document.getElementById(id);
   els = {
     panel: $("info-panel"),
@@ -45,18 +95,37 @@ export function initInfoPanel({ onStats, onSkillTree, onSelectVampire } = {}) {
     btnSkillTree: $("btnSkillTree"),
   };
   onSelectVampireCb = onSelectVampire;
+  onActivateSkillCb = onActivateSkill;
 
   els.skillSlots = Array.from({ length: SKILL_SLOT_COUNT }, () => {
-    const slot = document.createElement("div");
+    const slot = document.createElement("button");
+    slot.type = "button";
     slot.className = "skill-slot locked";
+    slot.disabled = true;
     els.skillGrid.appendChild(slot);
     return slot;
   });
   els.faceSlots = Array.from({ length: FACE_SLOT_COUNT }, () => {
-    const slot = document.createElement("button");
-    slot.type = "button";
+    const slot = document.createElement("div");
     slot.className = "face-slot empty";
-    slot.disabled = true;
+    slot.innerHTML =
+      `<button class="face-select-button" type="button">` +
+        `<span class="face-hp" aria-hidden="true"><i></i></span>` +
+        `<span class="face-screen" aria-hidden="true">` +
+          `<span class="face-portrait"><img src="${FACE_PORTRAIT_SRC}" alt="" draggable="false"></span>` +
+        `</span>` +
+        `<span class="revive-cd"></span>` +
+      `</button>` +
+      `<span class="face-mini-skills">` +
+        `<button type="button"></button>` +
+        `<button type="button"></button>` +
+        `<button type="button"></button>` +
+        `<button type="button"></button>` +
+      `</span>`;
+    slot._selectButton = slot.querySelector(".face-select-button");
+    slot._hpFill = slot.querySelector(".face-hp i");
+    slot._reviveCd = slot.querySelector(".revive-cd");
+    slot._miniSkills = [...slot.querySelectorAll(".face-mini-skills button")];
     els.faceGrid.appendChild(slot);
     return slot;
   });
@@ -106,20 +175,28 @@ function renderSkills(char) {
   const equipped = (char?.skills ?? []).filter((s) => SKILL_BOOK[s]);
   const dashCd = Math.max(0, Number(char?._dashCd) || 0);
   const dashCdSec = Math.ceil(dashCd);
-  const key = `${getLocale()}:${char ? `${char.id}:${equipped.join(",")}:${dashCdSec}` : "none"}`;
+  const backflipCd = Math.max(0, Number(char?._backflipCd) || 0);
+  const backflipCdSec = Math.ceil(backflipCd);
+  const key = `${getLocale()}:${char ? `${char.id}:${char.state}:${equipped.join(",")}:${dashCdSec}:${backflipCdSec}` : "none"}`;
   if (key === lastSkillKey) return;
   lastSkillKey = key;
   els.skillSlots.forEach((slot, i) => {
     const skillKey = equipped[i];
     const skill = SKILL_BOOK[skillKey];
     const name = skill ? t(skill.nameKey) : "";
-    const cooling = skillKey === "dash" && dashCdSec > 0;
+    const cooldownSec = skillKey === "dash" ? dashCdSec
+      : skillKey === BACKFLIP_SKILL_KEY ? backflipCdSec : 0;
+    const cooling = cooldownSec > 0;
     slot.classList.toggle("locked", !skill);
     slot.classList.toggle("cooldown", cooling);
-    slot.title = skill ? (cooling ? `${name} · ${dashCdSec}s` : name) : t("info.emptySlot");
+    slot.disabled = !skill?.active || !canActivateBackflip(char);
+    slot.title = skill ? (cooling ? `${name} · ${cooldownSec}s` : name) : t("info.emptySlot");
     slot.innerHTML = skill
-      ? `<img src="${skill.icon}" alt="${name}" draggable="false">${cooling ? `<span class="skill-cd">${dashCdSec}</span>` : ""}`
+      ? `<img src="${skill.icon}" alt="${name}" draggable="false">${cooling ? `<span class="skill-cd">${cooldownSec}</span>` : ""}`
       : "";
+    slot.onclick = skill?.active && char
+      ? () => onActivateSkillCb?.(char.id, skillKey)
+      : null;
   });
   els.skillName.textContent = equipped.length
     ? equipped.map((s) => t(SKILL_BOOK[s].nameKey)).join(" · ")
@@ -185,25 +262,77 @@ export function renderSquadPanel(vampires, account = null) {
     const v = sorted[i];
     slot.classList.toggle("empty", !v);
     slot.classList.toggle("dead", !!v && !!v.dead);
-    slot.disabled = !v || !!v.dead;
+    slot._selectButton.disabled = !v || !!v.dead;
     if (v) {
       const order = v.vampireOrder ?? i + 1;
+      const palette = faceThermalPalette(v.hp, v.maxHp, v.dead);
+      slot.style.setProperty("--face-hot", palette.hot);
+      slot.style.setProperty("--face-core", palette.core);
+      slot.style.setProperty("--face-shadow", palette.shadow);
+      slot.style.setProperty("--face-rim", palette.rim);
+      slot.style.setProperty("--face-glow", palette.glow);
+      slot._hpFill.style.width = `${palette.ratio * 100}%`;
+      const backflipLearned = hasBackflipSkill(v);
+      const backflipCd = Math.max(0, Number(v._backflipCd) || 0);
+      const backflipCdSec = Math.ceil(backflipCd);
+      const backflipButton = slot._miniSkills[0];
+      backflipButton.classList.toggle("equipped", backflipLearned);
+      backflipButton.classList.toggle("cooldown", backflipLearned && backflipCd > 0);
+      backflipButton.disabled = !backflipLearned || !canActivateBackflip(v);
+      backflipButton.style.setProperty(
+        "--skill-cd",
+        `${Math.min(100, (backflipCd / backflipCooldown(v)) * 100)}%`,
+      );
+      backflipButton.innerHTML = backflipLearned
+        ? `<img src="${BACKFLIP_ICON}" alt=""><span>${backflipCdSec > 0 ? backflipCdSec : ""}</span>`
+        : "";
+      backflipButton.title = backflipLearned
+        ? (backflipCdSec > 0 ? `${t("info.backflip")} · ${backflipCdSec}s` : t("info.backflip"))
+        : t("info.emptySlot");
+      backflipButton.setAttribute("aria-label", backflipButton.title);
+      backflipButton.onclick = backflipLearned
+        ? (event) => {
+            event.stopPropagation();
+            onActivateSkillCb?.(v.id, BACKFLIP_SKILL_KEY);
+          }
+        : null;
+      for (const miniSkill of slot._miniSkills.slice(1)) {
+        miniSkill.classList.remove("equipped", "cooldown");
+        miniSkill.disabled = true;
+        miniSkill.innerHTML = "";
+        miniSkill.title = t("info.emptySlot");
+        miniSkill.setAttribute("aria-label", miniSkill.title);
+        miniSkill.onclick = null;
+      }
       if (v.dead) {
         const secs = Math.max(0, Math.ceil(Number(v._reviveCd) || 0));
-        slot.innerHTML =
-          `<span class="face-ico">${SIDE_ICON.vampire}</span>` +
-          `<span class="revive-cd">${secs}</span><small>${order}</small>`;
+        slot._reviveCd.textContent = secs;
         slot.title = t("info.reviveIn", { number: order, secs });
-        slot.onclick = null;
+        slot._selectButton.setAttribute("aria-label", slot.title);
+        slot._selectButton.onclick = null;
       } else {
-        slot.innerHTML = `${SIDE_ICON.vampire}<small>${order}</small>`;
+        slot._reviveCd.textContent = "";
         slot.title = `${t("info.numberedVamp", { number: order })} Lv.${v.level}`;
-        slot.onclick = () => onSelectVampireCb?.(v.id);
+        slot._selectButton.setAttribute(
+          "aria-label",
+          `${slot.title}, HP ${Math.ceil(Number(v.hp) || 0)}/${Math.ceil(Number(v.maxHp) || 0)}`,
+        );
+        slot._selectButton.onclick = () => onSelectVampireCb?.(v.id);
       }
     } else {
-      slot.innerHTML = "";
+      slot._hpFill.style.width = "0%";
+      slot._reviveCd.textContent = "";
       slot.title = "";
-      slot.onclick = null;
+      slot._selectButton.removeAttribute("aria-label");
+      slot._selectButton.onclick = null;
+      slot._miniSkills.forEach((miniSkill) => {
+        miniSkill.classList.remove("equipped", "cooldown");
+        miniSkill.disabled = true;
+        miniSkill.innerHTML = "";
+        miniSkill.title = t("info.emptySlot");
+        miniSkill.setAttribute("aria-label", miniSkill.title);
+        miniSkill.onclick = null;
+      });
     }
   });
 }

@@ -346,6 +346,10 @@ export function tickCombat(state, simDt) {
     for (const h of state._dashHits) hitRecords.push(h);
     state._dashHits = [];
   }
+  if (state._activeSkillHits?.length) {
+    for (const h of state._activeSkillHits) hitRecords.push(h);
+    state._activeSkillHits = [];
+  }
 
   const lethalAttackers = new Map();
   for (const r of hitRecords) {
@@ -355,6 +359,24 @@ export function tickCombat(state, simDt) {
     const { dealt, absorbed } = absorbWithShield(r.target, reducedDamage);
     const hpBefore = r.target.hp;
     r.target.hp -= dealt;
+    if (dealt > 0 && r.lifestealRate > 0 && !r.attacker.dead) {
+      const healBefore = r.attacker.hp;
+      r.attacker.hp = Math.min(r.attacker.maxHp, r.attacker.hp + dealt * r.lifestealRate);
+      const amount = r.attacker.hp - healBefore;
+      if (amount > 0) events.push({ type: "backflipLifesteal", char: r.attacker, amount });
+    }
+    if (dealt > 0 && r.target.hp > 0 && r.stunUntil > 0
+      && r.stunUntil > (Number(r.target._stunUntil) || 0)
+      && r.stunStart >= (Number(r.target._stunImmuneUntil) || 0)) {
+      r.target._dropThroughId = r.target._platformId;
+      r.target.state = "STUN";
+      r.target.vx = 0;
+      r.target.vy = Math.max(0, Number(r.target.vy) || 0);
+      r.target._platformId = null;
+      r.target._stunUntil = r.stunUntil;
+      r.target._stunImmuneUntil = r.stunUntil + 1000;
+      events.push({ type: "backflipStun", target: r.target });
+    }
     if (dealt > 0 && hpBefore > 0 && r.target.hp <= 0 && !lethalAttackers.has(r.target)) {
       lethalAttackers.set(r.target, r.attacker);
     }

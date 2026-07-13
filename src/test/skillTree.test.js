@@ -7,7 +7,7 @@ import {
   investZombieHp, investZombieTrait, zombieHpBonus, ZOMBIE_TRAIT_COST,
 } from "../skills/zombieSkills.js";
 import {
-  SKILL_TREE, DASH_SKILL_DEFS, ZOMBIE_SKILL_DEFS, normalizeSkillProgress,
+  BACKFLIP_SKILL_DEFS, SKILL_TREE, DASH_SKILL_DEFS, ZOMBIE_SKILL_DEFS, normalizeSkillProgress,
 } from "../skills/skillTree.js";
 import { canUpgradeSkill, upgradeSkill } from "../ui/skillTreePanel.js";
 
@@ -50,6 +50,14 @@ describe("스킬트리 데이터", () => {
     const secondCol = SKILL_TREE.filter((s) => s.x === secondX).sort((a, b) => a.y - b.y);
     expect(secondCol.map((s) => s.zombie?.key)).toEqual(ZOMBIE_SKILL_DEFS.map((def) => def.key));
     expect(secondCol.every((s) => !s.dash)).toBe(true);
+  });
+
+  it("백플립 강화 8개를 세 번째 열에 위→아래로 배치한다", () => {
+    const xs = [...new Set(SKILL_TREE.map((s) => s.x))].sort((a, b) => a - b);
+    const thirdCol = SKILL_TREE.filter((s) => s.x === xs[2]).sort((a, b) => a.y - b.y);
+
+    expect(thirdCol.map((s) => s.active?.key)).toEqual(BACKFLIP_SKILL_DEFS.map((def) => def.key));
+    expect(SKILL_TREE.filter((s) => s.active)).toHaveLength(BACKFLIP_SKILL_DEFS.length);
   });
 
   it("레벨업 시 스킬포인트(별개 트랙)는 그대로 1씩 증가한다", () => {

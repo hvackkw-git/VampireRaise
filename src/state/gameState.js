@@ -9,6 +9,7 @@ import {
   VAMPIRE_SPAWN_ZONE, spawnXInZone, BASE_CORE_HP,
 } from "../constants.js";
 import { defaultDashColors } from "../skills/dashColors.js";
+import { BACKFLIP_SKILL_KEY, BACKFLIP_UPGRADE_KEYS } from "../skills/backflip.js";
 import { getPlatformYRange, PLATFORM_W, PLATFORM_H, PLATFORM_STEP } from "../platform/platformBlockRenderer.js";
 
 /** 초기 플랫폼 상단 행(위쪽) 블록 후보 — 별 테마. */
@@ -73,10 +74,19 @@ function normalizeZombiePattern(value) {
   return typeof value === "string" ? value : null;
 }
 
+function normalizeBackflipUpgrades(value) {
+  const source = value && typeof value === "object" ? value : {};
+  return Object.fromEntries(BACKFLIP_UPGRADE_KEYS.map((key) => [
+    key,
+    Math.max(0, Math.floor(Number(source[key]) || 0)),
+  ]));
+}
+
 export function createCharacter(state, side, opts = {}) {
   const id = state.chars.nextId++;
   const size = CHAR_SPRITES[side]?.size ?? CHAR_SIZE;
   const baseStats = side === "slave" ? SLAVE_BASE : VAMPIRE_BASE;
+  const backflipSkillPoints = side === "vampire" ? 1 : 0;
   // Vamp Shrimp는 왼쪽 아래 스폰 존(바닥)에서만 스폰. 그 외(Jombie Shrimp 등)는 기존 무작위 위치.
   const defaultX = side === "vampire"
     ? spawnXInZone(VAMPIRE_SPAWN_ZONE, size)
@@ -104,6 +114,8 @@ export function createCharacter(state, side, opts = {}) {
     _dashTargetId: null,        // 혈귀 돌진 대상 (Vamp Shrimp 패시브)
     _dashTimeLeft: 0,
     _dashCd: 0,
+    _backflipCd: 0,
+    _backflipT: 0,
     _atkCd: Math.random(),      // 첫 공격 타이밍 분산
     _projectileCd: Math.random(), // Holy Shrimp 투사체 첫 발사 타이밍 분산
     _siegeCd: Math.random(),    // 베이스 코어 공격 타이밍 분산 (Holy Shrimp)
@@ -117,7 +129,9 @@ export function createCharacter(state, side, opts = {}) {
     mp: opts.mp ?? opts.maxMp ?? baseStats.maxMp ?? HUMAN_BASE_MP,
     atk: opts.atk ?? baseStats.atk,
     job: null,                  // 향후 직업 분류
-    skills: side === "vampire" ? ["dash"] : [], // 장착 스킬 (v1: Vamp Shrimp 혈귀 돌진)
+    skills: side === "vampire"
+      ? ["dash", BACKFLIP_SKILL_KEY]
+      : [],
     skillPoints: side === "vampire"
       ? Math.max(0, Number(opts.skillPoints ?? ((opts.level ?? 1) - 1)) || 0)
       : 0,
@@ -134,6 +148,8 @@ export function createCharacter(state, side, opts = {}) {
     learnedSkills: side === "vampire" && Array.isArray(opts.learnedSkills)
       ? [...opts.learnedSkills]
       : [],
+    backflipSkillPoints,
+    backflipUpgrades: side === "vampire" ? normalizeBackflipUpgrades(opts.backflipUpgrades) : null,
     // 돌진 잔상 색상 포인트(빨주노초파보하). 기본은 복수(빨강) 1포인트 → 처음엔 전부 빨강
     dashColors: side === "vampire"
       ? (opts.dashColors && typeof opts.dashColors === "object"
@@ -218,6 +234,8 @@ export function toSaveData(state) {
           statPoints: c.statPoints, stats: c.stats,
           dashColors: c.dashColors, detectPoints: c.detectPoints,
           dashCdManaPoints: c.dashCdManaPoints,
+          backflipSkillPoints: c.backflipSkillPoints,
+          backflipUpgrades: c.backflipUpgrades,
           zombieHpPoints: c.zombieHpPoints,
           zombieTrait: c.zombieTrait,
           zombiePattern: c.zombiePattern,
@@ -278,6 +296,8 @@ export function fromSaveData(data) {
       dashColors: rec.dashColors,
       detectPoints: rec.detectPoints,
       dashCdManaPoints: rec.dashCdManaPoints,
+      backflipSkillPoints: rec.backflipSkillPoints,
+      backflipUpgrades: rec.backflipUpgrades,
       zombieHpPoints: rec.zombieHpPoints,
       zombieTrait: rec.zombieTrait,
       zombiePattern: rec.zombiePattern,
@@ -287,8 +307,13 @@ export function fromSaveData(data) {
     c.dir = rec.dir === -1 ? -1 : 1;
     c.exp = Number(rec.exp) || 0;
     c.job = rec.job ?? null;
-    // 구버전 저장본은 skills가 빈 배열 — createCharacter의 기본 장착(dash)을 유지
-    if (Array.isArray(rec.skills) && rec.skills.length) c.skills = rec.skills;
+    // 구버전 저장본도 현재 기본 장착 스킬을 항상 보유하도록 보정한다.
+    if (Array.isArray(rec.skills) && rec.skills.length) c.skills = [...rec.skills];
+    if (c.side === "vampire") {
+      for (const key of ["dash", BACKFLIP_SKILL_KEY]) {
+        if (!c.skills.includes(key)) c.skills.push(key);
+      }
+    }
     c.skillPoints = Math.max(0, Number(rec.skillPoints ?? c.skillPoints) || 0);
     c.learnedSkills = Array.isArray(rec.learnedSkills) ? [...rec.learnedSkills] : [];
     c.dead = !!rec.dead;

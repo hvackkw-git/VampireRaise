@@ -12,7 +12,7 @@ export default {
   },
   info: {
     attack: "ATK", emptySlot: "Empty slot", noEquippedSkills: "No equipped skills",
-    noVampShrimp: "— No Vamp Shrimp —", dash: "Bloody Dash",
+    noVampShrimp: "— No Vamp Shrimp —", dash: "Bloody Dash", backflip: "Crimson Spine Backflip",
     vampShrimp: "Vamp Shrimp", holyShrimp: "Holy Shrimp", jombieShrimp: "Jombie Shrimp",
     numberedVamp: "Vamp Shrimp #{number}", order: "#{number} ",
     reviveIn: "Vamp Shrimp #{number} · revives in {secs}s",
@@ -93,6 +93,14 @@ export default {
     zombieSwarmName: "Jombie Shrimp · Swarm", zombieSwarmEffect: "Jombie Shrimp gather and attack together (Coming soon)",
     zombieInfectName: "Jombie Shrimp · Infection", zombieInfectEffect: "Jombie Shrimp contribute to finishing effects (Coming soon)",
     zombieMasteryName: "Jombie Shrimp Mastery", zombieMasteryEffect: "Improves all Jombie Shrimp abilities (Coming soon)",
+    backflipRedName: "Red · Blood Drain", backflipRedEffect: "Heal for 8% of Backflip damage per point",
+    backflipOrangeName: "Orange · Sever", backflipOrangeEffect: "Backflip damage +20% per point",
+    backflipYellowName: "Yellow · Spine Bloom", backflipYellowEffect: "Spawn 2 additional rotating spines per point",
+    backflipGreenName: "Green · Recovery", backflipGreenEffect: "Backflip cooldown -10% per point (minimum 2s)",
+    backflipBlueName: "Blue · Impact", backflipBlueEffect: "Stun enemies for 0.25s per point",
+    backflipPurpleName: "Purple · Blood Armor", backflipPurpleEffect: "Gain a shield worth 10% max HP per point when cast",
+    backflipWhiteName: "White · Echo", backflipWhiteEffect: "Deal an additional hit for 25% damage per point",
+    backflipMasteryName: "Spine Mastery · Execute", backflipMasteryEffect: "Deal +20% damage per point to enemies at 30% HP or less",
     emptyName: "Empty Slot {number}",
   },
 };

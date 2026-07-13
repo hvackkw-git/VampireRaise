@@ -1,6 +1,7 @@
 // 스킬 트리 그래프. MVP: Dash 스킬(7색 + 대쉬 숙련 + 인식범위)과 Jombie Shrimp 스킬 열을 배치한다.
 // 배치 규칙 — 왼쪽 열(col0)에 7색 + 대쉬 숙련을 위→아래로 8칸 꽉 채우고,
-// 두 번째 열(col1)은 Jombie Shrimp 스킬이 담당한다. 인식범위는 맨 오른쪽 열의 맨 위(우상단)에 별도 배치한다.
+// 두 번째 열(col1)은 Jombie Shrimp, 세 번째 열(col2)은 백플립 강화가 담당한다.
+// 인식범위는 맨 오른쪽 열의 맨 위(우상단)에 별도 배치한다.
 // 레벨 제한·선행 없음.
 // (스프라이트/아트는 아직 굽지 않음. 색·이름·효과 텍스트만.)
 
@@ -10,6 +11,21 @@ const NUM_COLS = COLUMN_X.length;
 const NUM_ROWS = ROW_Y.length;
 
 const TREE_ICON_DIR = "assets/skills/tree";
+
+export const BACKFLIP_SKILL_DEFS = Object.freeze([
+  { key: "red", nameKey: "skills.backflipRedName", effectKey: "skills.backflipRedEffect", color: "#ef3f50" },
+  { key: "orange", nameKey: "skills.backflipOrangeName", effectKey: "skills.backflipOrangeEffect", color: "#f28a3a" },
+  { key: "yellow", nameKey: "skills.backflipYellowName", effectKey: "skills.backflipYellowEffect", color: "#f2d84a" },
+  { key: "green", nameKey: "skills.backflipGreenName", effectKey: "skills.backflipGreenEffect", color: "#52c96c" },
+  { key: "blue", nameKey: "skills.backflipBlueName", effectKey: "skills.backflipBlueEffect", color: "#4f91e8" },
+  { key: "purple", nameKey: "skills.backflipPurpleName", effectKey: "skills.backflipPurpleEffect", color: "#a465d8" },
+  { key: "white", nameKey: "skills.backflipWhiteName", effectKey: "skills.backflipWhiteEffect", color: "#e8edf2" },
+  { key: "mastery", nameKey: "skills.backflipMasteryName", effectKey: "skills.backflipMasteryEffect", color: "#d8203f" },
+].map((def) => Object.freeze({
+  ...def,
+  kind: "active-upgrade",
+  icon: "assets/block/spike_block.png",
+})));
 
 /** 왼쪽 열(col0)에 위→아래로 채울 Dash 스킬 정의. kind: color=잔상 색, passive=쿨타임/마나 숙련 */
 export const DASH_SKILL_DEFS = Object.freeze([
@@ -47,18 +63,23 @@ dashByIndex.set(NUM_COLS - 1, DETECT_SKILL_DEF); // 맨 오른쪽 열, 맨 위(r
 const zombieByIndex = new Map();
 ZOMBIE_SKILL_DEFS.forEach((def, row) => zombieByIndex.set(row * NUM_COLS + 1, def)); // col1, 위→아래
 
+const activeByIndex = new Map();
+BACKFLIP_SKILL_DEFS.forEach((def, row) => activeByIndex.set(row * NUM_COLS + 2, def)); // col2, 위→아래
+
 export const SKILL_TREE = Object.freeze(
   Array.from({ length: NUM_COLS * NUM_ROWS }, (_, index) => {
     const row = Math.floor(index / NUM_COLS);
     const col = index % NUM_COLS;
     const dash = dashByIndex.get(index) ?? null;
     const zombie = zombieByIndex.get(index) ?? null;
+    const active = activeByIndex.get(index) ?? null;
     return Object.freeze({
       id: `skill-${String(index + 1).padStart(2, "0")}`,
-      nameKey: dash?.nameKey ?? zombie?.nameKey ?? "skills.emptyName",
-      nameVars: dash || zombie ? null : { number: String(index + 1).padStart(2, "0") },
+      nameKey: dash?.nameKey ?? zombie?.nameKey ?? active?.nameKey ?? "skills.emptyName",
+      nameVars: dash || zombie || active ? null : { number: String(index + 1).padStart(2, "0") },
       dash, // { key, kind, name, effect } | null
       zombie, // { key, name, effect } | null
+      active, // { key, kind, name, effect } | null
       requiredLevel: 1,          // 레벨 제한 없음
       parents: Object.freeze([]), // 선행 없음
       x: COLUMN_X[col],

@@ -10,10 +10,13 @@ import {
 import {
   investZombieHp, investZombieTrait, zombieHpPoints, ZOMBIE_TRAIT_COST,
 } from "../skills/zombieSkills.js";
+import {
+  backflipUpgradePoints, investBackflipUpgrade, normalizeBackflipSkill,
+} from "../skills/backflip.js";
 import { t } from "../i18n/index.js";
 
 const skillName = (skill) => t(skill.nameKey, skill.nameVars ?? {});
-const skillEffect = (skill) => t((skill.dash ?? skill.zombie)?.effectKey ?? "");
+const skillEffect = (skill) => t((skill.dash ?? skill.zombie ?? skill.active)?.effectKey ?? "");
 
 function dashInvested(char, dash) {
   if (!dash) return 0;
@@ -30,6 +33,7 @@ export function canUpgradeSkill(char, skill) {
   const points = Math.max(0, Math.floor(Number(char?.skillPoints) || 0));
   if (!char || !skill || points < skillUpgradeCost(skill)) return false;
   if (skill.dash || skill.zombie?.key === "zombie-hp") return true;
+  if (skill.active) return true;
   if (skill.zombie?.trait) return !!skill.zombie.implemented && !char.zombieTrait;
   return false;
 }
@@ -41,6 +45,7 @@ export function upgradeSkill(char, skill, chars = []) {
   if (skill.dash) return investDashColor(char, skill.dash.key);
   if (skill.zombie?.key === "zombie-hp") return investZombieHp(char, chars);
   if (skill.zombie?.trait) return investZombieTrait(char, skill.zombie.key);
+  if (skill.active) return investBackflipUpgrade(char, skill.active.key);
   return false;
 }
 
@@ -58,6 +63,18 @@ function dashEffectAt(char, dash, invested) {
     return `x${detectRangeMult(invested).toFixed(1)} (${Math.round(range)}px)`;
   }
   if (dash.kind === "passive") return `x${dashCdManaMult(invested).toFixed(1)}`;
+  return "-";
+}
+
+function backflipEffectAt(active, invested) {
+  if (active.key === "red") return `${invested * 8}%`;
+  if (active.key === "orange") return `x${(1 + invested * 0.2).toFixed(1)}`;
+  if (active.key === "yellow") return `${12 + invested * 2}`;
+  if (active.key === "green") return `${Math.max(2, 8 * (0.9 ** invested)).toFixed(1)}s`;
+  if (active.key === "blue") return `${(invested * 0.25).toFixed(2)}s`;
+  if (active.key === "purple") return `${invested * 10}% HP`;
+  if (active.key === "white") return `+${invested * 25}%`;
+  if (active.key === "mastery") return `x${(1 + invested * 0.2).toFixed(1)} @ <=30% HP`;
   return "-";
 }
 
@@ -163,6 +180,16 @@ function skillDetailLines(char, skill) {
       skillEffect(skill),
     ];
   }
+  if (skill.active) {
+    const current = backflipUpgradePoints(char, skill.active.key);
+    return [
+      `${skillName(skill)} | ${t("skillTree.level")} ${current}`,
+      `${t("skillTree.current")}: ${backflipEffectAt(skill.active, current)}`,
+      `${t("skillTree.next")}: ${backflipEffectAt(skill.active, current + 1)}`,
+      skillEffect(skill),
+      t("skillTree.cost", { cost: 1 }),
+    ];
+  }
   return [t("skillTree.emptySlot")];
 }
 
@@ -212,6 +239,11 @@ export function initSkillTreePanel({ getCharacter, getCharacters, onChange, onOp
       button.classList.add("zombie-node");
       const icon = skill.zombie.icon ? `<img class="skill-node-icon" src="${skill.zombie.icon}" alt="" draggable="false">` : "";
       button.innerHTML = `${icon}<span class="skill-node-count">0</span>`;
+    } else if (skill.active) {
+      button.classList.add("active-node");
+      button.style.setProperty("--active-color", skill.active.color);
+      const icon = skill.active.icon ? `<img class="skill-node-icon" src="${skill.active.icon}" alt="" draggable="false">` : "";
+      button.innerHTML = `${icon}<span class="skill-node-count">0</span>`;
     } else {
       button.classList.add("empty-node");
     }
@@ -240,6 +272,7 @@ export function initSkillTreePanel({ getCharacter, getCharacters, onChange, onOp
 
     normalizeSkillProgress(char);
     normalizeDashPoints(char);
+    normalizeBackflipSkill(char);
     const order = Number.isFinite(char.vampireOrder)
       ? t("skillTree.shrimpNumber", { number: char.vampireOrder }) : t("skillTree.shrimp");
     owner.textContent = order;
@@ -273,6 +306,15 @@ export function initSkillTreePanel({ getCharacter, getCharacters, onChange, onOp
         button.classList.toggle("locked", (trait && !!char.zombieTrait && !learnedTrait) || (trait && !skill.zombie.implemented));
         const cost = trait ? ` | ${t("skillTree.choiceCost", { cost: ZOMBIE_TRAIT_COST })}` : "";
         button.title = `${skillName(skill)} | ${current}p${cost} | ${skillEffect(skill)}`;
+        button.setAttribute("aria-label", button.title);
+      } else if (skill.active) {
+        const current = backflipUpgradePoints(char, skill.active.key);
+        const countEl = button.querySelector(".skill-node-count");
+        if (countEl) countEl.textContent = String(current);
+        button.disabled = false;
+        button.classList.toggle("invested", current > 0);
+        button.classList.remove("locked");
+        button.title = `${skillName(skill)} | ${current}p | ${skillEffect(skill)}`;
         button.setAttribute("aria-label", button.title);
       } else {
         button.disabled = true;

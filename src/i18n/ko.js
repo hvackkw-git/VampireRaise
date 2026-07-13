@@ -10,7 +10,7 @@ export default {
   },
   info: {
     attack: "공격력", emptySlot: "빈 슬롯", noEquippedSkills: "장착 스킬 없음",
-    noVampShrimp: "— Vamp Shrimp 없음 —", dash: "혈귀 돌진",
+    noVampShrimp: "— Vamp Shrimp 없음 —", dash: "혈귀 돌진", backflip: "핏빛 가시 백플립",
     vampShrimp: "Vamp Shrimp", holyShrimp: "Holy Shrimp", jombieShrimp: "Jombie Shrimp",
     numberedVamp: "{number}번 Vamp Shrimp", order: "{number}번 ",
     reviveIn: "{number}번 Vamp Shrimp · 부활까지 {secs}초",
@@ -86,6 +86,14 @@ export default {
     zombieSwarmName: "Jombie Shrimp · 군집", zombieSwarmEffect: "Jombie Shrimp가 함께 몰려드는 능력 (준비 중)",
     zombieInfectName: "Jombie Shrimp · 감염", zombieInfectEffect: "Jombie Shrimp가 처치에 기여하는 효과 (준비 중)",
     zombieMasteryName: "Jombie Shrimp 숙련", zombieMasteryEffect: "Jombie Shrimp 계열 종합 강화 (준비 중)",
+    backflipRedName: "빨강 · 피흡", backflipRedEffect: "백플립 피해의 8%씩 체력 회복",
+    backflipOrangeName: "주황 · 절단력", backflipOrangeEffect: "백플립 피해량 +20%씩",
+    backflipYellowName: "노랑 · 가시 증식", backflipYellowEffect: "회전 가시 +2개씩",
+    backflipGreenName: "초록 · 재정비", backflipGreenEffect: "백플립 쿨타임 -10%씩 (최소 2초)",
+    backflipBlueName: "파랑 · 경직", backflipBlueEffect: "적중 대상 스턴 +0.25초씩",
+    backflipPurpleName: "보라 · 혈갑", backflipPurpleEffect: "시전 시 최대 체력의 10% 실드씩",
+    backflipWhiteName: "하양 · 잔향", backflipWhiteEffect: "피해의 25% 추가타씩",
+    backflipMasteryName: "가시 숙련 · 처형", backflipMasteryEffect: "체력 30% 이하 적에게 피해 +20%씩",
     emptyName: "빈 슬롯 {number}",
   },
 };

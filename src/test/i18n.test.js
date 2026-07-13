@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { getLocale, setLocale, t } from "../i18n/index.js";
 import { PLATFORM_BLOCK_TYPES } from "../platform/platformBlockRenderer.js";
-import { DASH_SKILL_DEFS, DETECT_SKILL_DEF, ZOMBIE_SKILL_DEFS } from "../skills/skillTree.js";
+import {
+  BACKFLIP_SKILL_DEFS, DASH_SKILL_DEFS, DETECT_SKILL_DEF, ZOMBIE_SKILL_DEFS,
+} from "../skills/skillTree.js";
 
 afterEach(() => setLocale("en"));
 
@@ -33,7 +35,7 @@ describe("i18n", () => {
   });
 
   it("has localized names and effects for every skill", () => {
-    const defs = [...DASH_SKILL_DEFS, DETECT_SKILL_DEF, ...ZOMBIE_SKILL_DEFS];
+    const defs = [...DASH_SKILL_DEFS, DETECT_SKILL_DEF, ...ZOMBIE_SKILL_DEFS, ...BACKFLIP_SKILL_DEFS];
     for (const locale of ["en", "ko"]) {
       setLocale(locale);
       for (const def of defs) {

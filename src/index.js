@@ -31,6 +31,9 @@ import { initStatPanel } from "./ui/statPanel.js";
 import { initHud } from "./ui/hud.js";
 import { applyDocumentTranslations, getLocale, setLocale, t } from "./i18n/index.js";
 import { effectiveMpRegen } from "./stats/characterStats.js";
+import {
+  activateBackflip, BACKFLIP_SKILL_KEY, tickBackflipSkills,
+} from "./skills/backflip.js";
 
 applyDocumentTranslations();
 
@@ -140,6 +143,11 @@ const infoPanel = initInfoPanel({
   },
   onSelectVampire: (id) => {
     ui.selectedCharId = id;
+    updatePanel();
+  },
+  onActivateSkill: (id, skillKey) => {
+    const char = state.chars.items.find((candidate) => candidate.id === id);
+    if (skillKey !== BACKFLIP_SKILL_KEY || !activateBackflip(char)) return;
     updatePanel();
   },
 });
@@ -278,7 +286,8 @@ function frame(nowMs) {
   });
   tickPistons(platforms, signals.powered, yBounds);
 
-  // 2) 감지·핑 추적(1초 갱신) → 캐릭터 물리
+  // 2) 액티브 스킬 → 감지·핑 추적(1초 갱신) → 캐릭터 물리
+  const activeSkillEvents = tickBackflipSkills(state, simDt, nowMs);
   const dashEvents = tickAggro(state, simDt, Math.random, signals.powered, nowMs);
   const ctx = { platforms, blockPowered: signals.powered, now: nowMs, rng: Math.random };
   for (const c of chars) {
@@ -292,7 +301,7 @@ function frame(nowMs) {
   // 3) 투사체 → 전투·전염 → 4) 웨이브
   const projectileEvents = tickHumanProjectiles(state, simDt);
   const combatEvents = tickCombat(state, simDt);
-  renderCombatEvents([...dashEvents, ...projectileEvents, ...combatEvents]);
+  renderCombatEvents([...activeSkillEvents, ...dashEvents, ...projectileEvents, ...combatEvents]);
   const waveEvents = tickWaves(state, simDt, Math.random, signals.powered);
   for (const ev of waveEvents) {
     if (ev.type === "clear") showToast(t("events.waveClear", { reward: ev.reward }));

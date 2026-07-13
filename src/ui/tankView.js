@@ -13,6 +13,7 @@ import {
 import { t } from "../i18n/index.js";
 import { DASH_COLOR_HEX, effectiveDetectRange } from "../skills/dashColors.js";
 import { auraTierForLevel, auraStyleForTier } from "../skills/shrimpAura.js";
+import { BACKFLIP_DURATION_S } from "../skills/backflip.js";
 
 const blockEls = new Map(); // platId → { el, img, lastSrc, lastRot }
 const charEls = new Map();  // charId → { el, sprite, hpFill, lastSide }
@@ -45,6 +46,17 @@ function swingAngle(c) {
 }
 
 export function spriteAttackTransform(c) {
+  if (c.state === "BACKFLIP") {
+    const progress = clamp((Number(c._backflipT) || 0) / BACKFLIP_DURATION_S, 0, 1);
+    const eased = progress < 0.5
+      ? 2 * progress * progress
+      : 1 - 2 * (1 - progress) * (1 - progress);
+    // Shrimprium처럼 바라보는 방향 기준으로 항상 뒤쪽 회전: 오른쪽은 +360, 왼쪽은 -360.
+    const angle = 360 * (c.dir > 0 ? 1 : -1) * eased;
+    const hop = Math.sin(progress * Math.PI) * 10;
+    const flip = c.dir > 0 ? " scaleX(-1)" : "";
+    return `translateY(${-hop}px) rotate(${angle}deg)${flip}`;
+  }
   const ang = swingAngle(c);
   const signedAng = c.dir > 0 ? -ang : ang;
   const rotate = `rotate(${signedAng}deg)`;
@@ -321,8 +333,8 @@ export function renderChars(state, nowMs, ui) {
     }
     // FIGHT/DASH는 빠르게 프레임을 돌려 몸싸움·질주 느낌을 낸다
     const moving = Math.abs(c.vx) > 1 || c.state === "CRAWL" || c.state === "JUMP"
-      || c.state === "FIGHT" || c.state === "DASH";
-    const fast = c.state === "FIGHT" || c.state === "DASH";
+      || c.state === "FIGHT" || c.state === "DASH" || c.state === "BACKFLIP";
+    const fast = c.state === "FIGHT" || c.state === "DASH" || c.state === "BACKFLIP";
     // 캐릭터별 걷기 위상 오프셋: 겹쳐 있어도 다리 프레임이 서로 어긋나 "여러 마리"로
     // 읽히게 한다(전원 같은 프레임이면 겹쳤을 때 한 마리처럼 보임). c.id로 고정.
     const phase = ((c.id % cfg.frames) + cfg.frames) % cfg.frames;
@@ -483,7 +495,19 @@ export function formatDamage(value) {
 
 export function renderCombatEvents(events) {
   for (const ev of events) {
-    if (ev.type === "hit" || ev.type === "projectileHit") {
+    if (ev.type === "backflipSpike") {
+      spawnBackflipSpike(ev.x, ev.y, ev.angleDeg, ev.index);
+    } else if (ev.type === "backflipBurst") {
+      const v = visualBounds(ev.char);
+      spawnBackflipRing(v.x, v.y, ev.radius);
+    } else if (ev.type === "backflipLifesteal") {
+      const v = visualBounds(ev.char);
+      spawnFloatText(v.x - 6, v.top - 14, `+${formatDamage(ev.amount)}`, "fx-infect");
+    } else if (ev.type === "backflipStun") {
+      const v = visualBounds(ev.target);
+      spawnDashFx(v.x, v.y, "fx-stunburst", "✦");
+      spawnFloatText(ev.target.x, v.top - 16, "STUN!", "fx-stun");
+    } else if (ev.type === "hit" || ev.type === "projectileHit") {
       const v = visualBounds(ev.target);
       spawnFloatText(v.x - 6, v.top - 8, `-${formatDamage(ev.dmg)}`);
     } else if (ev.type === "levelup") {
@@ -529,6 +553,27 @@ export function renderCombatEvents(events) {
       spawnFloatText(v.x - 6, v.top - 8, `-${formatDamage(ev.dmg)}`, "fx-poison");
     }
   }
+}
+
+function spawnBackflipSpike(x, y, angleDeg, index) {
+  const spike = document.createElement("span");
+  spike.className = "fx-backflip-spike";
+  spike.style.left = `${x}px`;
+  spike.style.top = `${y}px`;
+  spike.style.setProperty("--spike-angle", `${angleDeg}deg`);
+  spike.style.setProperty("--spike-delay", `${(index % 3) * 12}ms`);
+  layerFx.appendChild(spike);
+  spike.addEventListener("animationend", () => spike.remove());
+}
+
+function spawnBackflipRing(x, y, radius) {
+  const ring = document.createElement("span");
+  ring.className = "fx-backflip-ring";
+  ring.style.left = `${x}px`;
+  ring.style.top = `${y}px`;
+  ring.style.setProperty("--backflip-radius", `${radius}px`);
+  layerFx.appendChild(ring);
+  ring.addEventListener("animationend", () => ring.remove());
 }
 
 /** 중심 좌표에 잠깐 나타났다 사라지는 화려한 FX 조각 */
