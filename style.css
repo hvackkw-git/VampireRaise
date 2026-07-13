@@ -1384,6 +1384,25 @@ button,
 .skill-tree-detail-title {
   color: #f0d47a;
 }
+.skill-tree-detail-separator {
+  color: #66757b;
+}
+.skill-tree-detail-label {
+  color: #879aa1;
+}
+.skill-tree-detail-label.next {
+  color: #7fd8be;
+}
+.skill-tree-detail-value {
+  color: #e7d29a;
+  font-weight: 700;
+}
+.skill-tree-detail-value.next {
+  color: #7fd8be;
+}
+.skill-tree-detail-value.cost {
+  color: #e7b35f;
+}
 .skill-tree-level-up {
   flex: 0 0 62px;
   width: 62px;
