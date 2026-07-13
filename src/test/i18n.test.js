@@ -42,4 +42,13 @@ describe("i18n", () => {
       }
     }
   });
+
+  it("has localized stat panel labels", () => {
+    for (const locale of ["en", "ko"]) {
+      setLocale(locale);
+      for (const key of ["strength", "agility", "intelligence", "strengthEffect", "agilityEffect", "intelligenceEffect"]) {
+        expect(t(`statPanel.${key}`)).not.toBe(`statPanel.${key}`);
+      }
+    }
+  });
 });

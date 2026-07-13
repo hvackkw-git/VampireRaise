@@ -134,11 +134,55 @@
                   <button id="btnStat" class="hotkey-slot assigned stat-hotkey" title="Stats" aria-label="Stats" data-i18n-title="controls.stats" data-i18n-aria-label="controls.stats"><span class="hotkey-glyph">STAT</span></button>
                   <button id="btnSkillTree" class="hotkey-slot assigned skill-hotkey" title="Skill Tree" aria-label="Skill Tree" data-i18n-title="controls.skillTree" data-i18n-aria-label="controls.skillTree"><span class="hotkey-glyph">SKILL</span></button>
                 </div>
-                <div id="versionBadge">v0006</div>
+                <div id="versionBadge">v0007</div>
               </div>
             </div>
           </section>
         </div>
+
+        <section id="statPanel" class="stat-panel hidden" aria-label="Stats" data-i18n-aria-label="controls.stats">
+          <header class="stat-panel-header">
+            <div class="stat-panel-heading">
+              <h2 data-i18n="statPanel.title">Stats</h2>
+              <span id="statPanelOwner">—</span>
+            </div>
+            <div class="stat-panel-level">LV <strong id="statPanelLevel">1</strong></div>
+            <div class="stat-panel-points">AP <strong id="statPanelPoints">0</strong></div>
+            <button id="btnStatPanelClose" class="stat-panel-close" type="button" aria-label="Close Stats" title="Close" data-i18n-aria-label="controls.closeStats" data-i18n-title="controls.close">×</button>
+          </header>
+          <div class="stat-attribute-list">
+            <section class="stat-attribute stat-strength" data-stat-key="str">
+              <div class="stat-attribute-copy"><h3 class="stat-attribute-name">Strength</h3><p class="stat-attribute-effect"></p></div>
+              <strong class="stat-attribute-value">0</strong>
+              <button class="stat-invest-btn" type="button">+</button>
+            </section>
+            <section class="stat-attribute stat-agility" data-stat-key="agi">
+              <div class="stat-attribute-copy"><h3 class="stat-attribute-name">Agility</h3><p class="stat-attribute-effect"></p></div>
+              <strong class="stat-attribute-value">0</strong>
+              <button class="stat-invest-btn" type="button">+</button>
+            </section>
+            <section class="stat-attribute stat-intelligence" data-stat-key="int">
+              <div class="stat-attribute-copy"><h3 class="stat-attribute-name">Intelligence</h3><p class="stat-attribute-effect"></p></div>
+              <strong class="stat-attribute-value">0</strong>
+              <button class="stat-invest-btn" type="button">+</button>
+            </section>
+          </div>
+          <section class="stat-summary" aria-label="Current combat stats" data-i18n-aria-label="statPanel.summary">
+            <h3 data-i18n="statPanel.summary">Current combat stats</h3>
+            <div class="stat-summary-grid">
+              <div><span>HP</span><strong id="statSummary-hp">0</strong></div>
+              <div><span>ATK</span><strong id="statSummary-atk">0</strong></div>
+              <div><span>ARM</span><strong id="statSummary-armor">0</strong></div>
+              <div><span>ATK SPD</span><strong id="statSummary-attackSpeed">×1.00</strong></div>
+              <div><span>MOVE</span><strong id="statSummary-moveSpeed">0</strong></div>
+              <div><span>DASH</span><strong id="statSummary-dashSpeed">0</strong></div>
+              <div><span>DETECT</span><strong id="statSummary-detect">0</strong></div>
+              <div><span>MP</span><strong id="statSummary-mp">0</strong></div>
+              <div><span>MP REG</span><strong id="statSummary-regen">0/s</strong></div>
+              <div><span>MAG</span><strong id="statSummary-magicAtk">0</strong></div>
+            </div>
+          </section>
+        </section>
 
         <section id="skillTreePanel" class="skill-tree-panel hidden" aria-label="Skill Tree" data-i18n-aria-label="controls.skillTree">
           <header class="skill-tree-header">

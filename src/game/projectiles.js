@@ -11,6 +11,7 @@ import {
 import { aliveChars, findNearestEnemy, resetSwing } from "./combat.js";
 import { requestRangedDash } from "./ai.js";
 import { absorbWithShield } from "./dashEffects.js";
+import { mitigateDamage } from "../stats/characterStats.js";
 
 const centerOf = (c) => ({ x: c.x + c.w / 2, y: c.y + c.h / 2 });
 
@@ -100,7 +101,7 @@ export function tickHumanProjectiles(state, simDt) {
     }
     if (!hit) { kept.push(p); continue; }
     // 보라=실드: 원거리 피해도 실드가 먼저 흡수한다.
-    const { dealt, absorbed } = absorbWithShield(hit, p.damage);
+    const { dealt, absorbed } = absorbWithShield(hit, mitigateDamage(hit, p.damage));
     hit.hp -= dealt;
     const attacker = byId.get(p.attackerId) ?? null;
     // 빨강=복수: 원거리 피격도 '피격'이므로 복수 버프를 예약한다.

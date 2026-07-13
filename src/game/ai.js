@@ -26,6 +26,7 @@ import {
   isEnemySide,
 } from "../constants.js";
 import { dashCdManaMult } from "../skills/dashColors.js";
+import { effectiveDashSpeed } from "../stats/characterStats.js";
 
 /** Holy Shrimp가 행군하는 베이스(Vamp Shrimp 스폰 존) 중심 x */
 const BASE_GOAL_X = VAMPIRE_SPAWN_ZONE.x + VAMPIRE_SPAWN_ZONE.w / 2;
@@ -112,7 +113,7 @@ function beginDash(c, found) {
   // (점프 돌진의 좌표보정 leg까지 포함한 c._dashRoute 전체 길이 — 예산 판정용 route.dist와 다르다)
   // 타임아웃은 이 시간에 비례시킨다. 예전엔 DASH_MAX_S(1.5s) 고정이라 인식범위·주황 투자로
   // 예산이 390px(260px/s × 1.5s)를 넘는 긴 돌진이 중간에 타임아웃 → 그 자리에서 뚝 떨어졌다.
-  const durS = dashPathLength(c._dashRoute) / DASH_SPD;
+  const durS = dashPathLength(c._dashRoute) / effectiveDashSpeed(c, DASH_SPD);
   c._dashTimeLeft = Math.max(DASH_MAX_S, durS * 1.5 + 0.3);
   c._platformId = null;
   c._jumpApexY = null; // 점프 중 돌진 진입 시 잔여 점프 상태 정리
@@ -584,8 +585,9 @@ export function tickAggro(state, simDt, rng = Math.random, blockPowered = null, 
       c._dashRouteIndex = i;
       const d = Math.hypot(wp.x - cx, wp.y - cy);
       if (d <= 0.001) { c.vx = 0; c.vy = 0; continue; }
-      c.vx = ((wp.x - cx) / d) * DASH_SPD;
-      c.vy = ((wp.y - cy) / d) * DASH_SPD;
+      const dashSpeed = effectiveDashSpeed(c, DASH_SPD);
+      c.vx = ((wp.x - cx) / d) * dashSpeed;
+      c.vy = ((wp.y - cy) / d) * dashSpeed;
       c.dir = wp.x >= cx ? 1 : -1;
       continue;
     }

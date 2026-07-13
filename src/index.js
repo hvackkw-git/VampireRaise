@@ -10,7 +10,7 @@ import {
 import {
   tickTimers, tickRepeaters, tickGates, tickSensors, tickPistons,
 } from "./platform/logicBlocks.js";
-import { TANK_W, TANK_H, MP_REGEN_PER_S, VAMPIRE_SPAWN_ZONE } from "./constants.js";
+import { TANK_W, TANK_H, VAMPIRE_SPAWN_ZONE } from "./constants.js";
 import { createInitialState } from "./state/gameState.js";
 import { loadState, saveState } from "./state/saveLoad.js";
 import { initStorageAdapter, localStorageImpl } from "./storage/storageAdapter.js";
@@ -27,8 +27,10 @@ import {
 import { createDecorateMode } from "./decorate/decorateMode.js";
 import { initInfoPanel, renderInfoPanel, renderSquadPanel } from "./ui/infoPanel.js";
 import { initSkillTreePanel } from "./ui/skillTreePanel.js";
+import { initStatPanel } from "./ui/statPanel.js";
 import { initHud } from "./ui/hud.js";
 import { applyDocumentTranslations, getLocale, setLocale, t } from "./i18n/index.js";
+import { effectiveMpRegen } from "./stats/characterStats.js";
 
 applyDocumentTranslations();
 
@@ -72,6 +74,7 @@ function updatePanel() {
     renderSquadPanel(vampires, state.account);
   }
   skillTreePanel?.render();
+  statPanel?.render();
 }
 
 initTankView();
@@ -107,6 +110,8 @@ btnAllVampireLevelUp.addEventListener("click", () => {
   for (const char of state.chars.items) {
     if (char.side !== "vampire" || char.level >= 50) continue;
     char.level = Math.min(50, Math.max(1, Number(char.level) || 1) + 1);
+    char.skillPoints = Math.max(0, Number(char.skillPoints) || 0) + 1;
+    char.statPoints = Math.max(0, Number(char.statPoints) || 0) + 1;
     changed++;
   }
   if (changed === 0) {
@@ -121,9 +126,16 @@ btnAllVampireLevelUp.addEventListener("click", () => {
 let hud = null;
 const decorate = createDecorateMode(state, ui, { onExit: () => hud?.render() });
 let skillTreePanel = null;
+let statPanel = null;
 const infoPanel = initInfoPanel({
+  onStats: () => {
+    if (decorate.active) decorate.exit();
+    skillTreePanel?.close();
+    statPanel?.toggle();
+  },
   onSkillTree: () => {
     if (decorate.active) decorate.exit();
+    statPanel?.close();
     skillTreePanel?.toggle();
   },
   onSelectVampire: (id) => {
@@ -143,9 +155,21 @@ skillTreePanel = initSkillTreePanel({
     infoPanel.setSkillTreeOpen(open);
   },
 });
+statPanel = initStatPanel({
+  getCharacter: panelChar,
+  onChange: () => {
+    saveState(state);
+    updatePanel();
+  },
+  onOpenChange: (open) => {
+    ui.statPanelOpen = open;
+    infoPanel.setStatsOpen(open);
+  },
+});
 hud = initHud(state, {
   onDecorate: () => {
     skillTreePanel.close();
+    statPanel.close();
     if (decorate.active) {
       decorate.exit();
     } else {
@@ -163,6 +187,7 @@ hud = initHud(state, {
   },
   onReset: () => {
     skillTreePanel.close();
+    statPanel.close();
     if (decorate.active) decorate.exit();
     ui.selectedCharId = null;
     ui.selectedBlockId = null;
@@ -259,7 +284,7 @@ function frame(nowMs) {
   for (const c of chars) {
     tickCharacter(c, ctx, simDt);
     // MP 자연 재생 (돌진 등 스킬 사용으로 소모)
-    if (c.maxMp) c.mp = Math.min(c.maxMp, (c.mp ?? c.maxMp) + MP_REGEN_PER_S * simDt);
+    if (c.maxMp) c.mp = Math.min(c.maxMp, (c.mp ?? c.maxMp) + effectiveMpRegen(c) * simDt);
   }
   // 같은 편 걷는 새우들이 완전히 포개져 한 마리처럼 보이지 않도록 수평 분리
   tickSeparation(chars, simDt);

@@ -121,6 +121,16 @@ export function createCharacter(state, side, opts = {}) {
     skillPoints: side === "vampire"
       ? Math.max(0, Number(opts.skillPoints ?? ((opts.level ?? 1) - 1)) || 0)
       : 0,
+    statPoints: side === "vampire"
+      ? Math.max(0, Math.floor(Number(opts.statPoints ?? ((opts.level ?? 1) - 1)) || 0))
+      : 0,
+    stats: side === "vampire"
+      ? {
+          str: Math.max(0, Math.floor(Number(opts.stats?.str) || 0)),
+          agi: Math.max(0, Math.floor(Number(opts.stats?.agi) || 0)),
+          int: Math.max(0, Math.floor(Number(opts.stats?.int) || 0)),
+        }
+      : { str: 0, agi: 0, int: 0 },
     learnedSkills: side === "vampire" && Array.isArray(opts.learnedSkills)
       ? [...opts.learnedSkills]
       : [],
@@ -205,6 +215,7 @@ export function toSaveData(state) {
           ownerVampireId: c.ownerVampireId, vampireOrder: c.vampireOrder,
           job: c.job, skills: c.skills,
           skillPoints: c.skillPoints, learnedSkills: c.learnedSkills,
+          statPoints: c.statPoints, stats: c.stats,
           dashColors: c.dashColors, detectPoints: c.detectPoints,
           dashCdManaPoints: c.dashCdManaPoints,
           zombieHpPoints: c.zombieHpPoints,
@@ -261,6 +272,8 @@ export function fromSaveData(data) {
       maxMp: rec.maxMp, mp: rec.mp,
       ownerVampireId: rec.ownerVampireId, vampireOrder: rec.vampireOrder,
       skillPoints: rec.skillPoints ?? Math.max(0, (Number(rec.level) || 1) - 1),
+      statPoints: rec.statPoints ?? Math.max(0, (Number(rec.level) || 1) - 1),
+      stats: rec.stats,
       learnedSkills: rec.learnedSkills,
       dashColors: rec.dashColors,
       detectPoints: rec.detectPoints,

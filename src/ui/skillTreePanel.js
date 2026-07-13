@@ -59,6 +59,8 @@ export function initSkillTreePanel({ getCharacter, getCharacters, onChange, onOp
     const char = getCharacter?.();
     if (!char || char.level >= 50) return;
     char.level = Math.min(50, Math.max(1, Number(char.level) || 1) + 1);
+    char.skillPoints = Math.max(0, Number(char.skillPoints) || 0) + 1;
+    char.statPoints = Math.max(0, Number(char.statPoints) || 0) + 1;
     onChange?.(char);
     render();
   });

@@ -7,7 +7,7 @@ export default {
     levelAll: "Level up all Vamp Shrimp by 1", logicLayer: "Logic layer", done: "Done",
     skillTree: "Skill Tree", stats: "Stats", startWave: "Start wave", autoWave: "Auto wave",
     rebirth: "Rebirth", decorate: "Decorate", reset: "Restart from scratch",
-    closeSkillTree: "Close Skill Tree", close: "Close", dashSummary: "Dash skill summary",
+    closeSkillTree: "Close Skill Tree", closeStats: "Close Stats", close: "Close", dashSummary: "Dash skill summary",
     testLevelUp: "Test level +1", switchKorean: "Switch to Korean", switchEnglish: "Switch to English",
   },
   info: {
@@ -63,6 +63,14 @@ export default {
     reset: "Reset", investHint: "Select a slot to invest", noShrimp: "No shrimp selected",
     unavailable: "Skill Tree unavailable", shrimpNumber: "Shrimp #{number}", shrimp: "Shrimp",
     current: "Current", choiceCost: "Cost {cost} SP · Choose 1 of 2–4", choice: "{cost} SP · Choose 1", emptySlot: "Empty slot",
+  },
+  statPanel: {
+    title: "Stats", noShrimp: "No shrimp selected", shrimpNumber: "Shrimp #{number}", shrimp: "Shrimp",
+    strength: "Strength", agility: "Agility", intelligence: "Intelligence",
+    strengthEffect: "+8 HP · +1 ATK · +1 ARM per point",
+    agilityEffect: "+2% attack/move/dash speed · +3 detection range per point",
+    intelligenceEffect: "+6 MP · +0.25 MP regen · +1 magic ATK per point",
+    invest: "Invest in {stat}", summary: "Current combat stats",
   },
   skills: {
     redName: "Red · Revenge", redEffect: "Next attack gains ×1.1 per point after taking damage (Active)",

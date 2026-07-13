@@ -15,15 +15,18 @@ import {
   STUN_DURATION_MS, CONVEYOR_PUSH_SPD, SLIDE_SPD, WARP_COOLDOWN_MS,
   HUMAN_RANGED_BRACE_SPEED_MULT,
 } from "../constants.js";
+import { effectiveMoveSpeed } from "../stats/characterStats.js";
 
 const HOLY_OBSTACLE_DROP_DELAY_MS = 5000;
+const FIGHT_APPROACH_SPEED_MULT = 0.5;
 
 /**
  * 현재 걷기 속도. Holy Shrimp는 원거리 사거리 안에 적이 들어오면(_rangedBraced) 자세를 잡느라
  * 이속이 1/4로 줄어든다 — ai.tickAggro가 매 프레임 _rangedBraced를 갱신한다.
  */
 function crawlSpeed(c) {
-  return c._rangedBraced ? CRAWL_SPD * HUMAN_RANGED_BRACE_SPEED_MULT : CRAWL_SPD;
+  const speed = effectiveMoveSpeed(c, CRAWL_SPD);
+  return c._rangedBraced ? speed * HUMAN_RANGED_BRACE_SPEED_MULT : speed;
 }
 
 /**
@@ -304,7 +307,12 @@ export function tickCharacter(c, ctx, simDt) {
       c.state = "FALL";
     } else {
       c.y = effectiveGroundY; c.vy = 0;
-      // FIGHT는 전투 틱이 해제할 때까지 그 자리에서 마주보고 유지한다.
+      // 거리 부족으로 slam이 빗나간 Vamp Shrimp만 안전 사거리까지 짧게 전진한다.
+      if (c.side === "vampire" && c._fightClosing && c._fightAdvanceLeft > 0) {
+        const approachSpeed = effectiveMoveSpeed(c, CRAWL_SPD) * FIGHT_APPROACH_SPEED_MULT;
+        const boundedSpeed = Math.min(approachSpeed, c._fightAdvanceLeft / Math.max(simDt, 1e-6));
+        c.vx = c.dir * boundedSpeed;
+      }
     }
   }
 

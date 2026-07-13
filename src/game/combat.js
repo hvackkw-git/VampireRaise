@@ -12,6 +12,7 @@ import {
 } from "../constants.js";
 import { revengeAttackMult, multiHitChance } from "../skills/dashColors.js";
 import { hasZombieTrait, zombieHpBonus } from "../skills/zombieSkills.js";
+import { effectiveAttackCooldown, mitigateDamage } from "../stats/characterStats.js";
 import { absorbWithShield } from "./dashEffects.js";
 
 export const ZOMBIE_POISON_RADIUS = 46;
@@ -36,6 +37,17 @@ function isInSlamArea(a, t) {
   const tx = t.x + t.w / 2, ty = t.y + t.h / 2;
   const dxFront = (tx - ax) * a.dir;
   return dxFront > -a.w / 2 && dxFront <= SLAM_REACH && Math.abs(ty - ay) <= SLAM_MAX_DY;
+}
+
+const SLAM_APPROACH_BUFFER = 2;
+
+/** 같은 높이의 대상이 slam 사거리 밖에 있을 때 안전 사거리까지 남은 전진 거리. */
+function slamApproachDistance(a, t) {
+  const ax = a.x + a.w / 2, ay = a.y + a.h / 2;
+  const tx = t.x + t.w / 2, ty = t.y + t.h / 2;
+  const dxFront = (tx - ax) * a.dir;
+  if (Math.abs(ty - ay) > SLAM_MAX_DY || dxFront <= SLAM_REACH - SLAM_APPROACH_BUFFER) return 0;
+  return dxFront - (SLAM_REACH - SLAM_APPROACH_BUFFER);
 }
 
 /** 교전을 시작할 수 있는(지상에 서 있는) 상태 */
@@ -64,7 +76,10 @@ export function grantExp(c, amount, events) {
   while (c.exp >= expToNext(c.level)) {
     c.exp -= expToNext(c.level);
     c.level += 1;
-    if (c.side === "vampire") c.skillPoints = Math.max(0, Number(c.skillPoints) || 0) + 1;
+    if (c.side === "vampire") {
+      c.skillPoints = Math.max(0, Number(c.skillPoints) || 0) + 1;
+      c.statPoints = Math.max(0, Number(c.statPoints) || 0) + 1;
+    }
     c.maxHp += LEVELUP_HP_GAIN;
     c.atk += LEVELUP_ATK_GAIN;
     c.hp = c.maxHp;
@@ -208,6 +223,8 @@ function engage(c, target) {
   resetSwing(c);
   c.state = "FIGHT";
   c._fightTargetId = target.id;
+  c._fightClosing = false;
+  c._fightAdvanceLeft = 0;
   c._ping = null;
   c.vx = 0;
   c.dir = target.x + target.w / 2 >= c.x + c.w / 2 ? 1 : -1;
@@ -217,6 +234,8 @@ function engage(c, target) {
 function disengage(c) {
   if (c.state === "FIGHT") { c.state = "CRAWL"; c.timer = 0.3; }
   c._fightTargetId = null;
+  c._fightClosing = false;
+  c._fightAdvanceLeft = 0;
   resetSwing(c);
 }
 
@@ -270,17 +289,28 @@ export function tickCombat(state, simDt) {
     // 항상 대상을 마주본다
     c.dir = t.x + t.w / 2 >= c.x + c.w / 2 ? 1 : -1;
     if (c.side === "vampire") {
+      if (c._fightClosing && !c._swinging) {
+        const advanceLeft = slamApproachDistance(c, t);
+        if (advanceLeft > 0) {
+          c._fightAdvanceLeft = advanceLeft;
+          continue;
+        }
+        c._fightClosing = false;
+        c._fightAdvanceLeft = 0;
+      }
       if (c._atkCd <= 0 && !c._swinging) {
         c._swinging = true;
         c._swingT = 0;
         c._slamFired = false;
-        c._atkCd = ATTACK_COOLDOWN_S;
+        c._atkCd = effectiveAttackCooldown(c, ATTACK_COOLDOWN_S);
       }
       if (!c._swinging) continue;
       c._swingT = (Number(c._swingT) || 0) + simDt;
       const slamAt = ATTACK_RAISE_S + ATTACK_SLAM_S;
       if (c._swingT >= slamAt && !c._slamFired) {
         if (isInSlamArea(c, t)) {
+          c._fightClosing = false;
+          c._fightAdvanceLeft = 0;
           let dmg = c.atk;
           if (c._revengePending) {
             dmg = Math.round(dmg * revengeAttackMult(c.dashColors));
@@ -294,6 +324,11 @@ export function tickCombat(state, simDt) {
           }
           events.push({ type: "slam", attacker: c, target: t, hit: true });
         } else {
+          const advanceLeft = slamApproachDistance(c, t);
+          if (advanceLeft > 0) {
+            c._fightClosing = true;
+            c._fightAdvanceLeft = advanceLeft;
+          }
           events.push({ type: "slam", attacker: c, target: t, hit: false });
         }
         c._slamFired = true;
@@ -302,7 +337,7 @@ export function tickCombat(state, simDt) {
       continue;
     }
     if (c._atkCd > 0) continue;
-    c._atkCd = ATTACK_COOLDOWN_S;
+    c._atkCd = effectiveAttackCooldown(c, ATTACK_COOLDOWN_S);
     hitRecords.push({ attacker: c, target: t, dmg: c.atk });
   }
 
@@ -316,7 +351,8 @@ export function tickCombat(state, simDt) {
   for (const r of hitRecords) {
     if (r.attacker.dead || r.target.dead) continue;
     // 보라=실드: 대상이 실드를 두르고 있으면 피해를 먼저 흡수한다.
-    const { dealt, absorbed } = absorbWithShield(r.target, r.dmg);
+    const reducedDamage = mitigateDamage(r.target, r.dmg);
+    const { dealt, absorbed } = absorbWithShield(r.target, reducedDamage);
     const hpBefore = r.target.hp;
     r.target.hp -= dealt;
     if (dealt > 0 && hpBefore > 0 && r.target.hp <= 0 && !lethalAttackers.has(r.target)) {

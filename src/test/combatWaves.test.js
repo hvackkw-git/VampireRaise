@@ -5,6 +5,7 @@ import {
   tickCombat, grantExp, infectToSlave, explodeZombiePoison,
   ZOMBIE_POISON_MAX_STACKS,
 } from "../game/combat.js";
+import { tickCharacter } from "../engine/physics.js";
 import {
   startWave, tickWaves, vampireSideAlive, humansAlive, grantAccountExp, reviveVampires,
   vampireCount, canRebirth, rebirth, updateRebirthUnlock,
@@ -172,6 +173,38 @@ describe("전투와 전염", () => {
     expect(human.hp).toBe(100);
     expect(events.some((e) => e.type === "slam" && e.hit === false)).toBe(true);
     expect(events.some((e) => e.type === "hit" && e.attacker === vamp)).toBe(false);
+    expect(vamp._fightClosing).toBe(false); // 높이 차이는 수평 접근으로 해결하지 않는다.
+  });
+
+  it("거리 부족으로 slam이 빗나가면 가까이 붙은 뒤 다음 slam을 적중시킨다", () => {
+    const vamp = state.chars.items[0];
+    state.chars.items = [vamp];
+    state.platforms.items = [];
+    vamp.x = 100; vamp.y = FLOOR_Y - vamp.h; vamp.state = "CRAWL"; vamp._atkCd = 0;
+    const human = createCharacter(state, "human", {
+      x: 132, y: vamp.y, maxHp: 100, hp: 100, atk: 1,
+    });
+    human._atkCd = 999;
+
+    tickCombat(state, 0.016);
+    const missEvents = tickUntilSlam(state);
+    expect(human.hp).toBe(100);
+    expect(missEvents.some((e) => e.type === "slam" && e.hit === false)).toBe(true);
+    expect(vamp._fightClosing).toBe(true);
+
+    const ctx = { platforms: [], blockPowered: new Map(), now: 1000, rng: () => 0.5 };
+    const events = [];
+    for (let i = 0; i < 120 && human.hp === 100; i++) {
+      tickCharacter(vamp, ctx, 1 / 60);
+      tickCharacter(human, ctx, 1 / 60);
+      events.push(...tickCombat(state, 1 / 60));
+    }
+
+    const centerGap = (human.x + human.w / 2) - (vamp.x + vamp.w / 2);
+    expect(centerGap).toBeLessThanOrEqual(28.01);
+    expect(human.hp).toBeLessThan(100);
+    expect(events.some((e) => e.type === "slam" && e.hit === true)).toBe(true);
+    expect(vamp._fightClosing).toBe(false);
   });
 
   it("인간이 뱀파이어에게 막타를 맞으면 소유 노예로 전염된다", () => {

@@ -4,6 +4,7 @@
 // 순수 함수만 두어 테스트하기 쉽게 한다(뷰/상태 의존 없음).
 
 import { DETECT_RANGE, DASH_ROUTE_MULT } from "../constants.js";
+import { agilityDetectBonus } from "../stats/characterStats.js";
 
 /** 잔상 개수 스케일 기준이 되는 Vamp Shrimp 기본 인식 범위 */
 export const BASE_DETECT_RANGE = DETECT_RANGE.vampire;
@@ -24,7 +25,7 @@ export function effectiveDetectRange(char) {
   if (Number.isFinite(char?.detectRange)) return char.detectRange;
   const base = DETECT_RANGE[char?.side] ?? BASE_DETECT_RANGE;
   const pts = char?.side === "vampire" ? (char?.detectPoints || 0) : 0;
-  return base * detectRangeMult(pts);
+  return base * detectRangeMult(pts) + agilityDetectBonus(char);
 }
 //
 // ── Dash 색상 스킬 효과 카탈로그 (설계 노트 IMG_7727) ──

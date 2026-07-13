@@ -994,6 +994,175 @@ button,
 }
 #rebirthReq:empty { display: none; }
 
+/* ── 스탯 패널 ── */
+.stat-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 81;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 7px;
+  overflow: hidden;
+  background: #0e1114;
+  border: 2px solid #465258;
+}
+.stat-panel-header {
+  flex: 0 0 42px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 5px 4px 8px;
+  background: #192024;
+  border: 1px solid #465258;
+  border-radius: 5px;
+}
+.stat-panel-heading { flex: 1; min-width: 0; }
+.stat-panel-heading h2 {
+  margin: 0;
+  color: #f1e9d2;
+  font-size: 14px;
+  line-height: 17px;
+  letter-spacing: 0;
+}
+.stat-panel-heading span {
+  display: block;
+  overflow: hidden;
+  color: #8da0a6;
+  font-size: 8px;
+  line-height: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stat-panel-level,
+.stat-panel-points {
+  flex: 0 0 44px;
+  height: 27px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: 1px solid #536169;
+  border-radius: 4px;
+  background: #101619;
+  color: #809197;
+  font-size: 8px;
+}
+.stat-panel-level strong { color: #f1e9d2; font-size: 11px; }
+.stat-panel-points { border-color: #8b6b2a; color: #b59b55; }
+.stat-panel-points strong { color: #f0d47a; font-size: 13px; }
+.stat-panel-close {
+  flex: 0 0 27px;
+  width: 27px;
+  height: 27px;
+  padding: 0;
+  border: 1px solid #6d3d47;
+  border-radius: 4px;
+  background: #2c171c;
+  color: #e892a2;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+.stat-attribute-list {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 6px;
+}
+.stat-attribute {
+  --stat-accent: #c76f6f;
+  min-height: 82px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 38px 30px;
+  align-items: center;
+  gap: 7px;
+  padding: 9px;
+  border: 1px solid color-mix(in srgb, var(--stat-accent) 55%, #465258);
+  border-left: 4px solid var(--stat-accent);
+  border-radius: 5px;
+  background: #171d21;
+}
+.stat-agility { --stat-accent: #69b98a; }
+.stat-intelligence { --stat-accent: #65a9cf; }
+.stat-attribute-copy { min-width: 0; }
+.stat-attribute-name {
+  margin: 0 0 5px;
+  color: var(--stat-accent);
+  font-size: 13px;
+  line-height: 16px;
+  letter-spacing: 0;
+}
+.stat-attribute-effect {
+  margin: 0;
+  color: #aab7bb;
+  font-size: 9px;
+  line-height: 1.45;
+  letter-spacing: 0;
+}
+.stat-attribute-value {
+  color: #eef2f3;
+  font-size: 22px;
+  text-align: center;
+}
+.stat-invest-btn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--stat-accent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--stat-accent) 22%, #11171a);
+  color: #fff;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.stat-invest-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--stat-accent) 40%, #11171a);
+}
+.stat-invest-btn:disabled { opacity: 0.3; cursor: default; }
+.stat-summary {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 9px;
+  border: 1px solid #313c41;
+  border-radius: 5px;
+  background: #11171a;
+}
+.stat-summary h3 {
+  margin: 0 0 7px;
+  color: #bdc8cb;
+  font-size: 10px;
+  letter-spacing: 0;
+}
+.stat-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+.stat-summary-grid > div {
+  min-width: 0;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  padding: 0 7px;
+  border-bottom: 1px solid #2e393e;
+  background: #151c20;
+}
+.stat-summary-grid span {
+  color: #75878e;
+  font-size: 8px;
+  white-space: nowrap;
+}
+.stat-summary-grid strong {
+  overflow: hidden;
+  color: #dfe7e9;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ── 스킬 트리: 320×790 논리 화면 전체를 사용하는 세로 패널 ── */
 .skill-tree-panel {
   position: absolute;

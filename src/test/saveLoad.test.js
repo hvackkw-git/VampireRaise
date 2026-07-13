@@ -14,6 +14,8 @@ describe("saveLoad (storageAdapter 기반)", () => {
     state.blood = 42;
     state.wave.current = 7;
     state.account = { level: 3, exp: 10 };
+    state.chars.items[0].statPoints = 4;
+    state.chars.items[0].stats = { str: 2, agi: 1, int: 3 };
     expect(await saveState(state)).toBe(true);
 
     const restored = await loadState();
@@ -21,6 +23,8 @@ describe("saveLoad (storageAdapter 기반)", () => {
     expect(restored.wave.current).toBe(7);
     expect(restored.account).toEqual({ level: 3, exp: 10 });
     expect(restored.chars.items.length).toBe(state.chars.items.length);
+    expect(restored.chars.items[0].statPoints).toBe(4);
+    expect(restored.chars.items[0].stats).toEqual({ str: 2, agi: 1, int: 3 });
   });
 
   it("저장 시 _savedAt 메타데이터를 기록한다 (클라우드 충돌 해결용)", async () => {

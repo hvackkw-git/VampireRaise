@@ -7,6 +7,7 @@
 
 import { expToNext, accountExpToNext } from "../constants.js";
 import { getLocale, t } from "../i18n/index.js";
+import { effectiveArmor, effectiveMoveSpeed } from "../stats/characterStats.js";
 
 const SIDE_ICON = { vampire: "🦐", human: "🦐", slave: "🦐" };
 const SIDE_NAME_KEY = { vampire: "info.vampShrimp", human: "info.holyShrimp", slave: "info.jombieShrimp" };
@@ -22,7 +23,7 @@ let els = null;
 let lastSkillKey = null; // 장착 스킬 재구성 최소화용 캐시 키
 let onSelectVampireCb = null;
 
-export function initInfoPanel({ onSkillTree, onSelectVampire } = {}) {
+export function initInfoPanel({ onStats, onSkillTree, onSelectVampire } = {}) {
   const $ = (id) => document.getElementById(id);
   els = {
     panel: $("info-panel"),
@@ -40,6 +41,7 @@ export function initInfoPanel({ onSkillTree, onSelectVampire } = {}) {
     skillGrid: $("skillGrid"),
     skillName: $("skillName"),
     faceGrid: $("faceGrid"),
+    btnStat: $("btnStat"),
     btnSkillTree: $("btnSkillTree"),
   };
   onSelectVampireCb = onSelectVampire;
@@ -58,9 +60,14 @@ export function initInfoPanel({ onSkillTree, onSelectVampire } = {}) {
     els.faceGrid.appendChild(slot);
     return slot;
   });
+  els.btnStat.addEventListener("click", () => onStats?.());
   els.btnSkillTree.addEventListener("click", () => onSkillTree?.());
   lastSkillKey = null;
   return {
+    setStatsOpen(open) {
+      els.btnStat.classList.toggle("on", open);
+      els.btnStat.setAttribute("aria-pressed", String(open));
+    },
     setSkillTreeOpen(open) {
       els.btnSkillTree.classList.toggle("on", open);
       els.btnSkillTree.setAttribute("aria-pressed", String(open));
@@ -147,8 +154,8 @@ export function renderInfoPanel(char, account = null) {
   setBar(els.mpFill, els.mpNum, char.mp ?? 0, char.maxMp ?? 0);
   setBar(els.expFill, els.expNum, char.exp, expToNext(char.level));
   els.atk.textContent = stat3(char.atk);
-  els.arm.textContent = stat3(char.arm, char.armor);
-  els.spd.textContent = stat3(char.spd, char.speed);
+  els.arm.textContent = stat3(effectiveArmor(char));
+  els.spd.textContent = stat3(effectiveMoveSpeed(char));
   renderSkills(char);
 }
 

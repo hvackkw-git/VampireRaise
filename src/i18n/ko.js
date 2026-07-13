@@ -5,7 +5,7 @@ export default {
     levelAll: "Vamp Shrimp 전체 레벨 1 증가", logicLayer: "논리 레이어", done: "완료",
     skillTree: "스킬 트리", stats: "능력치", startWave: "웨이브 시작", autoWave: "자동 웨이브",
     rebirth: "재시작", decorate: "꾸미기", reset: "처음부터 재시작",
-    closeSkillTree: "스킬 트리 닫기", close: "닫기", dashSummary: "Dash 스킬 요약",
+    closeSkillTree: "스킬 트리 닫기", closeStats: "스탯 닫기", close: "닫기", dashSummary: "Dash 스킬 요약",
     testLevelUp: "테스트 레벨 +1", switchKorean: "한국어로 전환", switchEnglish: "영어로 전환",
   },
   info: {
@@ -58,6 +58,14 @@ export default {
     reset: "초기화", investHint: "슬롯을 눌러 투자", noShrimp: "선택된 새우 없음",
     unavailable: "스킬 트리 사용 불가", shrimpNumber: "{number}번 새우", shrimp: "새우",
     current: "현재", choiceCost: "비용 {cost}SP · 2~4 중 택1", choice: "{cost}SP · 택1", emptySlot: "빈 슬롯",
+  },
+  statPanel: {
+    title: "스탯", noShrimp: "선택한 새우 없음", shrimpNumber: "{number}번 새우", shrimp: "새우",
+    strength: "힘", agility: "민첩성", intelligence: "지능",
+    strengthEffect: "포인트당 체력 +8 · 공격력 +1 · 방어력 +1",
+    agilityEffect: "포인트당 공속/이속/대시 +2% · 감지범위 +3",
+    intelligenceEffect: "포인트당 마나 +6 · 마나회복 +0.25 · 마법공격력 +1",
+    invest: "{stat} 올리기", summary: "현재 전투 수치",
   },
   skills: {
     redName: "빨강 · 복수", redEffect: "피격 시 다음 공격력 ×1.1씩 (구현됨)",
