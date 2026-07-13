@@ -387,19 +387,24 @@ describe("웨이브", () => {
     expect(state.wave.pendingSpawns.every((spawn) => Number.isFinite(spawn.x))).toBe(true);
   });
 
-  it("인간 전멸 시 클리어: 보상 지급·웨이브 증가·죽은 뱀파이어 부활", () => {
+  it("인간 전멸 시 클리어: 보상 지급·웨이브 증가·베이스와 뱀파이어 체력 회복", () => {
     createCharacter(state, "vampire"); // 뱀파이어 진영이 전멸하지 않도록 한 마리 더 배치
     startWave(state);
     for (let t = 0; t < 12; t += 0.1) tickWaves(state, 0.1);
     // 인간 전멸 처리
     state.chars.items = state.chars.items.filter((c) => c.side !== "human");
+    state.core.hp = 1;
     state.chars.items[0].dead = true; // 죽은 뱀파이어 1
+    state.chars.items[1].hp = 1; // 살아있는 뱀파이어도 회복 대상
     const bloodBefore = state.blood;
     const events = tickWaves(state, 0.1);
     expect(events.some((e) => e.type === "clear")).toBe(true);
     expect(state.blood).toBeGreaterThan(bloodBefore);
     expect(state.wave.current).toBe(2);
+    expect(state.core.hp).toBe(state.core.max);
     expect(state.chars.items[0].dead).toBe(false); // 부활
+    expect(state.chars.items[0].hp).toBe(state.chars.items[0].maxHp);
+    expect(state.chars.items[1].hp).toBe(state.chars.items[1].maxHp);
   });
 
   it("뱀파이어 진영이 전멸해도 더 이상 웨이브가 끝나지 않는다 (베이스가 깨져야 리셋)", () => {
@@ -524,16 +529,16 @@ describe("재시작(Rebirth)", () => {
     expect(rebirth(state)).toBe(false);
   });
 
-  it("문턱 도달 후 게임오버로 웨이브가 1로 리셋돼도 재시작 활성이 유지된다", () => {
+  it("문턱 도달 후 게임오버로 이전 웨이브로 후퇴해도 재시작 활성이 유지된다", () => {
     // 문턱(웨이브 10) 도달 → 래치 켜짐
     state.wave.current = 10;
     updateRebirthUnlock(state);
     expect(state.wave.rebirthUnlocked).toBe(true);
     expect(canRebirth(state)).toBe(true);
 
-    // 다음 웨이브에서 죽음(게임오버) → 웨이브 1로 리셋됐다고 가정
-    state.wave.current = 1;
-    // 문턱 미달이지만 래치가 유지되어 여전히 재시작 가능
+    // 다음 웨이브에서 죽음(게임오버) → 이전 웨이브로 후퇴했다고 가정
+    state.wave.current = 9;
+    // 문턱 미달로 후퇴했지만 래치가 유지되어 여전히 재시작 가능
     expect(canRebirth(state)).toBe(true);
   });
 
