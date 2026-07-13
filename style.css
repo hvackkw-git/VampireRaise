@@ -1357,11 +1357,18 @@ button,
 /* Vamp Shrimp slam 공격 모션/FX */
 .char-sprite,
 .char-pattern {
-  transform-origin: 24px 100%;
+  transform-origin: 50% 100%;
 }
 .char.side-vampire .char-sprite,
 .char.side-vampire .char-pattern {
-  transform-origin: 24px 100%;
+  /*
+   * Keep the horizontal flip anchored to the sprite center.  The previous
+   * tail-side origin made scaleX(-1) translate the shrimp when it bounced and
+   * changed direction, so the body appeared to detach from its aura.  A bottom
+   * center pivot still makes the head lift upward for both facing directions
+   * because tankView applies opposite signed rotation per dir.
+   */
+  transform-origin: 50% 100%;
 }
 .fx-burst.fx-slam,
 .fx-burst.fx-slam-miss {
