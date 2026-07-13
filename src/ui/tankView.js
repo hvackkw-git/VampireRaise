@@ -44,6 +44,14 @@ function swingAngle(c) {
   return (1 - slamT) * ATTACK_RAISE_DEG;
 }
 
+export function spriteAttackTransform(c) {
+  const ang = swingAngle(c);
+  const signedAng = c.dir > 0 ? -ang : ang;
+  const rotate = `rotate(${signedAng}deg)`;
+  const flip = c.dir > 0 ? " scaleX(-1)" : "";
+  return `${rotate}${flip}`;
+}
+
 function charZIndex(c) {
   const yOrder = Math.max(0, Math.min(9999, Math.round(Number(c?.y) || 0)));
   return (c?.side === "vampire" ? 20000 : 10000) + yOrder;
@@ -329,10 +337,7 @@ export function renderChars(state, nowMs, ui) {
     entry.el.style.top = `${c.y}px`;
     entry.el.style.zIndex = String(charZIndex(c));
     // 스프라이트 기본 방향: 왼쪽 → 오른쪽 이동 시 좌우 반전. Vamp Shrimp는 slam 스윙 회전을 합성한다.
-    const ang = swingAngle(c);
-    const flip = c.dir > 0 ? "scaleX(-1) " : "";
-    const signedAng = c.dir > 0 ? -ang : ang;
-    entry.sprite.style.transform = `${flip}rotate(${signedAng}deg)`.trim();
+    entry.sprite.style.transform = spriteAttackTransform(c);
     entry.pattern.style.transform = entry.sprite.style.transform;
     entry.el.classList.toggle("stunned", c.state === "STUN");
     // 보라 실드 오라: 지속(_shieldT>0) 동안 표시, 남은 흡수량을 세기로 반영
