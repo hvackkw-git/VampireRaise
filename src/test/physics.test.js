@@ -1,6 +1,6 @@
 // 캐릭터 물리 테스트: 착지·이탈 낙하·측면 반전·스프링·워프·스턴
 import { describe, it, expect } from "vitest";
-import { tickCharacter, startJump, startDrop, tickSeparation } from "../engine/physics.js";
+import { tickCharacter, startJump, startDrop, startDiveDrop, tickSeparation } from "../engine/physics.js";
 import { FLOOR_Y, CHAR_SIZE, CHAR_SPRITES } from "../constants.js";
 import { CHAR_HITBOX_W } from "../platform/platformBlockRenderer.js";
 
@@ -235,7 +235,7 @@ describe("Holy Shrimp 이동 제한", () => {
     tickCharacter(c, ctx, 0);
     expect(c.state).toBe("FALL");
     expect(c._platformId).toBeNull();
-    expect(c._dropThroughId).toBe(current.id);
+    expect(c._diveDropMinLandY).toBeGreaterThan(0); // 다이브 드롭: 현재 줄 통과, 아래층부터 착지
 
     for (let t = 0; t < 2 && c._platformId == null; t += 1 / 60) {
       ctx.now += 1000 / 60;
@@ -280,9 +280,28 @@ describe("Holy Shrimp 이동 제한", () => {
     tickCharacter(c, ctx, 0);
 
     expect(c.state).toBe("FALL");
-    expect(c._dropThroughId).toBe(current.id);
+    expect(c._diveDropMinLandY).toBeGreaterThan(0); // 다이브 드롭으로 현재 발판을 뚫고 낙하
     expect(c._platformId).toBeNull();
     expect(c._obstacleDropAt).toBeNull();
+  });
+
+  it("다이브 드롭은 통짜(연속) 발판을 뚫고 아래층에 착지한다", () => {
+    // 같은 줄에 붙은 두 블록(연속) + 그 아래층 블록
+    const a = { id: 1, x: 100, y: 400, blockType: "platform_block" };
+    const b = { id: 2, x: 120, y: 400, blockType: "platform_block" };
+    const lower = { id: 3, x: 120, y: 470, blockType: "platform_block" };
+    const c = makeChar({ side: "vampire", x: 120, y: 400 - CHAR_SIZE, state: "CRAWL", _platformId: 2 });
+    const ctx = makeCtx([a, b, lower]);
+
+    startDiveDrop(c);
+    expect(c.state).toBe("FALL");
+    for (let t = 0; t < 2 && c._platformId == null; t += 1 / 60) {
+      ctx.now += 1000 / 60;
+      tickCharacter(c, ctx, 1 / 60);
+    }
+    // 일반 드롭이면 옆 블록(1)에 다시 얹히지만, 다이브 드롭은 그 줄을 통과해 아래층(3)에 안착.
+    expect(c._platformId).toBe(lower.id);
+    expect(c._diveDropMinLandY).toBeNull(); // 착지 시 해제
   });
 
   it("인간은 직접 점프와 스프링 도약을 하지 않는다", () => {
